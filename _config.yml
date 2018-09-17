@@ -9,7 +9,7 @@
 locale                   : "en"
 title                    : &toolkit "streamsx.sttgateway"
 title_separator          : "-"
-name                     : &name "Ronald Nordhausen" # &name is a YAML anchor which can be *referenced later
+name                     : &name "IBMStreams" # &name is a YAML anchor which can be *referenced later
 description              : &description "toolkit site description."
 url                      : https://ibmstreams.github.io # the base hostname & protocol for your site e.g. "https://mmistakes.github.io"
 baseurl                  : "/streamsx.sttgateway" # the subpath of your site, e.g. "/blog"
@@ -17,7 +17,7 @@ repository               : "IBMStreams/streamsx.sttgateway" # GitHub username/re
 github_base_url          : "https://github.com" # your github server, will differ when enterprise github
 github_editme_path       : https://github.com/IBMStreams/streamsx.sttgateway/blob/gh-pages
 spldoc_path              : &default_cta_url "/doc/spldoc/html"
-toolkit_excerpt          : &default_excerpt "This is the Speech-to-Text Gateway toolkit"
+toolkit_excerpt          : &default_excerpt "The STT Gateway Toolkit allows Streams applications to integrate with the Speech To Text service on the IBM Cloud (public and private)."
 teaser                   : # path of fallback teaser image, e.g. "/assets/images/500x300.png"
 # breadcrumbs            : false # true, false (default)
 words_per_minute         : 200

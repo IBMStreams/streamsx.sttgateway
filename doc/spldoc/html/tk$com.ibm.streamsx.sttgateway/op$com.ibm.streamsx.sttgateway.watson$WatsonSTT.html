@@ -1,0 +1,1492 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xml:lang="en-us" lang="en-us">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+<meta name="copyright" content="(C) Copyright 2005"/>
+<meta name="DC.rights.owner" content="(C) Copyright 2005"/>
+<meta name="DC.Type" content="reference"/>
+<meta name="DC.Title" content="Operator WatsonSTT"/>
+<meta name="DC.Format" content="XHTML"/>
+<meta name="DC.Identifier" content="spldoc_operator"/>
+<link rel="stylesheet" type="text/css" href="../../html/commonltr.css"/>
+<link rel="stylesheet" type="text/css" href="../../html/spldoc.css"/>
+<title>Operator WatsonSTT</title>
+</head>
+<body id="spldoc_operator">
+
+
+<h1 class="title topictitle1">Operator <tt class="ph tt">WatsonSTT</tt></h1>
+
+<div class="body refbody">
+<div class="section">
+<p class="p">
+<a class="xref" href="../toolkits/toolkits.html">Gateway to the IBM Speech To Text (STT) cloud service</a> &gt; <a class="xref" href="tk$com.ibm.streamsx.sttgateway.html">com.ibm.streamsx.sttgateway 1.0.0</a> &gt; <a class="xref" href="ns$com.ibm.streamsx.sttgateway.watson.html">com.ibm.streamsx.sttgateway.watson</a> &gt; WatsonSTT</p>
+
+</div>
+
+<div class="section splprimop">
+  <embed class="image" src="../../image/tk$com.ibm.streamsx.sttgateway/op$com.ibm.streamsx.sttgateway.watson$WatsonSTT.svg" width="872" height="112"/>
+</div>
+
+<div class="section">
+
+<p class="p">      The WatsonSTT operator is designed to ingest audio data in the form of a file (.wav, .mp3 etc.)       or RAW audio and then transcribe that audio into text via the        IBM Watson STT (Speech To Text) cloud service. It does that by sending the audio data        to the configured Watson STT service running in the IBM public cloud or in the        IBM Cloud Private (ICP) via the Websocket interface. It then outputs transcriptions of        speech in the form of utterances or in full text as configured. An utterance is a        group of transcribed words meant to approximate a sentence. Audio data must be in 16-bit        little endian, mono format. For the Telephony model and configurations, the audio must        have an 8 kHz sampling rate. For the Broadband model and configurations, the audio must        have a 16 kHz sampling rate. The data can be provided as a .wav file or as        RAW uncompressed PCM audio. Here is a sample ffmpeg command to convert a .wav file        to the correct telephony format (use -ar 16000 for broadband): 
+</p>
+
+<p class="p">      $ ffmpeg -i MyFile.wav -ac 1 -ar 8000 MyNewFile.wav
+</p>
+
+<p class="p">      This operator must be configured with a Websocket URL, a Watson STT authentication token and       a base language model (see in parameter section).       This operator may also be customized with many other optional parameters including        custom patch files and appropriate custom patch weights.
+</p>
+
+<div class="p">      Requirements: 
+<ul class="ul">
+<li class="li"> Intel RHEL6 or RHEL7 hosts installed with IBM Streams. </li>
+
+</ul>
+
+</div>
+
+<p class="p">      <strong class="ph b">Note:</strong> Multiple invocations of this operator can be fused to make        an efficient use of the available pool of CPU cores.
+</p>
+
+<p class="p">      See the samples folder inside this toolkit for working examples that show how to use this operator.
+</p>
+
+<p class="p">      For a detailed documentation about the operator design, usage patterns and in-depth technical       details, please refer to the STT Gateway toolkit documentation available at this URL:
+</p>
+
+<p class="p">      <a class="xref" href="https://ibmstreams.github.io/streamsx.sttgateway">https://ibmstreams.github.io/streamsx.sttgateway</a>
+</p>
+
+</div>
+
+<div class="section"><h2 class="title sectiontitle splhead-1">Summary</h2>
+
+<dl class="dl" compact="compact">
+ 
+  <dt class="dt dlterm">Ports</dt>
+
+  <dd class="dd">This operator has 1 input port and 1 output port.</dd>
+
+ 
+ 
+  <dt class="dt dlterm">Windowing</dt>
+
+  <dd class="dd">This operator does not accept any windowing configurations.</dd>
+
+ 
+ 
+  <dt class="dt dlterm">Parameters</dt>
+
+  <dd class="dd">This operator supports 24 parameters.
+<p class="p"> Required: 
+<a class="xref" href="#spldoc_operator__parameter__authToken">authToken</a>, <a class="xref" href="#spldoc_operator__parameter__baseLanguageModel">baseLanguageModel</a>, <a class="xref" href="#spldoc_operator__parameter__uri">uri</a>
+
+</p>
+
+<p class="p"> Optional: 
+<a class="xref" href="#spldoc_operator__parameter__acousticCustomizationId">acousticCustomizationId</a>, <a class="xref" href="#spldoc_operator__parameter__baseModelVersion">baseModelVersion</a>, <a class="xref" href="#spldoc_operator__parameter__contentType">contentType</a>, <a class="xref" href="#spldoc_operator__parameter__cpuYieldTimeInAudioSenderThread">cpuYieldTimeInAudioSenderThread</a>, <a class="xref" href="#spldoc_operator__parameter__customizationId">customizationId</a>, <a class="xref" href="#spldoc_operator__parameter__customizationWeight">customizationWeight</a>, <a class="xref" href="#spldoc_operator__parameter__filterProfanity">filterProfanity</a>, <a class="xref" href="#spldoc_operator__parameter__identifySpeakers">identifySpeakers</a>, <a class="xref" href="#spldoc_operator__parameter__keywordsSpottingThreshold">keywordsSpottingThreshold</a>, <a class="xref" href="#spldoc_operator__parameter__keywordsToBeSpotted">keywordsToBeSpotted</a>, <a class="xref" href="#spldoc_operator__parameter__maxAllowedConnectionAttempts">maxAllowedConnectionAttempts</a>, <a class="xref" href="#spldoc_operator__parameter__maxUtteranceAlternatives">maxUtteranceAlternatives</a>, <a class="xref" href="#spldoc_operator__parameter__smartFormattingNeeded">smartFormattingNeeded</a>, <a class="xref" href="#spldoc_operator__parameter__sttJsonResponseDebugging">sttJsonResponseDebugging</a>, <a class="xref" href="#spldoc_operator__parameter__sttRequestLogging">sttRequestLogging</a>, <a class="xref" href="#spldoc_operator__parameter__sttResultMode">sttResultMode</a>, <a class="xref" href="#spldoc_operator__parameter__waitTimeBeforeSTTServiceConnectionRetry">waitTimeBeforeSTTServiceConnectionRetry</a>, <a class="xref" href="#spldoc_operator__parameter__websocketLoggingNeeded">websocketLoggingNeeded</a>, <a class="xref" href="#spldoc_operator__parameter__wordAlternativesThreshold">wordAlternativesThreshold</a>, <a class="xref" href="#spldoc_operator__parameter__wordConfidenceNeeded">wordConfidenceNeeded</a>, <a class="xref" href="#spldoc_operator__parameter__wordTimestampNeeded">wordTimestampNeeded</a>
+
+</p>
+</dd>
+
+ 
+ 
+  <dt class="dt dlterm">Metrics</dt>
+
+  <dd class="dd">This operator reports 4 metrics.</dd>
+
+ 
+</dl>
+</div>
+
+<div class="section"><h2 class="title sectiontitle splhead-1">Properties</h2>
+
+<dl class="dl" compact="compact">
+ 
+  <dt class="dt dlterm">Implementation</dt>
+
+  <dd class="dd">C++</dd>
+
+ 
+ 
+  <dt class="dt dlterm"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__context__providessinglethreadedexecutioncontext">Threading</a></dt>
+
+  <dd class="dd"><tt class="ph tt">Never</tt> - Operator never provides a single threaded execution context.</dd>
+
+ 
+</dl>
+
+</div>
+
+<div class="section">
+<p class="p splhead-1"><strong class="ph b"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__input_port_set">Input Ports</a></strong></p>
+<dl class="dl">
+  
+   <dt class="dt dlterm">Ports (0)</dt>
+
+   <dd class="dd">
+<p class="p">      	This port brings the audio data into this operator for transcription.
+</p>
+
+<div class="p">      	Attributes on this input port:
+<ul class="ul">
+<li class="li"> <strong class="ph b">speech</strong> (required, rstring/blob) - In the case of file based input (.wav, .mp3 etc. for batch workload), the expected value will be an absolute path of a file as an rstring. In the case of RAW audio data (received from a network switch for real-time workload), the expected input is of type blob.</li>
+
+<li class="li"> <strong class="ph b">conversationId</strong> (optional, rstring) - An rstring conversationId field for identifying the origin of the audio data that is being sent for transcription (either an audio filename or a call center specific call identifier).</li>
+
+</ul>
+
+</div>
+
+<p class="p">		All the extra input attributes will be forwarded if matching output attributes are found.  	
+</p>
+
+   <dl class="dl">
+    
+      <dt class="dt dlterm">Properties</dt>
+
+      <dd class="dd">   <ul class="sl simple">
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__input_port_set__optional">Optional</a>: false
+     </li>
+
+   </ul>
+
+   <ul class="sl simple">
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__input_port_set__controlport">ControlPort</a>: false
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__input_port_set__tuplemutationallowed">TupleMutationAllowed</a>: true
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__input_port_set__windowingmode">WindowingMode</a>: NonWindowed
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__input_port_set__windowpunctuationinputmode">WindowPunctuationInputMode</a>: Oblivious
+     </li>
+
+   </ul>
+
+      </dd>
+    
+   </dl>
+
+   <p class="p"/>
+   </dd>
+
+  
+</dl>
+
+</div>
+
+<div class="section">
+<p class="p splhead-1"><strong class="ph b"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__output_port_set">Output Ports</a></strong></p>
+<dl class="dl">
+  
+     <dt class="dt dlterm">Assignments</dt>
+
+     <dd class="dd">This operator allows any SPL expression of the correct type to be assigned to output attributes.</dd>
+
+  
+</dl>
+
+<dl class="dl">
+      <dt class="dt dlterm"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__context__customoutputfunctions">Output Functions</a></dt>
+
+    <dd class="dd">
+      <dl class="dl">
+      
+        <dt class="dt dlterm">STTGatewayFunctions</dt>
+
+        <dd class="dd">
+          <dl class="dl">
+            <dt class="dt dlterm"/>
+<dd class="dd"/>
+
+            
+              <dt class="dt dlterm">
+                <tt class="ph tt">   &lt;any T&gt; T AsIs(T)</tt>              </dt>
+
+            <dd class="dd">
+
+<p class="p">The default function for output attributes. This function assigns the output attribute to the value of the input attribute with the same name.
+</p>
+              <p class="p"/>
+
+            </dd>
+
+                        
+              <dt class="dt dlterm">
+                <tt class="ph tt">   int32 getUtteranceNumber()</tt>              </dt>
+
+            <dd class="dd">
+
+<p class="p">Returns an int32 number indicating the utterance number.
+</p>
+              <p class="p"/>
+
+            </dd>
+
+                        
+              <dt class="dt dlterm">
+                <tt class="ph tt">   rstring getUtteranceText()</tt>              </dt>
+
+            <dd class="dd">
+
+<p class="p">Returns the transcription of audio in the form of a single utterance.
+</p>
+              <p class="p"/>
+
+            </dd>
+
+                        
+              <dt class="dt dlterm">
+                <tt class="ph tt">   boolean isFinalizedUtterance()</tt>              </dt>
+
+            <dd class="dd">
+
+<p class="p">Returns a boolean value to indicate if this is an interim partial utterance or a finalized utterance.
+</p>
+              <p class="p"/>
+
+            </dd>
+
+                        
+              <dt class="dt dlterm">
+                <tt class="ph tt">   float32 getConfidence()</tt>              </dt>
+
+            <dd class="dd">
+
+<p class="p">Returns a float32 confidence value for an interim partial utterance or for a finalized utterance or for the full text.
+</p>
+              <p class="p"/>
+
+            </dd>
+
+                        
+              <dt class="dt dlterm">
+                <tt class="ph tt">   rstring getFullTranscriptionText()</tt>              </dt>
+
+            <dd class="dd">
+
+<p class="p">Returns the transcription of audio in the form of full text after completing the entire transcription.
+</p>
+              <p class="p"/>
+
+            </dd>
+
+                        
+              <dt class="dt dlterm">
+                <tt class="ph tt">   rstring getSTTErrorMessage()</tt>              </dt>
+
+            <dd class="dd">
+
+<p class="p">Returns the Watson STT error message if any.
+</p>
+              <p class="p"/>
+
+            </dd>
+
+                        
+              <dt class="dt dlterm">
+                <tt class="ph tt">   boolean isTranscriptionCompleted()</tt>              </dt>
+
+            <dd class="dd">
+
+<p class="p">Returns a boolean value to indicate whether the full transcription is completed.
+</p>
+              <p class="p"/>
+
+            </dd>
+
+                        
+              <dt class="dt dlterm">
+                <tt class="ph tt">   list&lt;rstring&gt; getUtteranceAlternatives()</tt>              </dt>
+
+            <dd class="dd">
+
+<p class="p">Returns a list of n-best alternative hypotheses for an utterance result. List will have the very best guess first followed by the next best ones in that order.
+</p>
+              <p class="p"/>
+
+            </dd>
+
+                        
+              <dt class="dt dlterm">
+                <tt class="ph tt">   list&lt;list&lt;rstring&gt;&gt; getWordAlternatives()</tt>              </dt>
+
+            <dd class="dd">
+
+<p class="p">Returns a nested list of word alternatives (Confusion Networks).
+</p>
+              <p class="p"/>
+
+            </dd>
+
+                        
+              <dt class="dt dlterm">
+                <tt class="ph tt">   list&lt;list&lt;float64&gt;&gt; getWordAlternativesConfidences()</tt>              </dt>
+
+            <dd class="dd">
+
+<p class="p">Returns a nested list of word alternatives confidences (Confusion Networks).
+</p>
+              <p class="p"/>
+
+            </dd>
+
+                        
+              <dt class="dt dlterm">
+                <tt class="ph tt">   list&lt;float64&gt; getWordAlternativesStartTimes()</tt>              </dt>
+
+            <dd class="dd">
+
+<p class="p">Returns a list of word alternatives start times (Confusion Networks).
+</p>
+              <p class="p"/>
+
+            </dd>
+
+                        
+              <dt class="dt dlterm">
+                <tt class="ph tt">   list&lt;float64&gt; getWordAlternativesEndTimes()</tt>              </dt>
+
+            <dd class="dd">
+
+<p class="p">Returns a list of word alternatives end times (Confusion Networks).
+</p>
+              <p class="p"/>
+
+            </dd>
+
+                        
+              <dt class="dt dlterm">
+                <tt class="ph tt">   list&lt;rstring&gt; getUtteranceWords()</tt>              </dt>
+
+            <dd class="dd">
+
+<p class="p">Returns a list of words in an utterance result.
+</p>
+              <p class="p"/>
+
+            </dd>
+
+                        
+              <dt class="dt dlterm">
+                <tt class="ph tt">   list&lt;float64&gt; getUtteranceWordsConfidences()</tt>              </dt>
+
+            <dd class="dd">
+
+<p class="p">Returns a list of confidences of the words in an utterance result.
+</p>
+              <p class="p"/>
+
+            </dd>
+
+                        
+              <dt class="dt dlterm">
+                <tt class="ph tt">   list&lt;float64&gt; getUtteranceWordsStartTimes()</tt>              </dt>
+
+            <dd class="dd">
+
+<p class="p">Returns a list of start times of the words in an utterance result relative to the start of the audio.
+</p>
+              <p class="p"/>
+
+            </dd>
+
+                        
+              <dt class="dt dlterm">
+                <tt class="ph tt">   list&lt;float64&gt; getUtteranceWordsEndTimes()</tt>              </dt>
+
+            <dd class="dd">
+
+<p class="p">Returns a list of end times of the words in an utterance result relative to the start of the audio.
+</p>
+              <p class="p"/>
+
+            </dd>
+
+                        
+              <dt class="dt dlterm">
+                <tt class="ph tt">   float64 getUtteranceStartTime()</tt>              </dt>
+
+            <dd class="dd">
+
+<p class="p">Returns the start time of an utterance relative to the start of the audio.
+</p>
+              <p class="p"/>
+
+            </dd>
+
+                        
+              <dt class="dt dlterm">
+                <tt class="ph tt">   float64 getUtteranceEndTime()</tt>              </dt>
+
+            <dd class="dd">
+
+<p class="p">Returns the end time of an utterance relative to the start of the audio.
+</p>
+              <p class="p"/>
+
+            </dd>
+
+                        
+              <dt class="dt dlterm">
+                <tt class="ph tt">   list&lt;int32&gt; getUtteranceWordsSpeakers()</tt>              </dt>
+
+            <dd class="dd">
+
+<p class="p">Returns a list of speaker ids for the individual words in an utterance result.
+</p>
+              <p class="p"/>
+
+            </dd>
+
+                        
+              <dt class="dt dlterm">
+                <tt class="ph tt">   list&lt;float64&gt; getUtteranceWordsSpeakersConfidences()</tt>              </dt>
+
+            <dd class="dd">
+
+<p class="p">Returns a list of confidences in identifying the speakers of the individual words in an utterance result.
+</p>
+              <p class="p"/>
+
+            </dd>
+
+                        
+              <dt class="dt dlterm">
+                <tt class="ph tt">   map&lt;rstring, list&lt;map&lt;rstring, float64&gt;&gt;&gt; getKeywordsSpottingResults()</tt>              </dt>
+
+            <dd class="dd">
+
+<p class="p">Returns the STT keywords spotting results as a map of key/value pairs. Read this toolkit's documentation to learn about the map contents.
+</p>
+              <p class="p"/>
+
+            </dd>
+
+                      </dl>
+        </dd>
+
+      
+      </dl>
+
+    </dd>
+
+  </dl>
+
+ <dl class="dl">
+  
+   <dt class="dt dlterm">Ports (0)</dt>
+
+   <dd class="dd">
+
+<p class="p">      	This port produces the output tuples that carry the result of the speech to text transcription.
+</p>
+
+<p class="p">        An output tuple is created for every utterance that is observed from the incoming audio data.          An utterance is a group of transcribed words meant to approximate a sentence.          This means there is a one to many relationship between an incoming tuple and outgoing tuples          (i.e. a single .wav file may result in 30 output utterances).         Intermediate utterances are sent out on this output port only when the sttResultMode         operator parameter is set to a value of either 1 or 2. If it is set to 3, then only the         fully transcribed text for the entire audio data will be sent on this output port after         the given audio is completely transcribed.          <strong class="ph b">There are multiple available output functions</strong>, and output attributes can also be          assigned values with any SPL expression that evaluates to the proper type.      	
+</p>
+
+    <p class="p"/>
+
+    <dl class="dl">
+     
+      <dt class="dt dlterm">Properties</dt>
+
+      <dd class="dd">   <ul class="sl simple">
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__output_port_set__optional">Optional</a>: false
+     </li>
+
+   </ul>
+
+   <ul class="sl simple">
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__output_port_set__tuplemutationallowed">TupleMutationAllowed</a>: true
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__output_port_set__windowpunctuationoutputmode">WindowPunctuationOutputMode</a>: Preserving
+     </li>
+
+   </ul>
+
+</dd>
+     
+    </dl>
+
+    <p class="p"/>
+
+   </dd>
+
+  
+</dl>
+
+</div>
+
+<div class="section">
+<p class="p splhead-1"><strong class="ph b"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters">Parameters</a></strong></p>
+This operator supports 24 parameters.
+<p class="p"> Required: 
+<a class="xref" href="#spldoc_operator__parameter__authToken">authToken</a>, <a class="xref" href="#spldoc_operator__parameter__baseLanguageModel">baseLanguageModel</a>, <a class="xref" href="#spldoc_operator__parameter__uri">uri</a>
+
+</p>
+
+<p class="p"> Optional: 
+<a class="xref" href="#spldoc_operator__parameter__acousticCustomizationId">acousticCustomizationId</a>, <a class="xref" href="#spldoc_operator__parameter__baseModelVersion">baseModelVersion</a>, <a class="xref" href="#spldoc_operator__parameter__contentType">contentType</a>, <a class="xref" href="#spldoc_operator__parameter__cpuYieldTimeInAudioSenderThread">cpuYieldTimeInAudioSenderThread</a>, <a class="xref" href="#spldoc_operator__parameter__customizationId">customizationId</a>, <a class="xref" href="#spldoc_operator__parameter__customizationWeight">customizationWeight</a>, <a class="xref" href="#spldoc_operator__parameter__filterProfanity">filterProfanity</a>, <a class="xref" href="#spldoc_operator__parameter__identifySpeakers">identifySpeakers</a>, <a class="xref" href="#spldoc_operator__parameter__keywordsSpottingThreshold">keywordsSpottingThreshold</a>, <a class="xref" href="#spldoc_operator__parameter__keywordsToBeSpotted">keywordsToBeSpotted</a>, <a class="xref" href="#spldoc_operator__parameter__maxAllowedConnectionAttempts">maxAllowedConnectionAttempts</a>, <a class="xref" href="#spldoc_operator__parameter__maxUtteranceAlternatives">maxUtteranceAlternatives</a>, <a class="xref" href="#spldoc_operator__parameter__smartFormattingNeeded">smartFormattingNeeded</a>, <a class="xref" href="#spldoc_operator__parameter__sttJsonResponseDebugging">sttJsonResponseDebugging</a>, <a class="xref" href="#spldoc_operator__parameter__sttRequestLogging">sttRequestLogging</a>, <a class="xref" href="#spldoc_operator__parameter__sttResultMode">sttResultMode</a>, <a class="xref" href="#spldoc_operator__parameter__waitTimeBeforeSTTServiceConnectionRetry">waitTimeBeforeSTTServiceConnectionRetry</a>, <a class="xref" href="#spldoc_operator__parameter__websocketLoggingNeeded">websocketLoggingNeeded</a>, <a class="xref" href="#spldoc_operator__parameter__wordAlternativesThreshold">wordAlternativesThreshold</a>, <a class="xref" href="#spldoc_operator__parameter__wordConfidenceNeeded">wordConfidenceNeeded</a>, <a class="xref" href="#spldoc_operator__parameter__wordTimestampNeeded">wordTimestampNeeded</a>
+
+</p>
+<dl class="dl">
+  
+     <dt class="dt dlterm"><a name="spldoc_operator__parameter__acousticCustomizationId"><!-- --></a><tt class="ph tt">acousticCustomizationId</tt></dt>
+
+     <dd class="dd">
+<p class="p">This parameter specifies a custom acoustic model to be used for transcription. (Default is an empty string)
+</p>
+
+  <dl class="dl">
+    
+     <dt class="dt dlterm">Properties</dt>
+
+     <dd class="dd">   <ul class="sl simple">
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__type">Type</a>: rstring
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__cardinality">Cardinality</a>: 1
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__optional">Optional</a>: true
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__expressionmode">ExpressionMode</a>: AttributeFree
+     </li>
+
+   </ul>
+
+     <p class="p"/>
+     </dd>
+
+    
+  </dl>
+
+     </dd>
+
+  
+  
+     <dt class="dt dlterm"><a name="spldoc_operator__parameter__authToken"><!-- --></a><tt class="ph tt">authToken</tt></dt>
+
+     <dd class="dd">
+<p class="p">This parameter specifies the auth token needed to access the Watson STT service.
+</p>
+
+  <dl class="dl">
+    
+     <dt class="dt dlterm">Properties</dt>
+
+     <dd class="dd">   <ul class="sl simple">
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__type">Type</a>: rstring
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__cardinality">Cardinality</a>: 1
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__optional">Optional</a>: false
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__expressionmode">ExpressionMode</a>: AttributeFree
+     </li>
+
+   </ul>
+
+     <p class="p"/>
+     </dd>
+
+    
+  </dl>
+
+     </dd>
+
+  
+  
+     <dt class="dt dlterm"><a name="spldoc_operator__parameter__baseLanguageModel"><!-- --></a><tt class="ph tt">baseLanguageModel</tt></dt>
+
+     <dd class="dd">
+<p class="p">This parameter specifies the name of the Watson STT base language model that should be used.
+</p>
+
+  <dl class="dl">
+    
+     <dt class="dt dlterm">Properties</dt>
+
+     <dd class="dd">   <ul class="sl simple">
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__type">Type</a>: rstring
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__cardinality">Cardinality</a>: 1
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__optional">Optional</a>: false
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__expressionmode">ExpressionMode</a>: AttributeFree
+     </li>
+
+   </ul>
+
+     <p class="p"/>
+     </dd>
+
+    
+  </dl>
+
+     </dd>
+
+  
+  
+     <dt class="dt dlterm"><a name="spldoc_operator__parameter__baseModelVersion"><!-- --></a><tt class="ph tt">baseModelVersion</tt></dt>
+
+     <dd class="dd">
+<p class="p">This parameter specifies a particular base model version to be used for transcription. (Default is an empty string)
+</p>
+
+  <dl class="dl">
+    
+     <dt class="dt dlterm">Properties</dt>
+
+     <dd class="dd">   <ul class="sl simple">
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__type">Type</a>: rstring
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__cardinality">Cardinality</a>: 1
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__optional">Optional</a>: true
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__expressionmode">ExpressionMode</a>: AttributeFree
+     </li>
+
+   </ul>
+
+     <p class="p"/>
+     </dd>
+
+    
+  </dl>
+
+     </dd>
+
+  
+  
+     <dt class="dt dlterm"><a name="spldoc_operator__parameter__contentType"><!-- --></a><tt class="ph tt">contentType</tt></dt>
+
+     <dd class="dd">
+<p class="p">This parameter specifies the content type to be used for transcription. (Default is audio/wav)
+</p>
+
+  <dl class="dl">
+    
+     <dt class="dt dlterm">Properties</dt>
+
+     <dd class="dd">   <ul class="sl simple">
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__type">Type</a>: rstring
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__cardinality">Cardinality</a>: 1
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__optional">Optional</a>: true
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__expressionmode">ExpressionMode</a>: AttributeFree
+     </li>
+
+   </ul>
+
+     <p class="p"/>
+     </dd>
+
+    
+  </dl>
+
+     </dd>
+
+  
+  
+     <dt class="dt dlterm"><a name="spldoc_operator__parameter__cpuYieldTimeInAudioSenderThread"><!-- --></a><tt class="ph tt">cpuYieldTimeInAudioSenderThread</tt></dt>
+
+     <dd class="dd">
+<p class="p">This parameter specifies the CPU yield time (in seconds) needed inside the audio sender thread's tight loop spinning to look for new audio data to be sent to the STT service. It should be &gt;= 0.0 (Default is 0.001 i.e. 1 millisecond)
+</p>
+
+  <dl class="dl">
+    
+     <dt class="dt dlterm">Properties</dt>
+
+     <dd class="dd">   <ul class="sl simple">
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__type">Type</a>: float64
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__cardinality">Cardinality</a>: 1
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__optional">Optional</a>: true
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__expressionmode">ExpressionMode</a>: AttributeFree
+     </li>
+
+   </ul>
+
+     <p class="p"/>
+     </dd>
+
+    
+  </dl>
+
+     </dd>
+
+  
+  
+     <dt class="dt dlterm"><a name="spldoc_operator__parameter__customizationId"><!-- --></a><tt class="ph tt">customizationId</tt></dt>
+
+     <dd class="dd">
+<p class="p">This parameter specifies a custom language model to be used for transcription. (Default is an empty string)
+</p>
+
+  <dl class="dl">
+    
+     <dt class="dt dlterm">Properties</dt>
+
+     <dd class="dd">   <ul class="sl simple">
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__type">Type</a>: rstring
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__cardinality">Cardinality</a>: 1
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__optional">Optional</a>: true
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__expressionmode">ExpressionMode</a>: AttributeFree
+     </li>
+
+   </ul>
+
+     <p class="p"/>
+     </dd>
+
+    
+  </dl>
+
+     </dd>
+
+  
+  
+     <dt class="dt dlterm"><a name="spldoc_operator__parameter__customizationWeight"><!-- --></a><tt class="ph tt">customizationWeight</tt></dt>
+
+     <dd class="dd">
+<p class="p">This parameter specifies a relative weight for a custom language model as a float64 between 0.0 to 1.0 (Default is 0.0)
+</p>
+
+  <dl class="dl">
+    
+     <dt class="dt dlterm">Properties</dt>
+
+     <dd class="dd">   <ul class="sl simple">
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__type">Type</a>: float64
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__cardinality">Cardinality</a>: 1
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__optional">Optional</a>: true
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__expressionmode">ExpressionMode</a>: AttributeFree
+     </li>
+
+   </ul>
+
+     <p class="p"/>
+     </dd>
+
+    
+  </dl>
+
+     </dd>
+
+  
+  
+     <dt class="dt dlterm"><a name="spldoc_operator__parameter__filterProfanity"><!-- --></a><tt class="ph tt">filterProfanity</tt></dt>
+
+     <dd class="dd">
+<p class="p">This parameter indicates whether profanity should be filtered from a transcript. (Default is false)
+</p>
+
+  <dl class="dl">
+    
+     <dt class="dt dlterm">Properties</dt>
+
+     <dd class="dd">   <ul class="sl simple">
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__type">Type</a>: boolean
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__cardinality">Cardinality</a>: 1
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__optional">Optional</a>: true
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__expressionmode">ExpressionMode</a>: AttributeFree
+     </li>
+
+   </ul>
+
+     <p class="p"/>
+     </dd>
+
+    
+  </dl>
+
+     </dd>
+
+  
+  
+     <dt class="dt dlterm"><a name="spldoc_operator__parameter__identifySpeakers"><!-- --></a><tt class="ph tt">identifySpeakers</tt></dt>
+
+     <dd class="dd">
+<p class="p">This parameter indicates whether the speakers of the individual words in an utterance result should be identified. (Default is false)
+</p>
+
+  <dl class="dl">
+    
+     <dt class="dt dlterm">Properties</dt>
+
+     <dd class="dd">   <ul class="sl simple">
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__type">Type</a>: boolean
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__cardinality">Cardinality</a>: 1
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__optional">Optional</a>: true
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__expressionmode">ExpressionMode</a>: AttributeFree
+     </li>
+
+   </ul>
+
+     <p class="p"/>
+     </dd>
+
+    
+  </dl>
+
+     </dd>
+
+  
+  
+     <dt class="dt dlterm"><a name="spldoc_operator__parameter__keywordsSpottingThreshold"><!-- --></a><tt class="ph tt">keywordsSpottingThreshold</tt></dt>
+
+     <dd class="dd">
+<p class="p">This parameter specifies the minimum confidence level that the STT service must have for an utterance word to match a given keyword. A value of 0.0 disables this feature. Valid value must be less than 1.0. (Default is 0.0)
+</p>
+
+  <dl class="dl">
+    
+     <dt class="dt dlterm">Properties</dt>
+
+     <dd class="dd">   <ul class="sl simple">
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__type">Type</a>: float64
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__cardinality">Cardinality</a>: 1
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__optional">Optional</a>: true
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__expressionmode">ExpressionMode</a>: AttributeFree
+     </li>
+
+   </ul>
+
+     <p class="p"/>
+     </dd>
+
+    
+  </dl>
+
+     </dd>
+
+  
+  
+     <dt class="dt dlterm"><a name="spldoc_operator__parameter__keywordsToBeSpotted"><!-- --></a><tt class="ph tt">keywordsToBeSpotted</tt></dt>
+
+     <dd class="dd">
+<p class="p">This parameter specifies a list (array) of strings to be spotted. (Default is an empty list)
+</p>
+
+  <dl class="dl">
+    
+     <dt class="dt dlterm">Properties</dt>
+
+     <dd class="dd">   <ul class="sl simple">
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__type">Type</a>: list&lt;rstring&gt;
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__cardinality">Cardinality</a>: 1
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__optional">Optional</a>: true
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__expressionmode">ExpressionMode</a>: AttributeFree
+     </li>
+
+   </ul>
+
+     <p class="p"/>
+     </dd>
+
+    
+  </dl>
+
+     </dd>
+
+  
+  
+     <dt class="dt dlterm"><a name="spldoc_operator__parameter__maxAllowedConnectionAttempts"><!-- --></a><tt class="ph tt">maxAllowedConnectionAttempts</tt></dt>
+
+     <dd class="dd">
+<p class="p">This parameter specifies the maximum number of attempts to make a Websocket connection to the STT service. It should be &gt;= 1 (Default is 10)
+</p>
+
+  <dl class="dl">
+    
+     <dt class="dt dlterm">Properties</dt>
+
+     <dd class="dd">   <ul class="sl simple">
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__type">Type</a>: int32
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__cardinality">Cardinality</a>: 1
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__optional">Optional</a>: true
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__expressionmode">ExpressionMode</a>: AttributeFree
+     </li>
+
+   </ul>
+
+     <p class="p"/>
+     </dd>
+
+    
+  </dl>
+
+     </dd>
+
+  
+  
+     <dt class="dt dlterm"><a name="spldoc_operator__parameter__maxUtteranceAlternatives"><!-- --></a><tt class="ph tt">maxUtteranceAlternatives</tt></dt>
+
+     <dd class="dd">
+<p class="p">This parameter indicates the required number of n-best alternative hypotheses for the transcription results. (Default is 1)
+</p>
+
+  <dl class="dl">
+    
+     <dt class="dt dlterm">Properties</dt>
+
+     <dd class="dd">   <ul class="sl simple">
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__type">Type</a>: int32
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__cardinality">Cardinality</a>: 1
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__optional">Optional</a>: true
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__expressionmode">ExpressionMode</a>: AttributeFree
+     </li>
+
+   </ul>
+
+     <p class="p"/>
+     </dd>
+
+    
+  </dl>
+
+     </dd>
+
+  
+  
+     <dt class="dt dlterm"><a name="spldoc_operator__parameter__smartFormattingNeeded"><!-- --></a><tt class="ph tt">smartFormattingNeeded</tt></dt>
+
+     <dd class="dd">
+<p class="p">This parameter indicates whether to convert date, time, phone numbers, currency values, email and URLs into conventional representations. (Default is false)
+</p>
+
+  <dl class="dl">
+    
+     <dt class="dt dlterm">Properties</dt>
+
+     <dd class="dd">   <ul class="sl simple">
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__type">Type</a>: boolean
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__cardinality">Cardinality</a>: 1
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__optional">Optional</a>: true
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__expressionmode">ExpressionMode</a>: AttributeFree
+     </li>
+
+   </ul>
+
+     <p class="p"/>
+     </dd>
+
+    
+  </dl>
+
+     </dd>
+
+  
+  
+     <dt class="dt dlterm"><a name="spldoc_operator__parameter__sttJsonResponseDebugging"><!-- --></a><tt class="ph tt">sttJsonResponseDebugging</tt></dt>
+
+     <dd class="dd">
+<p class="p">This parameter is used for debugging the STT JSON response message. Mostly for IBM internal use. (Default is false)
+</p>
+
+  <dl class="dl">
+    
+     <dt class="dt dlterm">Properties</dt>
+
+     <dd class="dd">   <ul class="sl simple">
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__type">Type</a>: boolean
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__cardinality">Cardinality</a>: 1
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__optional">Optional</a>: true
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__expressionmode">ExpressionMode</a>: AttributeFree
+     </li>
+
+   </ul>
+
+     <p class="p"/>
+     </dd>
+
+    
+  </dl>
+
+     </dd>
+
+  
+  
+     <dt class="dt dlterm"><a name="spldoc_operator__parameter__sttRequestLogging"><!-- --></a><tt class="ph tt">sttRequestLogging</tt></dt>
+
+     <dd class="dd">
+<p class="p">This parameter specifies whether request logging should be done for every STT audio transcription request. (Default is false)
+</p>
+
+  <dl class="dl">
+    
+     <dt class="dt dlterm">Properties</dt>
+
+     <dd class="dd">   <ul class="sl simple">
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__type">Type</a>: boolean
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__cardinality">Cardinality</a>: 1
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__optional">Optional</a>: true
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__expressionmode">ExpressionMode</a>: AttributeFree
+     </li>
+
+   </ul>
+
+     <p class="p"/>
+     </dd>
+
+    
+  </dl>
+
+     </dd>
+
+  
+  
+     <dt class="dt dlterm"><a name="spldoc_operator__parameter__sttResultMode"><!-- --></a><tt class="ph tt">sttResultMode</tt></dt>
+
+     <dd class="dd">
+<p class="p">This parameter specifies what type of STT result is needed: 1 to get partial utterances, 2 to get completed utterance, 3 (default) to get the full text after transcribing the entire audio.
+</p>
+
+  <dl class="dl">
+    
+     <dt class="dt dlterm">Properties</dt>
+
+     <dd class="dd">   <ul class="sl simple">
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__type">Type</a>: int32
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__cardinality">Cardinality</a>: 1
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__optional">Optional</a>: true
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__expressionmode">ExpressionMode</a>: AttributeFree
+     </li>
+
+   </ul>
+
+     <p class="p"/>
+     </dd>
+
+    
+  </dl>
+
+     </dd>
+
+  
+  
+     <dt class="dt dlterm"><a name="spldoc_operator__parameter__uri"><!-- --></a><tt class="ph tt">uri</tt></dt>
+
+     <dd class="dd">
+<p class="p">This parameter specifies the Watson STT Websocket service URI.
+</p>
+
+  <dl class="dl">
+    
+     <dt class="dt dlterm">Properties</dt>
+
+     <dd class="dd">   <ul class="sl simple">
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__type">Type</a>: rstring
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__cardinality">Cardinality</a>: 1
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__optional">Optional</a>: false
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__expressionmode">ExpressionMode</a>: AttributeFree
+     </li>
+
+   </ul>
+
+     <p class="p"/>
+     </dd>
+
+    
+  </dl>
+
+     </dd>
+
+  
+  
+     <dt class="dt dlterm"><a name="spldoc_operator__parameter__waitTimeBeforeSTTServiceConnectionRetry"><!-- --></a><tt class="ph tt">waitTimeBeforeSTTServiceConnectionRetry</tt></dt>
+
+     <dd class="dd">
+<p class="p">This parameter specifies the time (in seconds) to wait before retrying a connection attempt to the Watson STT service. It should be &gt;= 1.0 (Default is 3.0)
+</p>
+
+  <dl class="dl">
+    
+     <dt class="dt dlterm">Properties</dt>
+
+     <dd class="dd">   <ul class="sl simple">
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__type">Type</a>: float64
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__cardinality">Cardinality</a>: 1
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__optional">Optional</a>: true
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__expressionmode">ExpressionMode</a>: AttributeFree
+     </li>
+
+   </ul>
+
+     <p class="p"/>
+     </dd>
+
+    
+  </dl>
+
+     </dd>
+
+  
+  
+     <dt class="dt dlterm"><a name="spldoc_operator__parameter__websocketLoggingNeeded"><!-- --></a><tt class="ph tt">websocketLoggingNeeded</tt></dt>
+
+     <dd class="dd">
+<p class="p">This parameter specifies whether logging is needed from the Websocket library. (Default is false)
+</p>
+
+  <dl class="dl">
+    
+     <dt class="dt dlterm">Properties</dt>
+
+     <dd class="dd">   <ul class="sl simple">
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__type">Type</a>: boolean
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__cardinality">Cardinality</a>: 1
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__optional">Optional</a>: true
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__expressionmode">ExpressionMode</a>: AttributeFree
+     </li>
+
+   </ul>
+
+     <p class="p"/>
+     </dd>
+
+    
+  </dl>
+
+     </dd>
+
+  
+  
+     <dt class="dt dlterm"><a name="spldoc_operator__parameter__wordAlternativesThreshold"><!-- --></a><tt class="ph tt">wordAlternativesThreshold</tt></dt>
+
+     <dd class="dd">
+<p class="p">This parameter controls the density of the word alternatives results (a.k.a. Confusion Networks). A value of 0.0 disables this feature. Valid value must be less than 1.0 (Default is 0.0)
+</p>
+
+  <dl class="dl">
+    
+     <dt class="dt dlterm">Properties</dt>
+
+     <dd class="dd">   <ul class="sl simple">
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__type">Type</a>: float64
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__cardinality">Cardinality</a>: 1
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__optional">Optional</a>: true
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__expressionmode">ExpressionMode</a>: AttributeFree
+     </li>
+
+   </ul>
+
+     <p class="p"/>
+     </dd>
+
+    
+  </dl>
+
+     </dd>
+
+  
+  
+     <dt class="dt dlterm"><a name="spldoc_operator__parameter__wordConfidenceNeeded"><!-- --></a><tt class="ph tt">wordConfidenceNeeded</tt></dt>
+
+     <dd class="dd">
+<p class="p">This parameter indicates whether the transcription result should include individual words and their confidences or not. (Default is false)
+</p>
+
+  <dl class="dl">
+    
+     <dt class="dt dlterm">Properties</dt>
+
+     <dd class="dd">   <ul class="sl simple">
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__type">Type</a>: boolean
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__cardinality">Cardinality</a>: 1
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__optional">Optional</a>: true
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__expressionmode">ExpressionMode</a>: AttributeFree
+     </li>
+
+   </ul>
+
+     <p class="p"/>
+     </dd>
+
+    
+  </dl>
+
+     </dd>
+
+  
+  
+     <dt class="dt dlterm"><a name="spldoc_operator__parameter__wordTimestampNeeded"><!-- --></a><tt class="ph tt">wordTimestampNeeded</tt></dt>
+
+     <dd class="dd">
+<p class="p">This parameter indicates whether the transcription result should include individual words and their timestamps or not. (Default is false)
+</p>
+
+  <dl class="dl">
+    
+     <dt class="dt dlterm">Properties</dt>
+
+     <dd class="dd">   <ul class="sl simple">
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__type">Type</a>: boolean
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__cardinality">Cardinality</a>: 1
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__optional">Optional</a>: true
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__expressionmode">ExpressionMode</a>: AttributeFree
+     </li>
+
+   </ul>
+
+     <p class="p"/>
+     </dd>
+
+    
+  </dl>
+
+     </dd>
+
+  
+</dl>
+
+</div>
+
+<div class="section">
+<p class="p splhead-1"><strong class="ph b"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__context__metrics">Metrics</a></strong></p>
+<dl class="dl">
+  
+    <dt class="dt dlterm"><tt class="ph tt">nFullAudioConversationsReceived</tt> - <a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__context__metrics_kind_gauge">Gauge</a></dt>
+
+    <dd class="dd">
+
+<p class="p">The number of full audio conversations received by this operator instance.
+</p>
+
+     <p class="p"/>
+
+     </dd>
+
+  
+  
+    <dt class="dt dlterm"><tt class="ph tt">nFullAudioConversationsTranscribed</tt> - <a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__context__metrics_kind_gauge">Gauge</a></dt>
+
+    <dd class="dd">
+
+<p class="p">The number of full audio conversations transcribed by this operator instance.
+</p>
+
+     <p class="p"/>
+
+     </dd>
+
+  
+  
+    <dt class="dt dlterm"><tt class="ph tt">nSTTResultMode</tt> - <a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__context__metrics_kind_counter">Counter</a></dt>
+
+    <dd class="dd">
+
+<p class="p">Current result mode for this WatsonSTT operator instance.
+</p>
+
+     <p class="p"/>
+
+     </dd>
+
+  
+  
+    <dt class="dt dlterm"><tt class="ph tt">nWebsocketConnectionAttempts</tt> - <a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__context__metrics_kind_counter">Counter</a></dt>
+
+    <dd class="dd">
+
+<p class="p">The number of Websocket connection attempts made by this operator instance.
+</p>
+
+     <p class="p"/>
+
+     </dd>
+
+  
+</dl>
+
+</div>
+
+<div class="section">
+<p class="p splhead-1"><strong class="ph b"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__context__dependencies">Libraries</a></strong></p>
+<dl class="dl">
+ 
+  <dt class="dt dlterm"><tt class="ph tt">Boost Library</tt>  </dt>
+
+<dd class="dd"/>
+  <dd class="dd"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__context__dependencies__managedlibrary__lib">Library Name</a>: <tt class="ph tt">boost_system</tt></dd>
+
+  <dd class="dd"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__context__dependencies__managedlibrary__libpath">Library Path</a>: <tt class="ph tt">../../impl/lib</tt></dd>
+
+ 
+ 
+  <dt class="dt dlterm"><tt class="ph tt">Boost Library</tt>  </dt>
+
+<dd class="dd"/>
+  <dd class="dd"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__context__dependencies__managedlibrary__lib">Library Name</a>: <tt class="ph tt">boost_chrono</tt></dd>
+
+  <dd class="dd"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__context__dependencies__managedlibrary__libpath">Library Path</a>: <tt class="ph tt">../../impl/lib</tt></dd>
+
+ 
+ 
+  <dt class="dt dlterm"><tt class="ph tt">Boost Library</tt>  </dt>
+
+<dd class="dd"/>
+  <dd class="dd"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__context__dependencies__managedlibrary__lib">Library Name</a>: <tt class="ph tt">boost_random</tt></dd>
+
+  <dd class="dd"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__context__dependencies__managedlibrary__libpath">Library Path</a>: <tt class="ph tt">../../impl/lib</tt></dd>
+
+ 
+ 
+  <dt class="dt dlterm"><tt class="ph tt">Boost Library</tt>  </dt>
+
+<dd class="dd"/>
+  <dd class="dd"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__context__dependencies__managedlibrary__lib">Library Name</a>: <tt class="ph tt">boost_thread</tt></dd>
+
+  <dd class="dd"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__context__dependencies__managedlibrary__libpath">Library Path</a>: <tt class="ph tt">../../impl/lib</tt></dd>
+
+ 
+</dl>
+
+</div>
+
+</div>
+
+
+</body>
+</html>

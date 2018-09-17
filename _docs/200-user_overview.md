@@ -1,0 +1,161 @@
+---
+title: "Toolkit Usage Overview"
+permalink: /docs/user/overview/
+excerpt: "How to use this toolkit."
+last_modified_at: 2018-09-09T12:37:48+01:00
+redirect_from:
+   - /theme-setup/
+sidebar:
+   nav: "userdocs"
+---
+{% include toc %}
+{%include editme %}
+
+## Satisfying the toolkit requirements
+As explained in the "Toolkit background overview" section, this toolkit requires network connectivity to the Watson STT service and a user specific authentication token to access the Watson STT serice. In addition, it also requires you to download and install the boost_1_67_0 or a higher version as well as the websocketpp version 0.8.1 on the IBM Streams application development machine where the application code is compiled to create the application bundle. These two C++ libraries form the major external dependency for this toolkit. 
+
+Bulk of the Websocket logic in this toolkit's operator relies on the following open source C++ Websocket header only library.
+[websocket++](https://github.com/zaphoyd/websocketpp)
+
+This toolkit requires the following two open source packages that are not shipped with this toolkit due to the open source code distribution policies. Users of this toolkit must first understand the usage clauses stipulated by these two packages and then bring these open source packages on their own inside of this toolkit as explained below. This needs to be done only on the Linux machine(s) where the Streams application development i.e. coding, compiling and packaging is done. Only after doing that, users can use this toolkit in their Streams applications.
+
+1. boost_1_67_0 or a higher version
+   - [IMPORTANT: Substitute your higher version number as needed in place of 1_67_0 below.]
+   Check the current official boost version from here: [C++ boost](https://www.boost.org/)
+   
+   - A few .so files from the boost_1_67_0/lib directory are copied into the impl/lib directory of this toolkit.
+       - (It is needed for the dynamic loading of these .so files when the Streams application using this toolkit is launched.)
+       
+   - The entire boost_1_67_0/include directory is copied into the impl/include directory of this toolkit. [Around 200 MB in size]
+       - (It is needed for a successful compilation of the Streams application that uses this toolkit. Please note that these include files will not bloat the size of that application's SAB file since the impl/include directory will not be part of the SAB file.)
+       
+2. websocketpp v0.8.1
+   - The entire websocketpp directory is copied into the impl/include directory of this toolkit. [Around 1.5 MB in size]
+       - (It is needed for a successful compilation of the Streams application that uses this toolkit. Please note that these include files will not bloat the size of that application's SAB file  since the impl/include directory will not be part of the SAB file.)
+
+## Downloading and building boost_1_67_0 or a higher version
+[IMPORTANT: Substitute your higher version number as needed in place of 1_67_0 below.]
+Check the current official boost version from here: [C++ boost](https://www.boost.org/)
+
+i. Download and build boost 1_67_0 or a higher version in the user's home directory by using the --prefix option as shown below:
+
+   - Download boost_1_67_0 in your home directory: 
+      - mkdir <YOUR_HOME_DIRECTORY>/boost-install-files
+      - cd <YOUR_HOME_DIRECTORY>/boost-install-files
+      - wget https://dl.bintray.com/boostorg/release/1.67.0/source/boost_1_67_0.tar.gz   [Approximately 1 minute]
+
+   - Extract boost_1_67_0 in <YOUR_HOME_DIRECTORY>/boost-install-files:
+      - cd <YOUR_HOME_DIRECTORY>/boost-install-files
+      - tar -xvzf <YOUR_HOME_DIRECTORY>/boost-install-files/boost_1_67_0.tar.gz    [Approximately 5 minutes]
+
+   - Bootstrap boost_1_67_0 and install it in your home directory using the --prefix option:
+      - cd <YOUR_HOME_DIRECTORY>/boost-install-files/boost_1_67_0
+      - ./bootstrap.sh --prefix=<YOUR_HOME_DIRECTORY>/boost_1_67_0             [Approximately 1 minute]
+      - ./b2 install --prefix=<YOUR_HOME_DIRECTORY>/boost_1_67_0 --with=all    [Approximately 25 minutes]
+      - cd <YOUR_HOME_DIRECTORY>
+      - rm -rf <YOUR_HOME_DIRECTORY>/boost-install-files         [Approximately 2 minutes]
+
+   - Instructions shown above are from this URL:
+      - [C++ boost install instructions](https://gist.github.com/1duo/2d1d851f76f8297be264b52c1f31a2ab)
+
+ii. After that, copy a few .so files from the <YOUR_HOME_DIRECTORY>/boost_1_67_0/lib directory into the impl/lib directory of this toolkit.
+   - (libboost_chrono.so.1.67.0, libboost_random.so.1.67.0, libboost_system.so.1.67.0, libboost_thread.so.1.67.0)
+    
+   - For all those .so files you copied, you must also create a symbolic link within the impl/lib directory of this toolkit.
+      - e-g: ln -s libboost_chrono.so.1.67.0 libboost_chrono.so
+
+iii. Move the entire <YOUR_HOME_DIRECTORY>/boost_1_67_0/include/boost directory into the impl/include directory of this toolkit.
+   
+iv. At this time, you may delete the <YOUR_HOME_DIRECTORY>/boost_1_67_0 directory.
+
+## Downloading websocketpp 0.8.1
+i. Download websocketpp v0.8.1 from https://github.com/zaphoyd/websocketpp/releases and extract it in your home directory first. Then move the ~/websocket-0.8.1/websocketpp directory into the impl/include directory of this toolkit.
+   - (websocket++ is a header only C++ library which has no .so files of its own. In that way, it is very convenient.)
+
+ii. At this time, you may delete the ~/websocket-0.8.1 directory.
+
+## A must do in the Streams applications that will use this toolkit
+i. You must add this toolkit as a dependency in your application.
+   - In Streams Studio, you can add this toolkit location in the Streams Explorer view and then add this toolkit as a dependency inside your application project's Dependencies section.
+       
+   - In a command line compile mode, simply add the -t option to point to this toolkit's top-level or its parent directory.
+       
+ii. In Streams studio, you must double click on the BuildConfig of your application's main composite and then select "Other" in the dialog that is opened. In the "C++ compiler options", you must add the following.
+   - -I <Full path to your com.ibm.streamsx.sttgateway toolkit>/impl/include  
+      - (e-g): -I /home/xyz/streamsx.sttgateway/com.ibm.streamsx.sttgateway/impl/include
+       
+   - In Streams studio, you must double click on the BuildConfig of your application's main composite and then select "Other" in the dialog that is opened. In the "Additional SPL compiler options", you must add the following.
+      - --c++std=c++11
+       
+   - If you are building your application from the command line, please refer to the Makefile provided in the AudioFileWatsonSTT example shipped with this toolkit. Before using that Makefile, you must set the STREAMS_STTGATEWAY_TOOLKIT environment variable to point to the full path of your streamsx.sttgateway/com.ibm.streamsx.sttgateway directory. To build your own applications, you can do the same as done in that Makefile.
+
+## Example usage of this toolkit inside a Streams application:
+Here is a code snippet that shows how to invoke the WatsonSTT operator available in this toolkit for the basic features. For using the advanced features of the Watson STT service, please refer to another example code snippet shown in the Toolkit Usage Patterns chapter.
+
+```
+use com.ibm.streamsx.sttgateway.watson::*;
+
+/*
+Invoke one or more instances of the WatsonSTT operator.
+You can send the audio data to this operator all at once or 
+you can send the audio data for the live-use case as it becomes
+available from your telephony network switches.
+
+NOTE: The WatsonSTT operator allows fusing multiple instances of
+this operator into a single PE. This will help in reducing the 
+total number of CPU cores used in running the application.
+*/
+@parallel(width = $numberOfSTTEngines, 
+partitionBy=[{port=ABC, attributes=[conversationId]}])
+(stream<STTResult_t> STTResult) as STT = WatsonSTT(AudioBlobContent as ABC) {
+   param
+      uri: $sttUri;
+      authToken: $sttAuthToken;
+      baseLanguageModel: $sttBaseLanguageModel;
+			
+   output
+      STTResult: conversationId = conversationId, 
+                 utteranceNumber = getUtteranceNumber(),
+                 utteranceText = getUtteranceText(),
+                 utteranceStartTime = getUtteranceStartTime(),
+                 utteranceEndTime = getUtteranceEndTime(),
+                 finalizedUtterance = isFinalizedUtterance(),
+                 transcriptionCompleted = isTranscriptionCompleted(),
+                 fullTranscriptionText = getFullTranscriptionText(),
+                 sttErrorMessage = getSTTErrorMessage();
+}
+```
+
+A built-in example inside this toolkit can be compiled and launched with the default STT options as shown below:
+
+```
+cd   streamsx.sttgateway/samples/AudioFileWatsonSTT
+make
+st  submitjob  -d  <YOUR_STREAMS_DOMAIN>  -i  <YOUR_STREAMS_INSTANCE>  output/com.ibm.streamsx.sttgateway.sample.watsonstt.AudioFileWatsonSTT.sab  -P  sttAuthToken=<YOUR_WATSON_STT_SERVICE_AUTH_TOKEN>
+```
+
+Following IBM Streams job sumission command shows how to override the default values with your own as needed for the various the STT options:
+
+```
+cd   streamsx.sttgateway/samples/AudioRawWatsonSTT
+make
+st submitjob  -d  <YOUR_STREAMS_DOMAIN>  -i  <YOUR_STREAMS_INSTANCE>  output/com.ibm.streamsx.sttgateway.sample.watsonstt.AudioRawWatsonSTT.sab -P  sttAuthToken=<YOUR_WATSON_STT_SERVICE_AUTH_TOKEN>  -P sttResultMode=2   -P sttBaseLanguageModel=en-US_NarrowbandModel  -P contentType="audio/wav"    -P filterProfanity=true   -P keywordsSpottingThreshold=0.294   -P keywordsToBeSpotted="['country', 'learning', 'IBM', 'model']"   -P smartFormattingNeeded=true   -P identifySpeakers=true   -P wordTimestampNeeded=true   -P wordConfidenceNeeded=true   -P wordAlternativesThreshold=0.251   -P maxUtteranceAlternatives=5   -P audioBlobFragmentSize=32768   -P audioDir=<YOUR_AUDIO_FILES_DIRECTORY>   -P numberOfSTTEngines=100
+```
+
+### Working examples shipped with this toolkit
+As explained in the previous section, there are two examples available within this toolkit directory that can be compiled and tested by using your valid authentication token required to connect to the Watson STT service. Within the same streamsx.sttgateway/samples directory where these two examples are present, there is also a directory named audio-files that contains a few test audio files useful for testing these two examples. 
+
+* [AudioFileWatsonSTT](https://github.com/IBMStreams/streamsx.sttgateway/tree/master/samples/AudioFileWatsonSTT)
+* [AudioRawWatsonSTT](https://github.com/IBMStreams/streamsx.sttgateway/tree/master/samples/AudioRawWatsonSTT)
+* [audio_files](https://github.com/IBMStreams/streamsx.sttgateway/tree/master/samples/audio-files)
+
+## Common log messages generated by the Websocket library
+There will be many log messages from the underlying C++ Websocket library routinely getting written in the Streams WatsonSTT operator log files. Such log messages are about making a connection to the Watson STT service, disconnecting from the Watson STT service, receiving Websocket control frames during the ongoing transcription etc. For example, in the absence of any audio data available for transcription for a prolonged period (30 seconds or more), the Watson STT service will terminate the Websocket connection to better utilize its back-end resources. In that case, a set of messages as shown below will be logged. 
+
+```
+[2018-08-11 10:07:35] [control] Control frame received with opcode 8
+[2018-08-11 10:07:35] [application] Websocket connection closed with the Watson STT service.
+[2018-08-11 10:07:35] [disconnect] Disconnect close local:[1011,see the previous message for the error details.] remote:[1011,see the previous message for the error details.]
+```
+
+These messages are normal and they don't reflect any error in the Streams WatsonSTT operator. When the audio data becomes available later, the WatsonSTT operator will reestablish the Websocket connection and continue the transcription task. Only when you see any abnormal runtime exception errors, you should take actions to diagnose and fix the problem.
