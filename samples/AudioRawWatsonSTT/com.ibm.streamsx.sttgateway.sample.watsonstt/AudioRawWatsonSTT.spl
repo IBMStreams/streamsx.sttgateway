@@ -1,0 +1,490 @@
+/*
+==============================================
+# Licensed Materials - Property of IBM
+# Copyright IBM Corp. 2018
+==============================================
+*/
+
+/*
+==============================================
+This example demonstrates transcription of raw audio data to text using the WatsonSTT operator. 
+This example code is suitable for processing the raw audio binary data that is either 
+received directly from the voice network switches via TCP/UDP (OR) read from the WAV files 
+on your own as audio blob data (in full or in partial blob fragments). Such raw binary
+audio data is then sent to the WatsonSTT operator for transcription.
+
+This example shows how to send the raw binary audio data to the WatsonSTT operator to 
+get the transcription results. If you are looking to pick up the audio files 
+available in a given directory and simply send the name of the file to the 
+WatsonSTT operator to get the transcription results, then please refer to a 
+different example project named AudioFileWatonSTT.
+
+Raw audio can be in uncompressed PCM, 16-bit little endian, 
+8 kHz (narrowband) or 16 KHz (broadband) sampling rate, mono format. 
+
+To either downsample or upsample a WAV file, you can use the following ffmpeg command: 
+    ffmpeg -i MyFile.wav -ac 1 -ar 8000 MyNewFile.wav
+
+You can build this example from command line via the make command by using the
+Makefile available in the top-level directory of this example. It will be
+necessary to export the STREAMS_STTGATEWAY_TOOLKIT environment variable by
+pointing it to the full path of your 
+streamsx.sttgateway/com.ibm.streamsx.sttgateway directory.
+
+If you want to build this example inside the Streams Studio, there are certain
+build configuration settings needed. Please refer to the streamsx.sttgateway
+toolkit documentation to learn more about those Streams Studio configuration settings.
+==============================================
+*/
+
+namespace com.ibm.streamsx.sttgateway.sample.watsonstt;
+
+use spl.file::*;
+use com.ibm.streamsx.sttgateway.watson::*;
+
+composite AudioRawWatsonSTT {
+	param
+		expression<rstring> $audioDir : getSubmissionTimeValue("audioDir", "../../audio-files");
+		// You can specify any audio blob fragment size (in number of bytes) to read 
+		// from a given audio file. If you give a size of 0, then the entire 
+		// file content will be read in one single blob and sent to the 
+		// WatsonSTT operator for transcription. In general, smaller the
+		// blob fragment size, longer the time it takes to transcribe a given
+		// audio conversation because of too many tuples and packets getting
+		// exchanged with the WatsonSTT operator as well as between the 
+		// WatsonSTT operator and the Watson STT cloud service. So, keeping the 
+		// blob fragment size as much larger as possible as permitted by the 
+		// usecase will result in shorter end-to-end transcription time for a 
+		// given audio conversation.
+		expression<int64> $audioBlobFragmentSize : (int64)
+			getSubmissionTimeValue("audioBlobFragmentSize", "512");
+		expression<int32> $numberOfSTTEngines :(int32)
+			getSubmissionTimeValue("numberOfSTTEngines", "5") ;
+		expression<rstring> $sttUri : getSubmissionTimeValue("sttUri",
+			"wss://stream.watsonplatform.net/speech-to-text/api/v1/recognize");
+		// IMPORTANT: The WatsonSTT operator uses Websocket to communicate with the 
+		// Watson STT cloud service. For the Websocket interface, one must use 
+		// the auth tokens and not the usual cloud service credentials. 
+		// So, user of the WatsonSTT operator must generate his/her 
+		// own  auth token and provide it via this submission time parameter.
+		// https://console.bluemix.net/docs/services/speech-to-text/input.html#tokens
+		expression<rstring> $sttAuthToken : getSubmissionTimeValue("sttAuthToken");
+		expression<rstring> $sttBaseLanguageModel : 
+			getSubmissionTimeValue("sttBaseLanguageModel", "en-US_NarrowbandModel");
+		expression<rstring> $contentType : 
+			getSubmissionTimeValue("contentType", "audio/wav");
+		expression<rstring> $baseModelVersion : 
+			getSubmissionTimeValue("baseModelVersion", "");
+		expression<rstring> $customizationId : 
+			getSubmissionTimeValue("customizationId", "");
+		expression<rstring> $acousticCustomizationId : 
+			getSubmissionTimeValue("acousticCustomizationId", "");
+		expression<float64> $customizationWeight : 
+			(float64)getSubmissionTimeValue("customizationWeight", "0.30");
+		expression<int32> $sttBatchSize : (int32)getSubmissionTimeValue("sttBatchSize", "0");
+		expression<int32> $sttResultMode : (int32)getSubmissionTimeValue("sttResultMode", "3");
+		expression<int32> $maxUtteranceAlternatives : 
+			(int32)getSubmissionTimeValue("maxUtteranceAlternatives", "1");	
+		expression<boolean> $sttRequestLogging : 
+			(boolean)getSubmissionTimeValue("sttRequestLogging", "false");
+		expression<boolean> $filterProfanity : 
+			(boolean)getSubmissionTimeValue("filterProfanity", "false");
+		expression<boolean> $sttJsonResponseDebugging : 
+			(boolean)getSubmissionTimeValue("sttJsonResponseDebugging", "false");
+		expression<float64> $wordAlternativesThreshold : 
+			(float64)getSubmissionTimeValue("wordAlternativesThreshold", "0.0");
+		expression<boolean> $wordConfidenceNeeded : 
+			(boolean)getSubmissionTimeValue("wordConfidenceNeeded", "false");
+		expression<boolean> $wordTimestampNeeded : 
+			(boolean)getSubmissionTimeValue("wordTimestampNeeded", "false");
+		expression<boolean> $identifySpeakers : 
+			(boolean)getSubmissionTimeValue("identifySpeakers", "false");
+		expression<boolean> $smartFormattingNeeded : 
+			(boolean)getSubmissionTimeValue("smartFormattingNeeded", "false");
+		expression<float64> $keywordsSpottingThreshold : 
+			(float64)getSubmissionTimeValue("keywordsSpottingThreshold", "0.0");
+		expression<list<rstring>> $keywordsToBeSpotted : 
+			(list<rstring>)getSubmissionTimeValue("keywordsToBeSpotted", "[]");	
+		expression<boolean> $websocketLoggingNeeded : 
+			(boolean)getSubmissionTimeValue("websocketLoggingNeeded", "false");
+		expression<float64> $cpuYieldTimeInAudioSenderThread : 
+			(float64)getSubmissionTimeValue("cpuYieldTimeInAudioSenderThread", "0.001");
+		expression<float64> $waitTimeBeforeSTTServiceConnectionRetry : 
+			(float64)getSubmissionTimeValue("waitTimeBeforeSTTServiceConnectionRetry", "3.0");
+		expression<int32> $maxAllowedConnectionAttempts : 
+			(int32)getSubmissionTimeValue("maxAllowedConnectionAttempts", "10");
+
+	type
+		// This STT result type contains many attributes to
+		// demonstrate all the basic and very advanced features of 
+		// the Watson STT service. Not all real life applications will need 
+		// all these attributes. You can decide to include or omit these
+		// attributes based on the specific STT features your application will need. 
+		// Trimming the unused attributes will also help in 
+		// reducing the STT processing overhead and in turn 
+		// help in receiving the STT results faster.
+		// Read the streamsx.sttgateway toolkit documentation to learn about
+		// what features are available, how they work and how different attributes are 
+		// related to those features.
+		STTResult_t = rstring conversationId, int32 utteranceNumber,
+			rstring utteranceText, boolean finalizedUtterance,
+			float32 confidence, rstring fullTranscriptionText,
+			rstring sttErrorMessage, boolean transcriptionCompleted,
+			list<rstring> utteranceAlternatives, 
+			list<list<rstring>> wordAlternatives,
+			list<list<float64>> wordAlternativesConfidences,
+			list<float64> wordAlternativesStartTimes,
+			list<float64> wordAlternativesEndTimes,
+			list<rstring> utteranceWords,
+			list<float64> utteranceWordsConfidences,
+			list<float64> utteranceWordsStartTimes,
+			list<float64> utteranceWordsEndTimes,
+			float64 utteranceStartTime,
+			float64 utteranceEndTime,
+			list<int32> utteranceWordsSpeakers,
+			list<float64> utteranceWordsSpeakersConfidences,
+			map<rstring, list<map<rstring, float64>>> keywordsSpottingResults;
+
+	graph
+		// Scan a directory periodically to pick up the audio files and 
+		// send the name of every audio file to the upstream Custom operator.
+		// That operator in turn will read the audio blob contents from that
+		// file and send the blob data either in full or in partial fragments
+		// to the WatsonSTT operator.
+		// Similar idea can be followed to receive the audio blob data from 
+		// the voice network switches (via TCP/UDP) instead of reading from the audio files.
+		//
+		// The output stream from this operator will be connected to the
+		// upstream Custom operator's input stream. That operator will
+		// read the blob data and send it to the WatsonSTT operator.
+		// That operator expects one of its input stream attributes to be 
+		// named as 'speech' with an SPL type of either rstring or blob.
+		// That operator can take as input an  audio filename (rstring) or 
+		// raw binary audio data (blob). In addition to that mandatory 
+		// input stream attribute, additional attributes can be sent 
+		// in the input stream to be auto assigned to the output stream of 
+		// the WatsonSTT operator.
+		stream<rstring fileName> AudioFileName = DirectoryScan() {
+			param
+				directory : $audioDir;
+				pattern : "\\.wav$";
+				initDelay : 10.0;
+		}
+
+		// In this Custom operator we will read the audio blob content and 
+		// send it to the WatsonSTT operator. Read the entire logic in this
+		// Custom operator thoroughly to understand what must be done to send
+		// the audio content as raw binary data to the WatsonSTT operator.
+		// There is an important step that must be performed after sending the
+		// entire blob content either in full or in partial blob fragments to the
+		// STT operator. Please read the commentary inside this operator completely.
+		stream<rstring conversationId, blob speech> AudioBlobContent as ABC = 
+			Custom(AudioFileName as AFN) {
+			logic
+				onTuple AFN: {
+					mutable int64 audioBlobFragmentSize =  $audioBlobFragmentSize;
+					
+					// Audio blob fragment size can be any value >= 0.
+					// If it is given as 0, then this operator will read the
+					// entire audio file content into a single blob and send it. 
+					if (audioBlobFragmentSize < 0l) {
+						printStringLn("Invalid blob fragment size " + 
+							(rstring)audioBlobFragmentSize + " given. It must be >= 0.");
+						abort();
+					}
+					
+					mutable uint64 fh = 0ul;
+					mutable int32 err = 0;
+                      
+					// Read the given binary audio file.
+					fh = fopen(fileName, "rb", err);
+
+					if (err != 0) {
+						appTrc(Trace.error, "Unable to open the audio file " + fileName + 
+							". Error code=" + (rstring)err, "AUDIO_BLOB_READ_ERROR");
+						return;
+					}
+
+					// Get the file size by seeking to the end of the audio file.
+					fseek(fh, 0l, optSEEK_END(), err);
+
+					if (err != 0) {
+						appTrc(Trace.error, "Unable to seek to the end of the audio file " + 
+							fileName + ". Error code=" + (rstring)err, "AUDIO_BLOB_READ_ERROR");
+						fclose(fh, err);
+						return;
+					}
+
+					// Get the current position at the very end of the audio file.
+					int64 fileSize = ftell(fh, err);
+
+					if (err != 0) {
+						appTrc(Trace.error, "Unable to get the size of the audio file " + 
+							fileName + ". Error code=" + (rstring)err, "AUDIO_BLOB_READ_ERROR");
+						fclose(fh, err);
+						return;
+					}
+
+					// If it is a zero length file, ignore this audio file.
+					if (fileSize == 0l) {
+						appTrc(Trace.error, "Audio file is empty. Skipping this file: " + 
+							fileName, "AUDIO_BLOB_READ_ERROR");
+						fclose(fh, err);
+						return;					
+					}
+
+					// Rewind to the top of the audio file.
+					fseek(fh, 0l, optSEEK_SET(), err);
+
+					if (err != 0) {
+						appTrc(Trace.error, "Unable to seek to the top of the audio file " + 
+							fileName + ". Error code=" + (rstring)err, "AUDIO_BLOB_READ_ERROR");
+						fclose(fh, err);
+						return;
+					}
+
+					if (audioBlobFragmentSize == 0l) {
+						// User has configured to send the entire audio file content in a single blob.
+						audioBlobFragmentSize = fileSize;
+					}					
+
+					int32 numberOfBlobFragments = fileSize / audioBlobFragmentSize;
+					int32 numberOfBytesRemaining = fileSize % audioBlobFragmentSize;
+					mutable int32 loopCnt = 0;
+					mutable boolean atleastOneBlobFragmentWasSent = false;
+					mutable list<uint8> audioBlob = [];
+					mutable boolean audioBlobReadError = false;
+					mutable AudioBlobContent oTuple = {};
+					oTuple.conversationId = AFN.fileName;
+					
+					// Stay in a loop to read all the blob fragments and send.
+					while(++loopCnt <= numberOfBlobFragments) {
+						// Read an audio blob fragment from the audio file.
+                      	clearM(audioBlob);
+						fread(audioBlob, fh, (uint64)audioBlobFragmentSize, err);
+
+						if (err != 0) {
+							appTrc(Trace.error, "Unable to read the binary contents of the audio file " +
+								fileName + ". Error code=" + (rstring)err, "AUDIO_BLOB_READ_ERROR");
+							audioBlobReadError = true;
+							break;
+						}
+						
+						// Send this blob data now.
+						oTuple.speech = (blob)audioBlob;
+						submit(oTuple, ABC);
+						atleastOneBlobFragmentWasSent = true;
+					} // End of while(++loopCnt <= numberOfBlobFragments)
+					
+					// See if there are still any remaining bytes that didn't manage to 
+					// fit in a full blob in the previous while loop. 
+					// (i.e. less than the configured audo blob fragment size).
+					while (numberOfBytesRemaining > 0 && audioBlobReadError == false) {
+						// Read the remaining bytes.
+                      	clearM(audioBlob);
+						fread(audioBlob, fh, (uint64)numberOfBytesRemaining, err);
+
+						if (err != 0) {
+							appTrc(Trace.error, "Unable to read the binary contents of the audio file " +
+								fileName + ". Error code=" + (rstring)err, "AUDIO_BLOB_READ_ERROR");
+							break;
+						}
+						
+						// Send this blob data now.
+						oTuple.speech = (blob)audioBlob;
+						submit(oTuple, ABC);
+						atleastOneBlobFragmentWasSent = true;
+						// This must be the very last statement in this while loop.
+						// We must only do a single iteration of this while loop.
+						break;
+					}					
+					
+					fclose(fh, err);
+					
+					// *** IMPORTANT LOGIC *** IMPORTANT LOGIC *** IMPORTANT LOGIC ***
+					//	
+					// If we have sent at least one blob fragment to the
+					// WatsonSTT operator for transcription, then we must send an empty blob to 
+					// indicate the end of the audio conversation. If we don't do this, 
+					// the WatsonSTT operator will not function correctly. That operator
+					// relies on this empty blob to inform the Watson STT service about
+					// the end of an ongoing audio conversation. So, it is very important
+					// for the SPL code here to send ONLY ONE empty blob at the end of transmitting 
+					// all the non-empty blob content (either in full or in partial fragments)
+					// belonging to a given audio conversation.
+					// So, remember to do this whether you are sending the audio blob data 
+					// after reading it from a file or receiving it from a network switch.
+					//
+					if (atleastOneBlobFragmentWasSent == true) {
+						clearM(oTuple.speech);
+						// Send an empty blob as the very last one for this audio conversation.
+						submit(oTuple, ABC);
+					}
+					//
+					// *** IMPORTANT LOGIC *** IMPORTANT LOGIC *** IMPORTANT LOGIC ***
+				} // End of onTuple AFN				
+		} // End of the Custom operator.
+		
+		// Invoke one or more instances of the WatsonSTT operator.
+		// You can send the audio data to this operator all at once or 
+		// you can send the audio data for the live-use case as it becomes
+		// available from your telephony network switches.
+		//
+		// NOTE: The WatsonSTT operator allows fusing multiple instances of
+		// this operator into a single PE. This will help in reducing the 
+		// total number of CPU cores used in running the application.
+		@parallel(width = $numberOfSTTEngines, 
+		partitionBy=[{port=ABC, attributes=[conversationId]}])
+		stream<STTResult_t> STTResult = WatsonSTT(AudioBlobContent as ABC) {
+			logic
+				state: {
+					mutable int32 _conversationCnt = 0;
+					mutable rstring _conversationId = "";
+				}
+				
+				onTuple ABC: {
+					if (_conversationId != ABC.conversationId) {
+						// There may be many blob fragments arriving for a given audio conversation.
+						// So, display only when the very first blob fragment for a given audio arrives.
+						_conversationId = ABC.conversationId;
+						appTrc(Trace.error, "Channel " + (rstring)getChannel() + 
+							", Speech input " + (rstring)++_conversationCnt +
+							": " + _conversationId);
+					}
+				}
+
+			// Just to demonstrate, we are using all the operator parameters below.
+			// Except for the first three parameters, every other parameter is an
+			// optional one. In real-life applications, such optional parameters
+			// can be omitted unless you want to change the default behavior of them.				
+			param
+				uri: $sttUri;
+				authToken: $sttAuthToken;
+				baseLanguageModel: $sttBaseLanguageModel;
+				contentType: $contentType;
+				sttResultMode: $sttResultMode;
+				sttRequestLogging: $sttRequestLogging;
+				filterProfanity: $filterProfanity;
+				sttJsonResponseDebugging: $sttJsonResponseDebugging;
+				maxUtteranceAlternatives: $maxUtteranceAlternatives;
+				wordAlternativesThreshold: $wordAlternativesThreshold;
+				wordConfidenceNeeded: $wordConfidenceNeeded;
+				wordTimestampNeeded: $wordTimestampNeeded;
+				identifySpeakers: $identifySpeakers;
+				smartFormattingNeeded: $smartFormattingNeeded;
+				keywordsSpottingThreshold: $keywordsSpottingThreshold;
+				keywordsToBeSpotted: $keywordsToBeSpotted;
+				websocketLoggingNeeded: $websocketLoggingNeeded;
+				cpuYieldTimeInAudioSenderThread: $cpuYieldTimeInAudioSenderThread;
+				waitTimeBeforeSTTServiceConnectionRetry : $waitTimeBeforeSTTServiceConnectionRetry;
+				maxAllowedConnectionAttempts : $maxAllowedConnectionAttempts;
+								
+				// Use the following operator parameters as needed.
+				// Point to a specific version of the base model if needed.
+				//
+				// e-g: "en-US_NarrowbandModel.v07-06082016.06202016"
+				baseModelVersion: $baseModelVersion;
+				// Language model customization id to be used for the transcription.
+				// e-g: "74f4807e-b5ff-4866-824e-6bba1a84fe96"
+				customizationId: $customizationId;
+				// Acoustic model customization id to be used for the transcription.
+				// e-g: "259c622d-82a4-8142-79ca-9cab3771ef31"
+				acousticCustomizationId: $acousticCustomizationId;
+				// Relative weight to be given to the words in the custom Language model.
+				customizationWeight: $customizationWeight;
+
+			// Just for demonstrative purposes, we are showing below the output attribute
+			// assignments using all the available custom output functions. In your
+			// real-life applications, it is sufficient to do the assignments via
+			// custom output functions only as needed.
+			//
+			// Some of the important output functions that must be used to check
+			// the result of the transcription are:
+			// getSTTErrorMessage --> It tells whether the transcription succeeded or not.
+			// isFinalizedUtterance --> In sttResultMode 1, it tells whether this is a 
+			//                          partial utterance or a finalized utterance.
+			// isTranscriptionCompleted --> It tells whether the transcription is 
+			//                              completed for the current audio conversation or not.
+			//
+			output
+				STTResult: conversationId = conversationId, 
+					utteranceNumber = getUtteranceNumber(),
+					utteranceText = getUtteranceText(),
+					finalizedUtterance = isFinalizedUtterance(),
+					confidence = getConfidence(),
+					fullTranscriptionText = getFullTranscriptionText(),
+					sttErrorMessage = getSTTErrorMessage(),
+					transcriptionCompleted = isTranscriptionCompleted(),
+					// n-best utterance alternative hypotheses.
+					utteranceAlternatives = getUtteranceAlternatives(),
+					// Confusion networks (a.k.a. Consensus)
+					wordAlternatives = getWordAlternatives(),
+					wordAlternativesConfidences = getWordAlternativesConfidences(),
+					wordAlternativesStartTimes = getWordAlternativesStartTimes(),
+					wordAlternativesEndTimes = getWordAlternativesEndTimes(),
+					utteranceWords = getUtteranceWords(),
+					utteranceWordsConfidences = getUtteranceWordsConfidences(),
+					utteranceWordsStartTimes = getUtteranceWordsStartTimes(),
+					utteranceWordsEndTimes = getUtteranceWordsEndTimes(),
+					utteranceStartTime = getUtteranceStartTime(),
+					utteranceEndTime = getUtteranceEndTime(),
+					// Speaker label a.k.a. Speaker id
+					utteranceWordsSpeakers = getUtteranceWordsSpeakers(),
+					utteranceWordsSpeakersConfidences = getUtteranceWordsSpeakersConfidences(),
+					// Results from keywords spotting (matching) in an utterance.
+					keywordsSpottingResults = getKeywordsSpottingResults();
+					
+			// If needed, you can decide not to fuse the WatsonSTT operator instances and
+			// keep each instance of this operator on its own PE (a.k.a Linux process) by
+			// removing the block comment around this config clause.
+			/*
+			config
+				placement : partitionExlocation("sttpartition");
+			*/
+		}
+		
+		// In a real-life application, there will be additional operators here with the 
+		// necessary logic to look inside the tuples arriving on the STTResult stream and
+		// analyze different kinds of speech to text result attributes returned from the STT service.
+		// 
+		// But, in this simple example we will only collect the results arriving from the 
+		// WatsonSTT operator and display them on stdout.
+		() as MySink1 = Custom(STTResult as SR) {
+			logic
+				state: {
+					mutable int32 _conversationCnt = 0;
+				}
+				
+				onTuple SR: {
+					// If the user gave us a non-zero batch size, we will print a single line
+					// about the batch completion at the very end. In that case, we will 
+					// avoid printing every individual transcription result. This will not
+					// make the file system very busy in the Distributed Mode execution.
+					// This is only useful if someone is interested in doing a 
+					// timing measurement to see how long it takes to transcribe a 
+					// known batch of audio conversations with the sttResultMode operator
+					// parameter to set to a value of 3 (get the full text after the
+					// entire conversation is transcribed).
+					if ($sttBatchSize > 0) {
+						++_conversationCnt;
+						
+						if (_conversationCnt == 1) {
+							appTrc(Trace.error, "STT result for conversation " + (rstring) _conversationCnt
+								+ " " + conversationId + " arrived.");
+						} else if (_conversationCnt == $sttBatchSize) {
+							appTrc(Trace.error, "STT result for conversation " + (rstring) _conversationCnt
+								+ " " + conversationId + " arrived.");
+						}
+					} else {
+						// User didn't give a non-zero batch size. In that case,
+						// we will print every transcription result, which will make the
+						// file system busy in the Distributed Mode execution.
+						appTrc(Trace.error, (rstring)++_conversationCnt + 
+							") STT result: " + (rstring)SR);
+					}
+				}
+				
+			config
+				threadedPort: queue(SR, Sys.Wait);
+		}
+}
