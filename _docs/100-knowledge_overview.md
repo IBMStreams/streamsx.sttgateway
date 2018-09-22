@@ -2,7 +2,7 @@
 title: "Toolkit Overview [Technical]"
 permalink: /docs/knowledge/overview/
 excerpt: "Basic knowledge of the toolkit's technical domain."
-last_modified_at: 2018-09-20T12:37:48+01:00
+last_modified_at: 2018-09-22T12:37:48+01:00
 redirect_from:
    - /theme-setup/
 sidebar:
@@ -21,15 +21,15 @@ At a very high level, this toolkit shares the same design goal as the other IBM 
 1. Namespace for them are different.
    - com.ibm.streams.speech2text.watson (Wraps Rapid libraries)
    - com.ibm.streamsx.sttgateway.watson (Invokes the IBM Watson STT cloud service)
-   
+
 2. Self contained versus external service invocation.
    - com.ibm.streams.speech2text is self contained. It includes the speech to text core libraries and a small number of base language model files that are necessary to do the speech to text conversion.
-       
+
    - com.ibm.streamsx.sttgateway relies on an external STT service. It contains the necessary code to communicate with the external STT service to get the speech to text conversion done.
        
 3. Speech data stays within your application versus going outside.
    - In com.ibm.streams.speech2text, audio content will not have to go outside of this toolkit.
-       
+
    - In com.ibm.streamsx.sttgateway, Audio content will go outside of this toolkit via the network to the external service that can run either on the IBM public cloud or inside your own private network in an ICP container.
 
 4. Ease of customizing the LM and AM models.
@@ -39,12 +39,12 @@ At a very high level, this toolkit shares the same design goal as the other IBM 
        
 5. Ease of switching between different language models and minimizing toolkit upgrade cycles.
    - In com.ibm.streams.speech2text, it is necessary to package relevant language base models (English, Spanish, French etc.) as part of this toolkit. This also implies that a toolkit upgrade will be needed for using newer versions of the models as well as the newer versions of the speech engine libraries.
-       
+
    - In com.ibm.streamsx.sttgateway, there is no packaging of the language model files needed inside the toolkit. Switching between different language models is simply done through an operator parameter. There is no need to upgrade this toolkit for using the newer versions of the models as well as the newer versions of the speech engine libraries as they become available in the external Watson STT service.
        
 6. Ease of using different audio formats.
    - In com.ibm.streams.speech2text, it may be possible to use only WAV formatted audio data.
-       
+
    - In com.ibm.streamsx.sttgateway, any supported audio format by the STT service can be used (mp3, WAV, FLAC etc.)
 
 7. Speech to text conversion performance.
@@ -52,22 +52,22 @@ At a very high level, this toolkit shares the same design goal as the other IBM 
        
 8. Operator names.
    - In com.ibm.streams.speech2text, WatsonS2T is the operator name.
-       
+
    - In com.ibm.streamsx.sttgateway, WatsonSTT is the operator name.
 
 9. RPM dependency.
    - In com.ibm.streams.speech2text, atlas and atlas-devel RPMs for Linux must be installed in all the Streams machines where the WatsonS2T is running.
-       
+
    - In com.ibm.streamsx.sttgateway, there is no such RPM dependency.
        
 10. CPU core usage.
    - In com.ibm.streams.speech2text, every instance of the WatsonS2T operator must run on its own PE (a.k.a Linux process). Multiple instances of that operator can't be fused to pack them into a single Linux process. This will result in using many CPU cores when there is a need to have a bank of WatsonS2T operators to achieve data parallelism.
-       
+
    - In com.ibm.streamsx.sttgateway, there is no such restriction to fuse multiple WatsonSTT operators into a single PE (Linux process). This will result in the efficient use of the CPU cores by requiring fewer CPU cores to have a bank of WatsonSTT operators to achieve data parallelism.
 
 11. Transcription result options.
    - In com.ibm.streams.speech2text, the WatsonS2T operator can only return one full utterance at a time.
-       
+
    - In com.ibm.streamsx.sttgateway, the WatsonSTT operator can be configured at runtime to return one of the following as transcription result.       
       - Option 1: Partial utterances as the transcription is in progress.
       - Option 2: Only finalized a.k.a. completed utterances.
