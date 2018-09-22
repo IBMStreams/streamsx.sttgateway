@@ -36,7 +36,7 @@
       See the samples folder inside this toolkit for working examples that show how to use this operator.
       
       For a detailed documentation about the operator design, usage patterns and in-depth technical
-      details, please refer to the STT Gateway toolkit documentation available at this URL:
+      details, please refer to the official STT Gateway toolkit documentation available at this URL:
       
       [https://ibmstreams.github.io/streamsx.sttgateway]
       </description>
@@ -45,25 +45,36 @@
       <iconUri size="32">watsonstt_32.gif</iconUri>
 
       <metrics>
-        <metric>
-          <name>nWebsocketConnectionAttempts</name>
-          <description>The number of Websocket connection attempts made by this operator instance.</description>
-          <kind>Counter</kind>
-        </metric>
-        <metric>
-          <name>nFullAudioConversationsReceived</name>
-          <description>The number of full audio conversations received by this operator instance.</description>
-          <kind>Gauge</kind>
-        </metric>
-        <metric>
-          <name>nFullAudioConversationsTranscribed</name>
-          <description>The number of full audio conversations transcribed by this operator instance.</description>
-          <kind>Gauge</kind>
-        </metric>
+      	<description>
+      	A few custom metrics are available for the WatsonSTT operator. The Counter kind 
+      	metrics listed below will be updated when the operator starts. 
+      	But, the Gauge kind metrics will be updated live during 
+      	transcription only when the sttLiveMetricsUpdateNeeded 
+      	operator parameter is set to true.
+      	</description>
+
         <metric>
           <name>nSTTResultMode</name>
-          <description>Current result mode for this WatsonSTT operator instance.</description>
+          <description>STT result mode currently in effect for a given operator instance.</description>
           <kind>Counter</kind>
+        </metric>
+        
+        <metric>
+          <name>nWebsocketConnectionAttempts</name>
+          <description>Number of STT service Websocket connection attempts made by this operator instance.</description>
+          <kind>Counter</kind>
+        </metric>
+        
+        <metric>
+          <name>nFullAudioConversationsReceived</name>
+          <description>Number of full audio conversations received for transcription by this operator instance.</description>
+          <kind>Gauge</kind>
+        </metric>
+        
+        <metric>
+          <name>nFullAudioConversationsTranscribed</name>
+          <description>Number of full audio conversations transcribed by this operator instance.</description>
+          <kind>Gauge</kind>
         </metric>
       </metrics>
       
@@ -441,6 +452,16 @@
         <rewriteAllowed>true</rewriteAllowed>
         <expressionMode>AttributeFree</expressionMode>
         <type>int32</type>
+        <cardinality>1</cardinality>
+      </parameter>
+
+      <parameter>
+        <name>sttLiveMetricsUpdateNeeded</name>
+        <description>This parameter specifies whether live update for this operator's custom metrics is needed. (Default is true)</description>
+        <optional>true</optional>
+        <rewriteAllowed>true</rewriteAllowed>
+        <expressionMode>AttributeFree</expressionMode>
+        <type>boolean</type>
         <cardinality>1</cardinality>
       </parameter>
 

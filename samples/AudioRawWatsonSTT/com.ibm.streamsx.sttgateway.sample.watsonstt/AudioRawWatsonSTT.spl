@@ -113,6 +113,8 @@ composite AudioRawWatsonSTT {
 			(float64)getSubmissionTimeValue("waitTimeBeforeSTTServiceConnectionRetry", "3.0");
 		expression<int32> $maxAllowedConnectionAttempts : 
 			(int32)getSubmissionTimeValue("maxAllowedConnectionAttempts", "10");
+		expression<boolean> $sttLiveMetricsUpdateNeeded : 
+			(boolean)getSubmissionTimeValue("sttLiveMetricsUpdateNeeded", "true");
 
 	type
 		// This STT result type contains many attributes to
@@ -328,7 +330,9 @@ composite AudioRawWatsonSTT {
 		// Invoke one or more instances of the WatsonSTT operator.
 		// You can send the audio data to this operator all at once or 
 		// you can send the audio data for the live-use case as it becomes
-		// available from your telephony network switches.
+		// available from your telephony network switch.
+		// Avoid feeding audio data coming from more than one data source into this 
+		// parallel region which may cause erroneous transcription results.
 		//
 		// NOTE: The WatsonSTT operator allows fusing multiple instances of
 		// this operator into a single PE. This will help in reducing the 
@@ -378,6 +382,7 @@ composite AudioRawWatsonSTT {
 				cpuYieldTimeInAudioSenderThread: $cpuYieldTimeInAudioSenderThread;
 				waitTimeBeforeSTTServiceConnectionRetry : $waitTimeBeforeSTTServiceConnectionRetry;
 				maxAllowedConnectionAttempts : $maxAllowedConnectionAttempts;
+				sttLiveMetricsUpdateNeeded : $sttLiveMetricsUpdateNeeded;
 								
 				// Use the following operator parameters as needed.
 				// Point to a specific version of the base model if needed.

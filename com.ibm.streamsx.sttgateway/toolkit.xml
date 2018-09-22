@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no" ?>
 <toolkitModel xmlns="http://www.ibm.com/xmlns/prod/streams/spl/toolkit" productVersion="4.2.4.1" xmlns:common="http://www.ibm.com/xmlns/prod/streams/spl/common" xmlns:ti="http://www.ibm.com/xmlns/prod/streams/spl/toolkitInfo" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
 
-  <toolkit name="com.ibm.streamsx.sttgateway" requiredProductVersion="4.1.0.0" version="1.0.0">
+  <toolkit name="com.ibm.streamsx.sttgateway" requiredProductVersion="4.1.0.0" version="1.0.1">
     <description/>
     <uriTable>
       <uri index="3" value="com.ibm.streamsx.sttgateway.watson/WatsonSTT/watsonstt_32.gif"/>
@@ -40,7 +40,7 @@
       See the samples folder inside this toolkit for working examples that show how to use this operator.
       
       For a detailed documentation about the operator design, usage patterns and in-depth technical
-      details, please refer to the STT Gateway toolkit documentation available at this URL:
+      details, please refer to the official STT Gateway toolkit documentation available at this URL:
       
       [https://ibmstreams.github.io/streamsx.sttgateway]
       </description>
@@ -210,6 +210,9 @@
         </parameter>
         <parameter cardinality="1" expressionMode="AttributeFree" name="maxAllowedConnectionAttempts" optional="true" type="int32">
           <description>This parameter specifies the maximum number of attempts to make a Websocket connection to the STT service. It should be &gt;= 1 (Default is 10)</description>
+        </parameter>
+        <parameter cardinality="1" expressionMode="AttributeFree" name="sttLiveMetricsUpdateNeeded" optional="true" type="boolean">
+          <description>This parameter specifies whether live update for this operator's custom metrics is needed. (Default is true)</description>
         </parameter>
         <inputPort maxNumPorts="1" minNumPorts="1" optional="false" windowPunctInputMode="Oblivious">
           <description>

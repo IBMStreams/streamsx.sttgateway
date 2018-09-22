@@ -60,6 +60,7 @@ public:
 	SPL::float64 cpuYieldTimeInAudioSenderThread;
 	SPL::float64 waitTimeBeforeSTTServiceConnectionRetry;
 	SPL::int32 maxAllowedConnectionAttempts;
+	bool sttLiveMetricsUpdateNeeded;
 	std::string uri;
 	std::string authToken;
 	std::string baseLanguageModel;
