@@ -22,7 +22,7 @@
 <div class="body refbody">
 <div class="section">
 <p class="p">
-<a class="xref" href="../toolkits/toolkits.html">Gateway to the IBM Speech To Text (STT) cloud service</a> &gt; <a class="xref" href="tk$com.ibm.streamsx.sttgateway.html">com.ibm.streamsx.sttgateway 1.0.1</a> &gt; <a class="xref" href="ns$com.ibm.streamsx.sttgateway.watson.html">com.ibm.streamsx.sttgateway.watson</a> &gt; WatsonSTT</p>
+<a class="xref" href="../toolkits/toolkits.html">Gateway to the IBM Speech To Text (STT) cloud service</a> &gt; <a class="xref" href="tk$com.ibm.streamsx.sttgateway.html">com.ibm.streamsx.sttgateway 1.0.0</a> &gt; <a class="xref" href="ns$com.ibm.streamsx.sttgateway.watson.html">com.ibm.streamsx.sttgateway.watson</a> &gt; WatsonSTT</p>
 
 </div>
 
@@ -55,7 +55,7 @@
 <p class="p">      See the samples folder inside this toolkit for working examples that show how to use this operator.
 </p>
 
-<p class="p">      For a detailed documentation about the operator design, usage patterns and in-depth technical       details, please refer to the official STT Gateway toolkit documentation available at this URL:
+<p class="p">      For a detailed documentation about the operator design, usage patterns and in-depth technical       details, please refer to the STT Gateway toolkit documentation available at this URL:
 </p>
 
 <p class="p">      <a class="xref" href="https://ibmstreams.github.io/streamsx.sttgateway">https://ibmstreams.github.io/streamsx.sttgateway</a>
@@ -81,14 +81,14 @@
  
   <dt class="dt dlterm">Parameters</dt>
 
-  <dd class="dd">This operator supports 25 parameters.
+  <dd class="dd">This operator supports 24 parameters.
 <p class="p"> Required: 
 <a class="xref" href="#spldoc_operator__parameter__authToken">authToken</a>, <a class="xref" href="#spldoc_operator__parameter__baseLanguageModel">baseLanguageModel</a>, <a class="xref" href="#spldoc_operator__parameter__uri">uri</a>
 
 </p>
 
 <p class="p"> Optional: 
-<a class="xref" href="#spldoc_operator__parameter__acousticCustomizationId">acousticCustomizationId</a>, <a class="xref" href="#spldoc_operator__parameter__baseModelVersion">baseModelVersion</a>, <a class="xref" href="#spldoc_operator__parameter__contentType">contentType</a>, <a class="xref" href="#spldoc_operator__parameter__cpuYieldTimeInAudioSenderThread">cpuYieldTimeInAudioSenderThread</a>, <a class="xref" href="#spldoc_operator__parameter__customizationId">customizationId</a>, <a class="xref" href="#spldoc_operator__parameter__customizationWeight">customizationWeight</a>, <a class="xref" href="#spldoc_operator__parameter__filterProfanity">filterProfanity</a>, <a class="xref" href="#spldoc_operator__parameter__identifySpeakers">identifySpeakers</a>, <a class="xref" href="#spldoc_operator__parameter__keywordsSpottingThreshold">keywordsSpottingThreshold</a>, <a class="xref" href="#spldoc_operator__parameter__keywordsToBeSpotted">keywordsToBeSpotted</a>, <a class="xref" href="#spldoc_operator__parameter__maxAllowedConnectionAttempts">maxAllowedConnectionAttempts</a>, <a class="xref" href="#spldoc_operator__parameter__maxUtteranceAlternatives">maxUtteranceAlternatives</a>, <a class="xref" href="#spldoc_operator__parameter__smartFormattingNeeded">smartFormattingNeeded</a>, <a class="xref" href="#spldoc_operator__parameter__sttJsonResponseDebugging">sttJsonResponseDebugging</a>, <a class="xref" href="#spldoc_operator__parameter__sttLiveMetricsUpdateNeeded">sttLiveMetricsUpdateNeeded</a>, <a class="xref" href="#spldoc_operator__parameter__sttRequestLogging">sttRequestLogging</a>, <a class="xref" href="#spldoc_operator__parameter__sttResultMode">sttResultMode</a>, <a class="xref" href="#spldoc_operator__parameter__waitTimeBeforeSTTServiceConnectionRetry">waitTimeBeforeSTTServiceConnectionRetry</a>, <a class="xref" href="#spldoc_operator__parameter__websocketLoggingNeeded">websocketLoggingNeeded</a>, <a class="xref" href="#spldoc_operator__parameter__wordAlternativesThreshold">wordAlternativesThreshold</a>, <a class="xref" href="#spldoc_operator__parameter__wordConfidenceNeeded">wordConfidenceNeeded</a>, <a class="xref" href="#spldoc_operator__parameter__wordTimestampNeeded">wordTimestampNeeded</a>
+<a class="xref" href="#spldoc_operator__parameter__acousticCustomizationId">acousticCustomizationId</a>, <a class="xref" href="#spldoc_operator__parameter__baseModelVersion">baseModelVersion</a>, <a class="xref" href="#spldoc_operator__parameter__contentType">contentType</a>, <a class="xref" href="#spldoc_operator__parameter__cpuYieldTimeInAudioSenderThread">cpuYieldTimeInAudioSenderThread</a>, <a class="xref" href="#spldoc_operator__parameter__customizationId">customizationId</a>, <a class="xref" href="#spldoc_operator__parameter__customizationWeight">customizationWeight</a>, <a class="xref" href="#spldoc_operator__parameter__filterProfanity">filterProfanity</a>, <a class="xref" href="#spldoc_operator__parameter__identifySpeakers">identifySpeakers</a>, <a class="xref" href="#spldoc_operator__parameter__keywordsSpottingThreshold">keywordsSpottingThreshold</a>, <a class="xref" href="#spldoc_operator__parameter__keywordsToBeSpotted">keywordsToBeSpotted</a>, <a class="xref" href="#spldoc_operator__parameter__maxAllowedConnectionAttempts">maxAllowedConnectionAttempts</a>, <a class="xref" href="#spldoc_operator__parameter__maxUtteranceAlternatives">maxUtteranceAlternatives</a>, <a class="xref" href="#spldoc_operator__parameter__smartFormattingNeeded">smartFormattingNeeded</a>, <a class="xref" href="#spldoc_operator__parameter__sttJsonResponseDebugging">sttJsonResponseDebugging</a>, <a class="xref" href="#spldoc_operator__parameter__sttRequestLogging">sttRequestLogging</a>, <a class="xref" href="#spldoc_operator__parameter__sttResultMode">sttResultMode</a>, <a class="xref" href="#spldoc_operator__parameter__waitTimeBeforeSTTServiceConnectionRetry">waitTimeBeforeSTTServiceConnectionRetry</a>, <a class="xref" href="#spldoc_operator__parameter__websocketLoggingNeeded">websocketLoggingNeeded</a>, <a class="xref" href="#spldoc_operator__parameter__wordAlternativesThreshold">wordAlternativesThreshold</a>, <a class="xref" href="#spldoc_operator__parameter__wordConfidenceNeeded">wordConfidenceNeeded</a>, <a class="xref" href="#spldoc_operator__parameter__wordTimestampNeeded">wordTimestampNeeded</a>
 
 </p>
 </dd>
@@ -97,7 +97,7 @@
  
   <dt class="dt dlterm">Metrics</dt>
 
-  <dd class="dd">This operator can report metrics.</dd>
+  <dd class="dd">This operator reports 4 metrics.</dd>
 
  
 </dl>
@@ -528,14 +528,14 @@
 
 <div class="section">
 <p class="p splhead-1"><strong class="ph b"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters">Parameters</a></strong></p>
-This operator supports 25 parameters.
+This operator supports 24 parameters.
 <p class="p"> Required: 
 <a class="xref" href="#spldoc_operator__parameter__authToken">authToken</a>, <a class="xref" href="#spldoc_operator__parameter__baseLanguageModel">baseLanguageModel</a>, <a class="xref" href="#spldoc_operator__parameter__uri">uri</a>
 
 </p>
 
 <p class="p"> Optional: 
-<a class="xref" href="#spldoc_operator__parameter__acousticCustomizationId">acousticCustomizationId</a>, <a class="xref" href="#spldoc_operator__parameter__baseModelVersion">baseModelVersion</a>, <a class="xref" href="#spldoc_operator__parameter__contentType">contentType</a>, <a class="xref" href="#spldoc_operator__parameter__cpuYieldTimeInAudioSenderThread">cpuYieldTimeInAudioSenderThread</a>, <a class="xref" href="#spldoc_operator__parameter__customizationId">customizationId</a>, <a class="xref" href="#spldoc_operator__parameter__customizationWeight">customizationWeight</a>, <a class="xref" href="#spldoc_operator__parameter__filterProfanity">filterProfanity</a>, <a class="xref" href="#spldoc_operator__parameter__identifySpeakers">identifySpeakers</a>, <a class="xref" href="#spldoc_operator__parameter__keywordsSpottingThreshold">keywordsSpottingThreshold</a>, <a class="xref" href="#spldoc_operator__parameter__keywordsToBeSpotted">keywordsToBeSpotted</a>, <a class="xref" href="#spldoc_operator__parameter__maxAllowedConnectionAttempts">maxAllowedConnectionAttempts</a>, <a class="xref" href="#spldoc_operator__parameter__maxUtteranceAlternatives">maxUtteranceAlternatives</a>, <a class="xref" href="#spldoc_operator__parameter__smartFormattingNeeded">smartFormattingNeeded</a>, <a class="xref" href="#spldoc_operator__parameter__sttJsonResponseDebugging">sttJsonResponseDebugging</a>, <a class="xref" href="#spldoc_operator__parameter__sttLiveMetricsUpdateNeeded">sttLiveMetricsUpdateNeeded</a>, <a class="xref" href="#spldoc_operator__parameter__sttRequestLogging">sttRequestLogging</a>, <a class="xref" href="#spldoc_operator__parameter__sttResultMode">sttResultMode</a>, <a class="xref" href="#spldoc_operator__parameter__waitTimeBeforeSTTServiceConnectionRetry">waitTimeBeforeSTTServiceConnectionRetry</a>, <a class="xref" href="#spldoc_operator__parameter__websocketLoggingNeeded">websocketLoggingNeeded</a>, <a class="xref" href="#spldoc_operator__parameter__wordAlternativesThreshold">wordAlternativesThreshold</a>, <a class="xref" href="#spldoc_operator__parameter__wordConfidenceNeeded">wordConfidenceNeeded</a>, <a class="xref" href="#spldoc_operator__parameter__wordTimestampNeeded">wordTimestampNeeded</a>
+<a class="xref" href="#spldoc_operator__parameter__acousticCustomizationId">acousticCustomizationId</a>, <a class="xref" href="#spldoc_operator__parameter__baseModelVersion">baseModelVersion</a>, <a class="xref" href="#spldoc_operator__parameter__contentType">contentType</a>, <a class="xref" href="#spldoc_operator__parameter__cpuYieldTimeInAudioSenderThread">cpuYieldTimeInAudioSenderThread</a>, <a class="xref" href="#spldoc_operator__parameter__customizationId">customizationId</a>, <a class="xref" href="#spldoc_operator__parameter__customizationWeight">customizationWeight</a>, <a class="xref" href="#spldoc_operator__parameter__filterProfanity">filterProfanity</a>, <a class="xref" href="#spldoc_operator__parameter__identifySpeakers">identifySpeakers</a>, <a class="xref" href="#spldoc_operator__parameter__keywordsSpottingThreshold">keywordsSpottingThreshold</a>, <a class="xref" href="#spldoc_operator__parameter__keywordsToBeSpotted">keywordsToBeSpotted</a>, <a class="xref" href="#spldoc_operator__parameter__maxAllowedConnectionAttempts">maxAllowedConnectionAttempts</a>, <a class="xref" href="#spldoc_operator__parameter__maxUtteranceAlternatives">maxUtteranceAlternatives</a>, <a class="xref" href="#spldoc_operator__parameter__smartFormattingNeeded">smartFormattingNeeded</a>, <a class="xref" href="#spldoc_operator__parameter__sttJsonResponseDebugging">sttJsonResponseDebugging</a>, <a class="xref" href="#spldoc_operator__parameter__sttRequestLogging">sttRequestLogging</a>, <a class="xref" href="#spldoc_operator__parameter__sttResultMode">sttResultMode</a>, <a class="xref" href="#spldoc_operator__parameter__waitTimeBeforeSTTServiceConnectionRetry">waitTimeBeforeSTTServiceConnectionRetry</a>, <a class="xref" href="#spldoc_operator__parameter__websocketLoggingNeeded">websocketLoggingNeeded</a>, <a class="xref" href="#spldoc_operator__parameter__wordAlternativesThreshold">wordAlternativesThreshold</a>, <a class="xref" href="#spldoc_operator__parameter__wordConfidenceNeeded">wordConfidenceNeeded</a>, <a class="xref" href="#spldoc_operator__parameter__wordTimestampNeeded">wordTimestampNeeded</a>
 
 </p>
 <dl class="dl">
@@ -1100,41 +1100,6 @@ This operator supports 25 parameters.
 
   
   
-     <dt class="dt dlterm"><a name="spldoc_operator__parameter__sttLiveMetricsUpdateNeeded"><!-- --></a><tt class="ph tt">sttLiveMetricsUpdateNeeded</tt></dt>
-
-     <dd class="dd">
-<p class="p">This parameter specifies whether live update for this operator's custom metrics is needed. (Default is true)
-</p>
-
-  <dl class="dl">
-    
-     <dt class="dt dlterm">Properties</dt>
-
-     <dd class="dd">   <ul class="sl simple">
-     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__type">Type</a>: boolean
-     </li>
-
-     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__cardinality">Cardinality</a>: 1
-     </li>
-
-     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__optional">Optional</a>: true
-     </li>
-
-     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__expressionmode">ExpressionMode</a>: AttributeFree
-     </li>
-
-   </ul>
-
-     <p class="p"/>
-     </dd>
-
-    
-  </dl>
-
-     </dd>
-
-  
-  
      <dt class="dt dlterm"><a name="spldoc_operator__parameter__sttRequestLogging"><!-- --></a><tt class="ph tt">sttRequestLogging</tt></dt>
 
      <dd class="dd">
@@ -1420,17 +1385,13 @@ This operator supports 25 parameters.
 
 <div class="section">
 <p class="p splhead-1"><strong class="ph b"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__context__metrics">Metrics</a></strong></p>
-
-<p class="p">      	A few custom metrics are available for the WatsonSTT operator. The Counter kind        	metrics listed below will be updated when the operator starts.        	But, the Gauge kind metrics will be updated live during        	transcription only when the sttLiveMetricsUpdateNeeded        	operator parameter is set to true.
-</p>
-
 <dl class="dl">
   
     <dt class="dt dlterm"><tt class="ph tt">nFullAudioConversationsReceived</tt> - <a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__context__metrics_kind_gauge">Gauge</a></dt>
 
     <dd class="dd">
 
-<p class="p">Number of full audio conversations received for transcription by this operator instance.
+<p class="p">The number of full audio conversations received by this operator instance.
 </p>
 
      <p class="p"/>
@@ -1443,7 +1404,7 @@ This operator supports 25 parameters.
 
     <dd class="dd">
 
-<p class="p">Number of full audio conversations transcribed by this operator instance.
+<p class="p">The number of full audio conversations transcribed by this operator instance.
 </p>
 
      <p class="p"/>
@@ -1456,7 +1417,7 @@ This operator supports 25 parameters.
 
     <dd class="dd">
 
-<p class="p">STT result mode currently in effect for a given operator instance.
+<p class="p">Current result mode for this WatsonSTT operator instance.
 </p>
 
      <p class="p"/>
@@ -1469,7 +1430,7 @@ This operator supports 25 parameters.
 
     <dd class="dd">
 
-<p class="p">Number of STT service Websocket connection attempts made by this operator instance.
+<p class="p">The number of Websocket connection attempts made by this operator instance.
 </p>
 
      <p class="p"/>

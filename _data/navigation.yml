@@ -13,14 +13,14 @@ main:
 
 # knowledge documentation links
 knowledgedocs:
-  - title: Toolkit technical background overview
+  - title: Toolkit Background
     children:
       - title: "Overview"
         url: /docs/knowledge/overview
 
 # user documentation links
 userdocs:
-  - title: User documentation
+  - title: User Documentation
     children:
       - title: "Toolkit Usage Overview"
         url: /docs/user/overview
@@ -28,12 +28,12 @@ userdocs:
         url: /docs/user/SPLDoc
       - title: "Operator Design"
         url: /docs/user/OperatorDesign
-      - title: "WatsonSTT Usage Patterns"
+      - title: "Operator Usage Patterns"
         url: /docs/user/WatsonSTTUsagePatterns
 
 # developer documentation links
 developerdocs:
-  - title: Developer documentation
+  - title: Developer Documentation
     children:
       - title: "Toolkit Development Overview"
         url: /docs/developer/overview

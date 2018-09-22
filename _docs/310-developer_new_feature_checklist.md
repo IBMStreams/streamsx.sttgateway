@@ -1,8 +1,8 @@
 ---
-title: "New feature checklist"
+title: "New Feature Checklist"
 permalink: /docs/developer/new_feature_checklist/
 excerpt: "New feature checklist"
-last_modified_at: 2018-09-11T12:37:48+01:00
+last_modified_at: 2018-09-21T12:37:48+01:00
 redirect_from:
    - /theme-setup/
 sidebar:

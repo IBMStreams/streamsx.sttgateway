@@ -1,8 +1,8 @@
 ---
-title: "WatsonSTT Usage Patterns"
+title: "Operator Usage Patterns"
 permalink: /docs/user/WatsonSTTUsagePatterns/
 excerpt: "Describes the WatsonSTT operator usage patterns."
-last_modified_at: 2018-09-11T12:37:48+01:00
+last_modified_at: 2018-09-21T12:37:48+01:00
 redirect_from:
    - /theme-setup/
 sidebar:
@@ -18,9 +18,9 @@ As described in the other documentation pages, the WatsonSTT operator uses the W
 
 2. Content type of your audio data. Supported content types are listed in this URL: [Content type](https://console.bluemix.net/docs/services/speech-to-text/audio-formats.html#audio-formats)
 
-3. Your authentication token for securely accessing the IBM Watson STT service. You must ensure that you have a valid authentication token obtained using the procedure outlined in this URL: [Auth Token](https://console.bluemix.net/docs/services/speech-to-text/input.html#tokens)
+3. Your authentication token for securely accessing the IBM Watson STT service. You must ensure that you have a valid authentication token obtained using the procedure as outlined in this URL: [Auth Token](https://console.bluemix.net/docs/services/speech-to-text/input.html#tokens)
 
-These three important values are passed via the corresponding operator parameters. There are also other STT optional parameters that you can configure for additional things that your application may require.
+These three important values are passed via the corresponding operator parameters. There are also other STT optional parameters that you can configure for additional STT features that your application may require.
 
 ## WatsonSTT operator's result mode parameter
 WatsonSTT operator can process the given audio data and return the transcription results in one of the following three configurable modes. This is controlled by the operator parameter named `sttResultMode` which takes a value of 1 or 2 or 3 as explained below in that order.
@@ -47,7 +47,7 @@ In addition to the mandatory `speech` attribute, one can have any number of othe
 All the extra attributes present in the input port schema will be forwarded if matching attributes are found in the output port schema.
 
 ## Configuration parameters for the WatsonSTT operator
-This operator provides about two dozen parameters to configure the way in which this operator will function to return different values in the output tuples containing the transcribed text. For the basic transcription i.e. sending some audio data and getting back just the fully transcribed text of the entire audio conversation, you can simply use only the three important parameters discussed [here](#Important-details-needed-for-using-the-WatsonSTT-operator). For getting back a lot more than just the fully transcribed text in the output tuple, you will have to use the other operator parameters as listed in the previous page.
+This operator provides about two dozen parameters to configure the way in which this operator will function to return different values in the output tuples containing the transcribed text. For the basic transcription i.e. sending some audio data and getting back just the fully transcribed text of the entire audio conversation, you can simply use only the three important parameters as discussed at the very top of this page. For getting back a lot more than just the fully transcribed text in the output tuple, you will have to use the other operator parameters as listed in the previous page.
 
 ## Input stream schema for the WatsonSTT operator
 At the very basic level, input stream schema can be as shown below with just two attributes. But, in addition to these two attributes, there can also be other attributes as needed. 
@@ -85,12 +85,14 @@ type STTResult_t =
 ## Invoking the WatsonSTT operator
 In your SPL application, this operator can be invoked with either all operator parameters or a subset of the operator parameters. Similarly, in the output clause of the operator body, you can either call all the available custom output functions or a subset of those custom output functions to do your output stream attribute assignments. You can decide on the total number of operator parameters and the total number of custom output functions to use based on the real needs of your application.
 
-You can invoke one or more instances of the WatsonSTT operator depending on the total amount of speech data available for transcription. You can send the audio data for a given audio file or an ongoing audio conversation to this operator all at once or you can send the audio data for the live-use case as it becomes available from your telephony network switch in multiple blob fragments.
+You can invoke one or more instances of the WatsonSTT operator depending on the total amount of speech data available for transcription. You can send the audio data for a given audio file or an ongoing audio conversation to this operator all at once or you can send the audio data for the live usecase as it becomes available from your telephony network switch in multiple blob fragments.
 
 **NOTE:** The WatsonSTT operator allows fusing multiple instances of this operator into a single PE. This will help in reducing the total number of CPU cores used in running your application. If you use multiple operator instances inside a Streams parallel region, you can decide to enable the partitioning feature for the parallel channels via a partition key e-g: by using an application-specific conversationId as a partition key. In general, audio data ingested from files will not require partitioning of the parallel channels. It will make better sense to use the partitioning of the parallel channels for real-time usecases where audio data is received from a network switch as several blob fragments for an ongoing audio conversation.
 
 ```
 // Invoke one or more instances of the WatsonSTT operator.
+// Avoid feeding audio data coming from more than one data source into this 
+// parallel region which may cause erroneous transcription results.
 // NOTE: The WatsonSTT operator allows fusing multiple instances of
 // this operator into a single PE. This will help in reducing the 
 // total number of CPU cores used in running the application.
@@ -133,6 +135,7 @@ stream<STTResult_t> STTResult = WatsonSTT(AudioFileName as AFN) {
       cpuYieldTimeInAudioSenderThread: $cpuYieldTimeInAudioSenderThread;
       waitTimeBeforeSTTServiceConnectionRetry : $waitTimeBeforeSTTServiceConnectionRetry;
       maxAllowedConnectionAttempts : $maxAllowedConnectionAttempts;
+      sttLiveMetricsUpdateNeeded : $sttLiveMetricsUpdateNeeded;
 								
       // Use the following operator parameters as needed.
       // Point to a specific version of the base model if needed.
@@ -223,7 +226,7 @@ At the very basic level, users should call the very first three custom output fu
 
 **getFullTranscriptionText()** or **getUtteranceText()** is used either to get the full transcription text for the entire audio when the operator parameter `sttResultMode` is set to 3 or in the latter case to get either the partial or finalized utterance text when the operator parameter `sttResultMode` is set to 1 or 2.
 
-There are many other custom output functions available in this operator that can be used as needed. They are all documented well in the previous documentation page as well as in the SPLDoc for this toolkit. For additional reading, relevant pointers are given below directly to go to the documentation pages for the Watson STT service.
+There are many other custom output functions available in this operator that can be used as needed. They are all documented well in the previous  page as well as in the SPLDoc for this toolkit. For additional reading, relevant pointers are given below directly to go to the documentation pages for the Watson STT service.
 
 **getUtteranceNumber()** is used to get the current utterance number in the given audio conversation being transcribed. It is applicable when the `sttResultMode` operator parameter is set to 1 or 2.
 
@@ -257,7 +260,7 @@ There are many other custom output functions available in this operator that can
 
 **getUtteranceWordsSpeakersConfidences()** is used to obtain the confidence score for the speacker ids present in a finalized utterance. It is applicable when the `sttResultMode` operator parameter is set to 1 or 2. It returns a list of float64 values.
 
-**getKeywordsSpottingResults()** is used to obtain the result of certain keywords to be spotted in the given audio conversation. It is applicable when the `sttResultMode` operator parameter is set to 1 or 2. It returns a map<rstring, list<map<rstring, float64>>>. This map contains all the rstring matching keywords as its keys. For every such key, it will hold a list containing another map which will have an rstring key and a float64 value. In this inner map, it will have these as keys along with their corresponding values: `start_time, end_time and confidence`. For more details, read [here](https://console.bluemix.net/docs/services/speech-to-text/output.html#keyword_spotting).
+**getKeywordsSpottingResults()** is used to obtain the result of certain keywords to be spotted in the given audio conversation. It is applicable when the `sttResultMode` operator parameter is set to 1 or 2. It returns a `map<rstring, list<map<rstring, float64>>>`. This map contains all the rstring matching keywords as its keys. For every such key, it will hold a list containing another map which will have an rstring key and a float64 value. In this inner map, it will have these as keys along with their corresponding values: `start_time, end_time and confidence`. For more details, read [here](https://console.bluemix.net/docs/services/speech-to-text/output.html#keyword_spotting).
 
 ## Using customized Language Model (LM) and Acoustic Model (AM) in the WatsonSTT operator
 In addition to using the base language model provided by the IBM Watson STT service, users can do their own customization for Language model (LM) and Acoustic Model (AM). This will help to increase the transcription accuracy by reducing the word error rate (WER). This can be done via the published tools and techniques supported by the IBM Watson STT service. After completing the customization, users can obtain the customization ids for their custom LM and AM and pass them to the WatsonSTT operator via the following parameters.
@@ -281,13 +284,13 @@ For the steps required to create your own custom language model (LM), read [here
 For the steps required to create your own custom acoustic model (AM), read [here](https://console.bluemix.net/docs/services/speech-to-text/acoustic-create.html#acoustic).
 
 ## Custom metrics available in the WatsonSTT operator
-This operator provides the following custom metrics that can be queried via the IBM Streams REST/JMX APIs or viewed via the commonly used utilities such as streamtool and Streams Web Console.
+This operator provides the following custom metrics that can be queried via the IBM Streams REST/JMX APIs or viewed via the commonly used utilities such as streamtool and Streams Web Console. The Counter kind metrics listed below will be updated when the operator starts. But, the Gauge kind metrics will be updated live during transcription only when the sttLiveMetricsUpdateNeeded operator parameter is set to true.
 
 1. **nWebsocketConnectionAttempts**: It shows how many connection attempts it took to connect to the STT service from this operator. It is useful to know whether the Websocket connection to the Watson STT service was made within the allowed number of connection attempts or not.
 
-2. **nFullAudioConversationsReceived**: It shows a running total of the total number of audio conversations received for processing by this operator.
+2. **nFullAudioConversationsReceived**: It shows a running total of the number of audio conversations received for processing by this operator.
 
-3. **nFullAudioConversationsTranscribed**: It shows a running total of the total number of audio conversations transcribed by this operator.
+3. **nFullAudioConversationsTranscribed**: It shows a running total of the number of audio conversations transcribed by this operator.
 
 4. **nSTTResultMode**: It shows how this operator is configured to return the STT results. 1 = Return partial utterances, 2 = Return only finalized utterances, 3 = Return only the full transcribed text after completing the transcription for the entire audio conversation.
 
