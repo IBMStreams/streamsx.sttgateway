@@ -158,6 +158,9 @@ using websocketpp::lib::bind;
     my $maxAllowedConnectionAttempts = $model->getParameterByName("maxAllowedConnectionAttempts");
 	# Default: 10 attempts
     $maxAllowedConnectionAttempts = $maxAllowedConnectionAttempts ? $maxAllowedConnectionAttempts->getValueAt(0)->getCppExpression() : 10;
+    
+    my $sttLiveMetricsUpdateNeeded = $model->getParameterByName("sttLiveMetricsUpdateNeeded");
+    $sttLiveMetricsUpdateNeeded = $sttLiveMetricsUpdateNeeded ? $sttLiveMetricsUpdateNeeded->getValueAt(0)->getCppExpression() : 1;    
 %>
 
 <%SPL::CodeGen::implementationPrologue($model);%>
@@ -165,13 +168,17 @@ using websocketpp::lib::bind;
 // Constructor
 MY_OPERATOR::MY_OPERATOR() 
 {
-	// They are already defined in the operator model XML file. Hence, there is no need to explicitly create them here.
+	// Custom metrics for this operator are already defined in the operator model XML file. 
+	// Hence, there is no need to explicitly create them here.
 	// Simply get the custom metrics already defined for this operator. 
+	// We will update the Counter kind custom metrics when the operator starts.
+	// We will update the Gauge kind custom metrics during transcription only when the 
+	// sttLiveMetricsUpdateNeeded optional operator parameter is set to true.
 	OperatorMetrics  & opm = getContext().getMetrics();
+	nSTTResultModeMetric = & opm.getCustomMetricByName("nSTTResultMode");
 	nWebsocketConnectionAttemptsMetric = & opm.getCustomMetricByName("nWebsocketConnectionAttempts");
 	nFullAudioConversationsReceivedMetric = & opm.getCustomMetricByName("nFullAudioConversationsReceived");
 	nFullAudioConversationsTranscribedMetric = & opm.getCustomMetricByName("nFullAudioConversationsTranscribed");
-	nSTTResultModeMetric = & opm.getCustomMetricByName("nSTTResultMode");
 	
 	numberOfAudioBlobFragmentsReceivedInCurrentConversation = 0;
 	numberOfFullAudioConversationsReceived = 0;
@@ -298,6 +305,8 @@ MY_OPERATOR::MY_OPERATOR()
 			" Valid value must be greater than or equal to 1.");	
 	}	
 
+	sttLiveMetricsUpdateNeeded = <%=$sttLiveMetricsUpdateNeeded%>;
+	
 	// We are not going to support the following utterance based 
 	// features when the STT result mode is 3 (full transcript).
 	// Many of these features return the results in individual arrays for a 
@@ -323,7 +332,7 @@ MY_OPERATOR::MY_OPERATOR()
 	}
 	
 	// Update the operator metric.
-	nSTTResultModeMetric->setValue(sttResultMode);
+	nSTTResultModeMetric->setValueNoLock(sttResultMode);
 }
 
 // Destructor
@@ -549,8 +558,10 @@ void MY_OPERATOR::process(Tuple & tuple, uint32_t port)
 		numberOfFullAudioConversationsReceived++;
 	} // End of if (audioInputAsBlob == true)
 
-	// Update the operator metric.
-	nFullAudioConversationsReceivedMetric->setValue(numberOfFullAudioConversationsReceived);	
+	// Update the operator metric only if the user asked for a live update.
+	if (sttLiveMetricsUpdateNeeded == true) {
+		nFullAudioConversationsReceivedMetric->setValueNoLock(numberOfFullAudioConversationsReceived);
+	}
 	
 	// Let us do all the auto output tuple attribute assignments and store it in a
 	// list to be used in the on_message event handler method below at the time of
@@ -617,15 +628,26 @@ void MY_OPERATOR::ws_audio_blob_sender() {
 	while (!getPE().getShutdownRequested()) {
 		// Keep waiting in this while loop until
 		// there is some work that needs to be performed.
-		// Wait for a configured amount of time that is not 0.0.
-		if (cpuYieldTimeInAudioSenderThread > 0.0) {
+		// Wait for a configured amount of time that is not 0.0 when there is
+		// audio data actively available for processing.
+		// When there is no audio data available, yield the CPU for
+		// slightly a longer time.
+		int32_t audioBytesVectorSize = audioBytes.size();
+		int32_t audioFilesVectorSize = audioFiles.size();
+		if(audioBytesVectorSize <= 0 && audioFilesVectorSize <= 0) {
+			// There is no audio data available at this time.
+			// Yield the CPU for slightly a longer time.
+			// 1 second instead of 1 msec.
+			SPL::Functions::Utility::block(1.0);
+		} else if (cpuYieldTimeInAudioSenderThread > 0.0) {
+			// Audio data available for processing. Yield the CPU briefly and get to work soon.
 			// Even a tiny value of 1 millisecond (0.001 second) will yield the
 			// CPU and will not show 0% idle in the Linux top command.
 			SPL::Functions::Utility::block(cpuYieldTimeInAudioSenderThread);
 		}
 		
 		// Check if the Websocket connection needs to be established.
-		if ((audioBytes.size() > 0 || audioFiles.size() > 0) && 
+		if ((audioBytesVectorSize > 0 || audioFilesVectorSize > 0) && 
 			wsConnectionEstablished == false) {
 			// When there is audio data waiting to be processed and
 			// if the Websocket connection is not active at that time, 
@@ -667,7 +689,7 @@ void MY_OPERATOR::ws_audio_blob_sender() {
 			websocketConnectionErrorOccurred = false;
 			makeNewWebsocketConnection = true;
 			// Update the operator metric.
-			nWebsocketConnectionAttemptsMetric->setValue(numberOfWebsocketConnectionAttempts);
+			nWebsocketConnectionAttemptsMetric->setValueNoLock(numberOfWebsocketConnectionAttempts);
 			
 			// After a successful connection, makeNewWebsocketConnection will be
 			// set to false in the ws_init method below.
@@ -707,7 +729,7 @@ void MY_OPERATOR::ws_audio_blob_sender() {
 				SPLAPPTRC(L_DEBUG, "Operator " << operatorPhysicalName <<
 					"-->Channel " << boost::to_string(udpChannelNumber) <<
 					"-->Reached 9", "reestablish_ws_connection");
-				SPL::Functions::Utility::block(0.250);
+				SPL::Functions::Utility::block(0.500);
 				SPLAPPTRC(L_DEBUG, "Operator " << operatorPhysicalName <<
 					"-->Channel " << boost::to_string(udpChannelNumber) <<
 					"-->Reached 10", "reestablish_ws_connection");
@@ -715,7 +737,7 @@ void MY_OPERATOR::ws_audio_blob_sender() {
 			
 			// Continue from the top of the outer loop.
 			continue;
-		} // End of the if block
+		} // End of the if segment
 
 		// It is a special delay to give enough time for the 
 		// Websocket thread's on_close event handler method below to 
@@ -731,7 +753,7 @@ void MY_OPERATOR::ws_audio_blob_sender() {
 		}
 		
 		// Check if there is audio data waiting to be sent to the STT service.
-		if ((audioBytes.size() > 0 || audioFiles.size() > 0) && 
+		if ((audioBytesVectorSize > 0 || audioFilesVectorSize > 0) && 
 			wsConnectionEstablished == true &&
 			statusOfAudioDataTransmissionToSTT != FULL_AUDIO_DATA_SENT_TO_STT) {
 			// If an error happened in the STT processing (invalid audio data or
@@ -875,7 +897,7 @@ void MY_OPERATOR::ws_audio_blob_sender() {
 				// Continue from the top of the while loop.
 				continue;
 			} // End of if (audioInputAsBlob == false)
-		} // End of if ((audioBytes.size() > 0 ||
+		} // End of if ((audioBytesVectorSize > 0 ||
 	} // End of the while loop	
 }
 
@@ -890,8 +912,8 @@ void MY_OPERATOR::ws_init() {
 		if (makeNewWebsocketConnection == false) {
 			// Keep waiting in this while loop until
 			// a need arises to make a new Websocket connection.
-			// 250 milliseconds wait.
-			SPL::Functions::Utility::block(0.250);
+			// 1 second wait.
+			SPL::Functions::Utility::block(1.0);
 			continue;
 		}
 		
@@ -2436,9 +2458,11 @@ void MY_OPERATOR::on_message(MY_OPERATOR::client* c, websocketpp::connection_hdl
 		  }
 
 		  numberOfFullAudioConversationsTranscribed++;
-		  // Update the operator metric.
-		  nFullAudioConversationsTranscribedMetric->setValue(numberOfFullAudioConversationsTranscribed);	
-		  
+		  // Update the operator metric only if the user asked for a live update.
+		  if (sttLiveMetricsUpdateNeeded == true) {
+			  nFullAudioConversationsTranscribedMetric->setValueNoLock(numberOfFullAudioConversationsTranscribed);
+		  }
+			  
 		  if (sttJsonResponseDebugging == true) {
 			  std::string tempString = "transcription completion.";
 			  

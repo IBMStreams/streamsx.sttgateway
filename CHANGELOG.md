@@ -1,4 +1,12 @@
 Changes
 =======
+## v1.0.1:
+* Sep/21/2018
+* In the internal threads of the WatsonSTT operator code, the CPU yield time during idleness and in between the Websocket connection attempts was increased from a few milliseconds to 1 second.
+* New operator parameter sttLiveMetricsUpdateNeeded was added to give the users a way to turn the custom operator metrics reporting on and off in the time critical path of audio transcription.
+* Use of the internal custom metrics update API was changed from setValue to setValueNoLock. 
+* Corresponding documentation refinements were also done.
+
 ## v1.0.0:
-* Very first release that is tested to work well with the Watson STT cloud service.
+* Sep/17/2018
+* Very first release of this toolkit that was tested to support all the major features available in the IBM Watson Speech To Text (STT) cloud service.
