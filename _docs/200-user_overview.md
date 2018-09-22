@@ -90,7 +90,7 @@ ii. In Streams studio, you must double click on the BuildConfig of your applicat
    - If you are building your application from the command line, please refer to the Makefile provided in the AudioFileWatsonSTT example shipped with this toolkit. Before using that Makefile, you must set the STREAMS_STTGATEWAY_TOOLKIT environment variable to point to the full path of your streamsx.sttgateway/com.ibm.streamsx.sttgateway directory. To build your own applications, you can do the same as done in that Makefile.
 
 ## Example usage of this toolkit inside a Streams application:
-Here is a code snippet that shows how to invoke the WatsonSTT operator available in this toolkit for the basic features. For using the advanced features of the Watson STT service, please refer to another example code snippet shown in the Toolkit Usage Patterns chapter.
+Here is a code snippet that shows how to invoke the WatsonSTT operator available in this toolkit for the basic features. For using the advanced features of the Watson STT service, please refer to another example code snippet shown in the Operator Usage Patterns section.
 
 ```
 use com.ibm.streamsx.sttgateway.watson::*;

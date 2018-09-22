@@ -2,7 +2,7 @@
 title: "Operator Usage Patterns"
 permalink: /docs/user/WatsonSTTUsagePatterns/
 excerpt: "Describes the WatsonSTT operator usage patterns."
-last_modified_at: 2018-09-21T12:37:48+01:00
+last_modified_at: 2018-09-22T12:37:48+01:00
 redirect_from:
    - /theme-setup/
 sidebar:
@@ -284,7 +284,7 @@ For the steps required to create your own custom language model (LM), read [here
 For the steps required to create your own custom acoustic model (AM), read [here](https://console.bluemix.net/docs/services/speech-to-text/acoustic-create.html#acoustic).
 
 ## Custom metrics available in the WatsonSTT operator
-This operator provides the following custom metrics that can be queried via the IBM Streams REST/JMX APIs or viewed via the commonly used utilities such as streamtool and Streams Web Console. The Counter kind metrics listed below will be updated when the operator starts. But, the Gauge kind metrics will be updated live during transcription only when the sttLiveMetricsUpdateNeeded operator parameter is set to true.
+This operator provides the following custom metrics that can be queried via the IBM Streams REST/JMX APIs or viewed via the commonly used utilities such as streamtool and Streams Web Console. The Counter kind metrics (1 and 4 below) will be updated when the operator starts. But, the Gauge kind metrics (2 and 3 below) will be updated live during transcription only when the sttLiveMetricsUpdateNeeded operator parameter is set to true.
 
 1. **nWebsocketConnectionAttempts**: It shows how many connection attempts it took to connect to the STT service from this operator. It is useful to know whether the Websocket connection to the Watson STT service was made within the allowed number of connection attempts or not.
 

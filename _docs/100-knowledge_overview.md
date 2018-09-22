@@ -13,7 +13,7 @@ sidebar:
 
 ## Purpose of this toolkit
 
-The streamsx.sttgateway toolkit provides an operator that helps you to integrate IBM Streams with the [IBM Watson Speech To Text (STT) cloud service](https://www.ibm.com/watson/services/speech-to-text/). This toolkit lets you send audio data to the Watson STT service and get back the transcription results. This toolkit is designed to work with the IBM Watson STT service available on IBM public cloud and on IBM Cloud Private (ICP). It uses the Websocket communication API interface provided by that Watson STT service. It can take audio data either from the real-time speech conversations or from the prerecorded speech conversations that are stored in files.
+The streamsx.sttgateway toolkit provides an operator that helps you to integrate IBM Streams applications with the [IBM Watson Speech To Text (STT) cloud service](https://www.ibm.com/watson/services/speech-to-text/). This toolkit lets you send audio data to the Watson STT service and get back the transcription results. This toolkit is designed to work with the IBM Watson STT service available on IBM public cloud and on IBM Cloud Private (ICP). It uses the Websocket communication API interface provided by that Watson STT service. It can take audio data either from the real-time speech conversations or from the prerecorded speech conversations that are stored in files.
 
 ## Technical positioning of this toolkit
 At a very high level, this toolkit shares the same design goal as the other IBM Streams toolkit named com.ibm.streams.speech2text to convert speech data into text. But, they both work very differently to realize that design goal. IBM Streams users can select either of these two toolkits depending on their application and hardware infrastructure needs. So, it is important to know the following major differences between these two toolkits before choosing the suitable one for a given situation.
@@ -69,9 +69,9 @@ At a very high level, this toolkit shares the same design goal as the other IBM 
    - In com.ibm.streams.speech2text, the WatsonS2T operator can only return one full utterance at a time.
        
    - In com.ibm.streamsx.sttgateway, the WatsonSTT operator can be configured at runtime to return one of the following as transcription result.       
-       i.   Partial utterances as the transcription is in progress.
-       ii.  Only finalized a.k.a. completed utterances.
-       iii. (default) Full text containing all the finalized utterances after transcribing the entire audio.
+      - Option 1: Partial utterances as the transcription is in progress.
+      - Option 2: Only finalized a.k.a. completed utterances.
+      - Option 3: (default) Full text containing all the finalized utterances after transcribing the entire audio.
        
 12. Value added features.
    - In com.ibm.streams.speech2text, the WatsonS2T operator can only provide the core speech to text capabilities.
