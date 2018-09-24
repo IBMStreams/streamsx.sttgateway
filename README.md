@@ -72,6 +72,10 @@ st submitjob  -d  <YOUR_STREAMS_DOMAIN>  -i  <YOUR_STREAMS_INSTANCE>  output/com
 
 ## WHATS NEW
 
+v1.0.2:
+* Sep/24/2018
+* Added a .gitkeep file in the data, impl, include and lib empty folders.
+
 v1.0.1:
 - Sep/21/2018
 - In the internal threads of the WatsonSTT operator code, the CPU yield time during idleness and in between the Websocket connection attempts was increased from a few milliseconds to 1 second.
