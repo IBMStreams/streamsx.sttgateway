@@ -1,8 +1,12 @@
-# Copyright (C)2018, International Business Machines Corporation and  
+# Copyright (C)2018, 2019 International Business Machines Corporation and  
 # others. All Rights Reserved.                        
 .PHONY: build all distributed clean
 
 STREAMS_STTGATEWAY_TOOLKIT ?= $(PWD)/../../com.ibm.streamsx.sttgateway
+# You must change the following line to point to your
+# correct streamsx.json toolkit directory (v1.4.6 or abovee needed).
+STREAMS_JSON_TOOLKIT ?= $(HOME)/streamsx.json
+
 ifeq ($(STREAMS_STUDIO_BUILDING), 1)
     $(info Building from Streams Studio, use env vars set by studio)
     SPLC = $(STREAMS_STUDIO_SC_PATH)
@@ -17,7 +21,7 @@ else
     SPLC = $(STREAMS_INSTALL)/bin/sc
     DATA_DIR = data
     OUTPUT_DIR = output
-    TOOLKIT_PATH = $(STREAMS_STTGATEWAY_TOOLKIT)
+    TOOLKIT_PATH = $(STREAMS_STTGATEWAY_TOOLKIT):$(STREAMS_JSON_TOOLKIT)
 endif
 
 SPL_MAIN_COMPOSITE = com.ibm.streamsx.sttgateway.sample.watsonstt::AudioRawWatsonSTT
@@ -33,5 +37,4 @@ distributed:
 
 clean:
 	$(SPLC) $(SPLC_FLAGS) -M $(SPL_MAIN_COMPOSITE) -t ${TOOLKIT_PATH} --data-dir $(DATA_DIR) --output-dir $(OUTPUT_DIR) -C $(SPL_CMD_ARGS)
-
-
+	rm -rf output

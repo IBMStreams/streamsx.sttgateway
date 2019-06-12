@@ -1,7 +1,7 @@
 # STT Gateway toolkit for IBM Streams
 
 ## Purpose
-This toolkit is designed to ingest audio data either stored in files (.wav, .mp3 etc. for a batch workload) or streamed through a network switch (for a real-time workload). It then transcribes that audio into text via the IBM Watson STT (Speech To Text) service running on the IBM public cloud or on the IBM Cloud Private (ICP).
+This toolkit is designed to ingest audio data either stored in files (.wav, .mp3 etc. for a batch workload) or streamed through a network switch (for a real-time workload). It then transcribes that audio into text via the IBM Watson STT (Speech To Text) service running on the IBM public cloud or on the IBM Cloud Pak (ICP).
 
 ## Documentation
 1. The official toolkit documentation with extensive details is available at this URL: https://ibmstreams.github.io/streamsx.sttgateway/
@@ -9,9 +9,9 @@ This toolkit is designed to ingest audio data either stored in files (.wav, .mp3
 2. A file named sttgateway-tech-brief.txt available at this tooolkit's top-level directory also provides a good amount of information about what this toolkit does, how it can be built and how it can be used in the IBM Streams applications.
 
 ## Requirements
-1. Network connectivity to the IBM Watson Speech To Text (STT) service running either on the public or the private cloud is needed from the IBM Streams Linux machines where this toolkit will be used.
+1. Network connectivity to the IBM Watson Speech To Text (STT) service running either on the public cloud or on the cloud pak is needed from the IBM Streams Linux machines where this toolkit will be used.
    
-2. A valid authentication token is needed to use the Watson STT service. This toolkit uses Websocket to communicate with the Watson STT cloud service. For that Websocket interface, one must use the auth tokens and not the usual cloud service credentials. So, users of this toolkit must generate their own authentication token and provide it when launching the Streams application(s) that will have a dependency on this toolkit. To generate your own auth token, please do more reading from [here](https://console.bluemix.net/docs/services/speech-to-text/input.html#tokens).
+2. A valid IAM access token is needed to use the Watson STT service. This toolkit uses Websocket to communicate with the Watson STT cloud service. For that Websocket interface, one must use the IAM access token and not the usual cloud service credentials. So, users of this toolkit must provide their STT service instance's API key when launching the Streams application(s) that will have a dependency on this toolkit. Using that API key, a utility SPL composite named IAMAccessTokenGenerator available in this toolkit will be able to generate the IAM access token and then subsequently refresh that token to keep it valid. A Streams application employing this toolkit can make use of that utility composite to generate the necessary IAM access token. Please do more reading about the IAM access token from [here](https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-websockets#WSopen).
 
 3. On the IBM Streams application development machine (where the application code is compiled to create the application bundle), it is necessary to download and install the boost_1_67_0 or a higher version as well as the websocketpp version 0.8.1. Please note that this is not needed on the Streams application execution machines. For the essential steps to meet this requirement, please refer to the above-mentioned documentation URL or a file named sttgateway-tech-brief.txt available at this tooolkit's top-level directory.
 
@@ -34,11 +34,10 @@ this operator into a single PE. This will help in reducing the
 total number of CPU cores used in running the application.
 */
 @parallel(width = $numberOfSTTEngines, 
-partitionBy=[{port=ABC, attributes=[conversationId]}])
-(stream<STTResult_t> STTResult) as STT = WatsonSTT(AudioBlobContent as ABC) {
+partitionBy=[{port=ABC, attributes=[conversationId]}], broadcast=[IAT])
+(stream<STTResult_t> STTResult) as STT = WatsonSTT(AudioBlobContent as ABC; IamAccessToken as IAT) {
    param
       uri: $sttUri;
-      authToken: $sttAuthToken;
       baseLanguageModel: $sttBaseLanguageModel;
 			
    output
@@ -59,7 +58,7 @@ A built-in example inside this toolkit can be compiled and launched with the def
 ```
 cd   streamsx.sttgateway/samples/AudioFileWatsonSTT
 make
-st  submitjob  -d  <YOUR_STREAMS_DOMAIN>  -i  <YOUR_STREAMS_INSTANCE>  output/com.ibm.streamsx.sttgateway.sample.watsonstt.AudioFileWatsonSTT.sab  -P  sttAuthToken=<YOUR_WATSON_STT_SERVICE_AUTH_TOKEN>
+st  submitjob  -d  <YOUR_STREAMS_DOMAIN>  -i  <YOUR_STREAMS_INSTANCE>  output/com.ibm.streamsx.sttgateway.sample.watsonstt.AudioFileWatsonSTT.sab  -P  sttApiKey=<YOUR_WATSON_STT_SERVICE_API_KEY>
 ```
 
 Following IBM Streams job sumission command shows how to override the default values with your own as needed for the various STT options:
@@ -67,10 +66,15 @@ Following IBM Streams job sumission command shows how to override the default va
 ```
 cd   streamsx.sttgateway/samples/AudioRawWatsonSTT
 make
-st submitjob  -d  <YOUR_STREAMS_DOMAIN>  -i  <YOUR_STREAMS_INSTANCE>  output/com.ibm.streamsx.sttgateway.sample.watsonstt.AudioRawWatsonSTT.sab -P  sttAuthToken=<YOUR_WATSON_STT_SERVICE_AUTH_TOKEN>  -P sttResultMode=2   -P sttBaseLanguageModel=en-US_NarrowbandModel  -P contentType="audio/wav"    -P filterProfanity=true   -P keywordsSpottingThreshold=0.294   -P keywordsToBeSpotted="['country', 'learning', 'IBM', 'model']"   -P smartFormattingNeeded=true   -P identifySpeakers=true   -P wordTimestampNeeded=true   -P wordConfidenceNeeded=true   -P wordAlternativesThreshold=0.251   -P maxUtteranceAlternatives=5   -P audioBlobFragmentSize=32768   -P sttLiveMetricsUpdateNeeded=true  -P audioDir=<YOUR_AUDIO_FILES_DIRECTORY>   -P numberOfSTTEngines=100
+st submitjob  -d  <YOUR_STREAMS_DOMAIN>  -i  <YOUR_STREAMS_INSTANCE>  output/com.ibm.streamsx.sttgateway.sample.watsonstt.AudioRawWatsonSTT.sab -P  sttApiKey=<YOUR_WATSON_STT_SERVICE_API_KEY>  -P sttResultMode=2   -P sttBaseLanguageModel=en-US_NarrowbandModel  -P contentType="audio/wav"    -P filterProfanity=true   -P keywordsSpottingThreshold=0.294   -P keywordsToBeSpotted="['country', 'learning', 'IBM', 'model']"   -P smartFormattingNeeded=true   -P identifySpeakers=true   -P wordTimestampNeeded=true   -P wordConfidenceNeeded=true   -P wordAlternativesThreshold=0.251   -P maxUtteranceAlternatives=5   -P audioBlobFragmentSize=32768   -P sttLiveMetricsUpdateNeeded=true  -P audioDir=<YOUR_AUDIO_FILES_DIRECTORY>   -P numberOfSTTEngines=100
 ```
 
 ## WHATS NEW
+
+v1.0.3:
+* Jun/12/2019
+* Replaced the use of the auth token with the IAM access token.
+* Added a utility composite named IAMAccessTokenGenerator to generate/refresh an IAM access token. This utility composite can be invoked within the IBM Streams applications that make use of this toolkit to perform speech to text transcription.
 
 v1.0.2:
 * Sep/24/2018

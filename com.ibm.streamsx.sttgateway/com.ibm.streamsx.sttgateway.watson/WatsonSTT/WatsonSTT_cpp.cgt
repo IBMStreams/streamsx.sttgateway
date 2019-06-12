@@ -1,12 +1,15 @@
 /*
 ==============================================
 # Licensed Materials - Property of IBM
-# Copyright IBM Corp. 2018
+# Copyright IBM Corp. 2018, 2019
 ==============================================
 */
 
 /*
 ============================================================
+First created on: Jul/01/2018
+Last modified on: Jun/12/2019
+
 Please refer to the sttgateway-tech-brief.txt file in the 
 top-level directory of this toolkit to read about 
 what this toolkit does, how it can be built and 
@@ -18,7 +21,7 @@ https://github.com/IBMStreams/administration/issues/136
 */
 
 /* Additional includes go here */
-// https://console.bluemix.net/docs/services/speech-to-text/websockets.html#advantages
+// https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-websockets#advantages
 // https://docs.websocketpp.org/index.html
 // This operator heavily relies on the Websocket++ header only library.
 // This C++11 library code does the asynchronous full duplex Websocket communication with
@@ -45,6 +48,7 @@ using websocketpp::lib::bind;
 
 // Verify the input tuple attribute name and then read the operator parameters.
 <%
+	# Check the input port 0 i.e. the first input port. 
 	my $inputPort = $model->getInputPortAt(0);
 	my $inputTupleName = $inputPort->getCppTupleName();
 	my $audioInputAsBlob = undef;	
@@ -71,20 +75,46 @@ using websocketpp::lib::bind;
 	}
 	
 	if ($speechAttributeFound == 0 ) {
-		SPL::CodeGen::exitln("WatsonSTT_cpp.cgt: The required input tuple attribute 'speech' is missing.");
+		SPL::CodeGen::exitln("WatsonSTT_cpp.cgt: The required input tuple attribute 'speech' is missing in the first input port.");
 	}
 	
 	if (!(defined($audioInputAsBlob))) {
-		SPL::CodeGen::exitln("WatsonSTT_cpp.cgt: The required input tuple attribute 'speech' is not of type 'rstring' or 'blob'.");
+		SPL::CodeGen::exitln("WatsonSTT_cpp.cgt: The required input tuple attribute 'speech' is not of type 'rstring' or 'blob' in the first input port.");
+	}
+	
+	# Check the input port number 1 i.e. the second input port.
+	my $inputPort2 = $model->getInputPortAt(1);
+	my $inputTupleName2 = $inputPort2->getCppTupleName();
+	my $accessTokenAsString = undef;	
+	my $inputAttrs2 = $inputPort2->getAttributes();
+	my $accessTokenAttributeFound = 0;
+	
+	foreach my $inputAttr2 (@$inputAttrs2) {
+		my $inAttrName2 = $inputAttr2->getName();
+		my $inAttrType2 = $inputAttr2->getSPLType();
+		
+		if ($inAttrName2 eq "access_token") {
+			$accessTokenAttributeFound = 1;
+			
+			if ($inAttrType2 eq "rstring") {
+				# This tuple attribute will carry the IAM access token.
+				$accessTokenAsString = 1;
+			}
+		}
+	}
+	
+	if ($accessTokenAttributeFound == 0 ) {
+		SPL::CodeGen::exitln("WatsonSTT_cpp.cgt: The required input tuple attribute 'accessToken' is missing in the second input port.");
+	}
+	
+	if (!(defined($accessTokenAsString))) {
+		SPL::CodeGen::exitln("WatsonSTT_cpp.cgt: The required input tuple attribute 'accessToken' is not of type 'rstring' in the second input port.");
 	}
 	
 	# Following are the operator parameters.
     my $uri = $model->getParameterByName("uri");
     $uri = $uri->getValueAt(0)->getCppExpression();
 
-    my $authToken = $model->getParameterByName("authToken");
-    $authToken = $authToken->getValueAt(0)->getCppExpression();
-    
     my $baseLanguageModel = $model->getParameterByName("baseLanguageModel");
     $baseLanguageModel = $baseLanguageModel->getValueAt(0)->getCppExpression();
 
@@ -211,8 +241,10 @@ MY_OPERATOR::MY_OPERATOR()
 		}		
 	%>
 
-	uri = <%=$uri%>;
-	authToken = <%=$authToken%>;
+	uri = <%=$uri%>;	
+	// It must be set via the second input stream for this operator.
+	accessToken = "";
+	
 	baseLanguageModel = <%=$baseLanguageModel%>;	
 	customizationWeight = <%=$customizationWeight%>;
 	
@@ -421,7 +453,7 @@ void MY_OPERATOR::allPortsReady()
     // audio data availability so that the audio blob can be 
     // sent to the Watson STT service via Websocket.
     // This thread will also monitor for any Websocket 
-    // connection termination due to inactivity timeout or
+    // connection termination due to inactivity/session timeout or
     // due to invalid audio data that was sent for transcription which 
     // forced the Watson STT service to terminate the connection. 
     try {
@@ -461,6 +493,12 @@ void MY_OPERATOR::process(uint32_t idx)
 }
 
 // Tuple processing for mutating ports 
+// This operator has two input ports.
+// Port 0: Audio data (a file name or a blob) arrives on this port.
+// Port 1: It is a control port where the IAM access token is
+//         sent into this operator for connecting to the
+//         STT service in a secure manner.
+//
 // With the WebSocket interface, audio data is always streamed to the 
 // STT service over the connection. You can pass the blob data through the 
 // Websocket all at once, or you can pass data for the live-use case 
@@ -484,6 +522,34 @@ void MY_OPERATOR::process(Tuple & tuple, uint32_t port)
 	// All those methods work in parallel inside their own threads.
 	// To make that vector access thread safe, we will use this mutex.
 	SPL::AutoMutex autoMutex(sttMutex1);
+
+	// Let is first process if the IAM access token is sent via port 1 i.e. second input port.
+	if (port == 1) {
+		// Use this variable if needed in the future.
+		IPort1Type const & <%=$inputTupleName2%> = static_cast<IPort1Type const&>(tuple);
+		// Save the access token for subsequent use within this operator.
+		ValueHandle handle1 = tuple.getAttributeValue("access_token");
+		rstring & accessToken_rstring = handle1;
+		accessToken = accessToken_rstring.string();
+		SPLAPPTRC(L_ERROR, "Operator " << operatorPhysicalName <<
+			"-->Channel " << boost::to_string(udpChannelNumber) <<
+			"-->Received new/refreshed access token.", "process");
+		return;
+	}
+	
+	// This must be the audio data arriving here via port 0 i.e. first input port.
+	// If we have a non-empty IAM access token, process the audio data.
+	// Otherwise, skip it.
+	if (accessToken == "") {
+		SPLAPPTRC(L_ERROR, "Operator " << operatorPhysicalName <<
+			"-->Channel " << boost::to_string(udpChannelNumber) <<
+			"-->Ignoring the received audio data at this time due " <<
+			"to an empty IAM access token. User must first provide "
+			" the IAM access token before sending any audio data to this operator.",
+			"process");
+		return;
+	}
+
 	// Use this variable if needed in the future.
 	IPort0Type const & <%=$inputTupleName%> = static_cast<IPort0Type const&>(tuple);
 	
@@ -655,7 +721,7 @@ void MY_OPERATOR::ws_audio_blob_sender() {
 			//
 			// 1) Very first connection to STT service has not yet been
 			//	  made since the time this operator came alive.
-			// 2) Due to inactive timeout, STT service may have terminated the connection. 
+			// 2) Due to inactivity or session timeout, STT service may have terminated the connection. 
 			// 3) Invalid audio data was sent to STT earlier and STT rejected that 
 			//    invalid data and terminated the Websocket connection.
 			// 4) Other network or remote STT service system error may have
@@ -711,7 +777,7 @@ void MY_OPERATOR::ws_audio_blob_sender() {
 							"-->Channel " + boost::to_string(udpChannelNumber) + 
 							std::string("-->WatsonSTT_cpp.cgt: Unable to establish a Websocket connection to ") +
 							std::string("the STT service. It could be either due to network issues or ") +
-							std::string("invalid service URL or invalid authentication token or ") +
+							std::string("invalid service URL or invalid access token or ") +
 							std::string("invalid configuration done for the STT service parameters.") +
 							std::string(" Giving up after 10 attempts. This operator instance will ") + 
 							std::string(" be idle from this point onwards without doing any transcription work.");
@@ -835,11 +901,11 @@ void MY_OPERATOR::ws_audio_blob_sender() {
 						(std::istreambuf_iterator<char>()));
 	
 					// Send the blob read from an audio file to the STT service.
-					// https://console.bluemix.net/docs/services/speech-to-text/websockets.html#WSaudio
+					// https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-websockets#WSaudio
 					// c->get_alog().write(websocketpp::log::alevel::app, "Sent binary Message: " + boost::to_string(buffer.size()));  
 					wsClient->send(wsHandle, buffer.data(), buffer.size(), websocketpp::frame::opcode::binary);
 					// Signal end of the audio data.
-					// https://console.bluemix.net/docs/services/speech-to-text/websockets.html#WSstop
+					// https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-websockets#WSstop
 					wsClient->send(wsHandle, "{\"action\" : \"stop\"}" , websocketpp::frame::opcode::text);
 					// In a file based audio data, the entire file content has been sent to the STT service at this time.
 					// So set this flag to indicate that.
@@ -872,7 +938,7 @@ void MY_OPERATOR::ws_audio_blob_sender() {
 				if (buffer == NULL) {
 					// We reached the end of the blob data as sent/streamed from the SPL application.
 					// Signal end of the audio data.
-					// https://console.bluemix.net/docs/services/speech-to-text/websockets.html#WSstop
+					// https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-websockets#WSstop
 					wsClient->send(wsHandle, "{\"action\" : \"stop\"}" , websocketpp::frame::opcode::text);
 					// In a blob based audio data, the entire blob has been sent to the STT service at this time.
 					// So set this flag to indicate that.
@@ -880,7 +946,7 @@ void MY_OPERATOR::ws_audio_blob_sender() {
 				} else {
 					// Speech data is sent into this operator via a blob buffer rather than via a file.
 					// Send the blob data (either in full or in a partial fragment) to the STT service.
-					// https://console.bluemix.net/docs/services/speech-to-text/websockets.html#WSaudio
+					// https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-websockets#WSaudio
 					// c->get_alog().write(websocketpp::log::alevel::app, "Sent binary Message: " + boost::to_string(buffer.size()));  
 					wsClient->send(wsHandle, buffer, sizeOfBlob, websocketpp::frame::opcode::binary);
 					statusOfAudioDataTransmissionToSTT = AUDIO_BLOB_FRAGMENTS_BEING_SENT_TO_STT;
@@ -917,19 +983,19 @@ void MY_OPERATOR::ws_init() {
 			continue;
 		}
 		
-		// https://console.bluemix.net/docs/services/speech-to-text/websockets.html#WSopen
+		// https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-websockets#WSopen
 		std::string uri = this->uri;
-		// https://console.bluemix.net/docs/services/speech-to-text/input.html#models
+		// https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-input#models
 		uri += "?model=" + baseLanguageModel;
-		// https://console.bluemix.net/docs/services/speech-to-text/input.html#logging
+		https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-input#logging
 		uri += "&x-watson-learning-opt-out=" + std::string(sttRequestLogging ? "false" : "true");
 		
-		// https://console.bluemix.net/docs/services/speech-to-text/input.html#version
+		// https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-input#version
 		if (baseModelVersion != "") {
 			uri += "&base_model_version=" + baseModelVersion;
 		}	
 		
-		// https://console.bluemix.net/docs/services/speech-to-text/input.html#custom
+		// https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-input#custom
 		// At a time, only one LM customization can be specified.
 		// LM custom model chaining is not available as of Aug/2018.
 		if (customizationId != "") {
@@ -940,6 +1006,7 @@ void MY_OPERATOR::ws_init() {
 			uri += "&acoustic_customization_id=" + acousticCustomizationId;
 		}
 		
+		uri += "&access_token=" + accessToken;
 		wsConnectionEstablished = false;
 
 		if (wsClientExists == true) {
@@ -991,31 +1058,24 @@ void MY_OPERATOR::ws_init() {
 				"-->Channel " << boost::to_string(udpChannelNumber) <<
 				"-->Reached 1", "ws_init");
 			websocketpp::lib::error_code ec;
-			// https://console.bluemix.net/docs/services/speech-to-text/basic-request.html#using-the-websocket-interface
+			// https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-basic-request#using-the-websocket-interface
 			client::connection_ptr con = wsClient->get_connection(uri, ec);
 			SPLAPPTRC(L_DEBUG, "Operator " << operatorPhysicalName <<
 				"-->Channel " << boost::to_string(udpChannelNumber) <<
 				"-->Reached 2", "ws_init");
-			// For the Websocket interface, only auth tokens are supported and the
-			// usual cloud service credentials are not supported. So, user of this
-			// operator must generate his/her own auth token.
-			// https://console.bluemix.net/docs/services/speech-to-text/input.html#tokens
-			con->append_header("Authorization", "Basic " + authToken);
-			SPLAPPTRC(L_DEBUG, "Operator " << operatorPhysicalName <<
-				"-->Channel " << boost::to_string(udpChannelNumber) <<
-				"-->Reached 3", "ws_init");
+
 			wsClient->connect(con);
 			// A new Websocket connection has just been made. Reset this flag.
 			makeNewWebsocketConnection = false;
 			SPLAPPTRC(L_DEBUG, "Operator " << operatorPhysicalName <<
 				"-->Channel " << boost::to_string(udpChannelNumber) <<
-				"-->Reached 4", "ws_init");
+				"-->Reached 3", "ws_init");
 	
 			// Start the ASIO io_service run loop
 			wsClient->run();
 			SPLAPPTRC(L_DEBUG, "Operator " << operatorPhysicalName <<
 				"-->Channel " << boost::to_string(udpChannelNumber) <<
-				"-->Reached 5", "ws_init");
+				"-->Reached 4", "ws_init");
 		} catch (const std::exception & e) {
 			std::cout << "Operator " << operatorPhysicalName <<
 				"-->Channel " << boost::to_string(udpChannelNumber) << 
@@ -1042,10 +1102,10 @@ void MY_OPERATOR::on_open(MY_OPERATOR::client* c, websocketpp::connection_hdl hd
 		  "-->Channel " << boost::to_string(udpChannelNumber) <<
 		  "-->Reached 6", "on_open");
 	  // On Websocket connection open, establish a session with the STT service.
-	  // https://console.bluemix.net/docs/services/speech-to-text/websockets.html#WSstart
+	  // https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-websockets#WSstart
 	  // We have to form a proper JSON message structure for the  
 	  // STT recognition request start message with all the output features we want. 
-	  // https://console.bluemix.net/docs/services/speech-to-text/output.html#output
+	  // https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-output#output
 	  std::string msg = "{\"action\" : \"start\"";
 	  msg += ", \"content-type\" : \"" + contentType + "\"";
 
@@ -1056,10 +1116,10 @@ void MY_OPERATOR::on_open(MY_OPERATOR::client* c, websocketpp::connection_hdl hd
 		  interimResultsNeeded = "true";
 	  }
 	 
-	  // https://console.bluemix.net/docs/services/speech-to-text/output.html#interim
+	  // https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-output#interim
 	  msg += ", \"interim_results\" : " + interimResultsNeeded;
 	  
-	  // https://console.bluemix.net/docs/services/speech-to-text/input.html#timeouts
+	  // https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-input#timeouts
 	  msg += ", \"inactivity_timeout\": -1";
 	  	  
 	  // Customization weight of 9.9 indicates that the user never configured this parameter in SPL.
@@ -1069,7 +1129,7 @@ void MY_OPERATOR::on_open(MY_OPERATOR::client* c, websocketpp::connection_hdl hd
 		  std::ostringstream strs;
 		  strs << customizationWeight;
 		  
-		  // https://console.bluemix.net/docs/services/speech-to-text/input.html#custom
+		  // https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-input#custom
 		  msg += std::string(", \"customization_weight\" : ") + strs.str();
 	  }	  
 	  
@@ -1079,38 +1139,38 @@ void MY_OPERATOR::on_open(MY_OPERATOR::client* c, websocketpp::connection_hdl hd
 		  profanityFilteringNeeded = "false";
 	  }
 	 
-	  // https://console.bluemix.net/docs/services/speech-to-text/output.html#profanity_filter
+	  // https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-output#profanity_filter
 	  msg += ", \"profanity_filter\" : " + profanityFilteringNeeded;	
 	  
-	  // https://console.bluemix.net/docs/services/speech-to-text/output.html#max_alternatives
+	  // https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-output#max_alternatives
 	  msg += ", \"max_alternatives\" : " + boost::to_string(maxUtteranceAlternatives); 
 	  
-	  // https://console.bluemix.net/docs/services/speech-to-text/output.html#word_alternatives
+	  // https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-output#word_alternatives
 	  if(wordAlternativesThreshold > 0.0) {
 		  msg += ", \"word_alternatives_threshold\" : " + boost::to_string(wordAlternativesThreshold);
 	  }
 	  
-	  // https://console.bluemix.net/docs/services/speech-to-text/output.html#word_confidence
+	  // https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-output#word_confidence
 	  if (wordConfidenceNeeded == true) {
 		  msg += ", \"word_confidence\" : true"; 
 	  }
 	  
-	  // https://console.bluemix.net/docs/services/speech-to-text/output.html#word_timestamps
+	  // https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-output#word_timestamps
 	  if (wordTimestampNeeded == true) {
 		  msg += ", \"timestamps\" : true"; 
 	  }
 	  
-	  // https://console.bluemix.net/docs/services/speech-to-text/output.html#speaker_labels
+	  // https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-output#speaker_labels
 	  if (identifySpeakers == true) {
 		  msg += ", \"speaker_labels\" : true"; 
 	  }
 
-	  // https://console.bluemix.net/docs/services/speech-to-text/output.html#smart_formatting
+	  // https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-output#smart_formatting
 	  if (smartFormattingNeeded == true) {
 		  msg += ", \"smart_formatting\" : true"; 
 	  }
 	  
-	  // https://console.bluemix.net/docs/services/speech-to-text/output.html#keyword_spotting
+	  // https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-output#keyword_spotting
 	  if (keywordsSpottingThreshold > 0.0) {
 		  msg += ", \"keywords_threshold\" : " + boost::to_string(keywordsSpottingThreshold);
 		  // We have to send all the keywords to be spotted as a JSON list.
@@ -1186,7 +1246,7 @@ Tree query(Tree& pt, typename Tree::path_type path) {
 
 // Whenever a message (transcription result, STT service message or an STT error message) is
 // received from the STT service, this callback method will be called from the websocketpp layer.
-// https://console.bluemix.net/docs/services/speech-to-text/websockets.html#WSexample
+// https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-websockets#WSexample
 void MY_OPERATOR::on_message(MY_OPERATOR::client* c, websocketpp::connection_hdl hdl, message_ptr msg) {
   // c->get_alog().write(websocketpp::log::alevel::app, "Received Reply: "+msg->get_payload());
   //
@@ -1383,7 +1443,7 @@ void MY_OPERATOR::on_message(MY_OPERATOR::client* c, websocketpp::connection_hdl
 		  // case for our stt result mode 1 and 2), STT JSON response sometimes will
 		  // contain just the speaker_labels field without the results array and result_index fields.
 		  // Read the Watson STT service speaker labels documentation about it.
-		  // https://console.bluemix.net/docs/services/speech-to-text/output.html#speaker_labels
+		  // https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-output#speaker_labels
 		  // So, we will always read the speaker_labels field first on its own and
 		  // store it in the member variables of this operator class instead of
 		  // local variables as it is done below for all the other JSON response fields.
@@ -1567,7 +1627,7 @@ void MY_OPERATOR::on_message(MY_OPERATOR::client* c, websocketpp::connection_hdl
 			  // result_index field and the results array field in certain situations with 
 			  // interim_results enabled for stt result mode 1 or 2. 
 			  // Read the Watson STT service speaker labels documentation about it.
-			  // https://console.bluemix.net/docs/services/speech-to-text/output.html#speaker_labels
+			  // https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-output#speaker_labels
 			  // In this case, we will ignote this exception and continue to the next
 			  // while loop which will also exit that loop due to missing "results" array field.
 		  }
@@ -1834,7 +1894,7 @@ void MY_OPERATOR::on_message(MY_OPERATOR::client* c, websocketpp::connection_hdl
 				  // Let us now iterate through the "word_confidence" array.
 				  // This is an optional field within the "results.alternatives" JSON array.
 				  // Refer to this URL for the correct JSON format:
-				  // https://console.bluemix.net/docs/services/speech-to-text/output.html#word_confidence
+				  // https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-output#word_confidence
 				  idx3 = -1;
 				  bool utteranceWordsPopulated = false;
 				  
@@ -1910,7 +1970,7 @@ void MY_OPERATOR::on_message(MY_OPERATOR::client* c, websocketpp::connection_hdl
 				  // Let us now iterate through the "timestamps" array.
 				  // This is an optional field within the "results.alternatives" JSON array.
 				  // Refer to this URL for the correct JSON format:
-				  // https://console.bluemix.net/docs/services/speech-to-text/output.html#word_timestamps
+				  // https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-output#word_timestamps
 				  idx3 = -1;
 				  
 				  while(true) {
@@ -2133,7 +2193,7 @@ void MY_OPERATOR::on_message(MY_OPERATOR::client* c, websocketpp::connection_hdl
 			  // Let us now iterate through the "word_alternatives" array (Confusion Networks).
 			  // This is an optional field within the "results" JSON array.
 			  // Refer to this URL for the correct JSON format:
-			  // https://console.bluemix.net/docs/services/speech-to-text/output.html#word_alternatives
+			  // https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-output#word_alternatives
 			  idx2 = -1;
 			  while(true) {
 				  ++idx2;
@@ -2283,7 +2343,7 @@ void MY_OPERATOR::on_message(MY_OPERATOR::client* c, websocketpp::connection_hdl
 			  // Let us now iterate through the "keywords_result" associative array (Keyword Spotting).
 			  // This is an optional field within the "results" JSON array.
 			  // Refer to this URL for the correct JSON format:
-			  // https://console.bluemix.net/docs/services/speech-to-text/output.html#keyword_spotting
+			  // https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-output#keyword_spotting
 			  idx2 = -1;
 			  SPL::int32 sizeOfkeywordsToBeSpottedList = 
 				  keywordsToBeSpotted.size();

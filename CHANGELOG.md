@@ -1,5 +1,10 @@
 Changes
 =======
+## v1.0.3:
+* Jun/12/2019
+* Replaced the use of the auth token with the IAM access token.
+* Added a utility composite named IAMAccessTokenGenerator to generate/refresh an IAM access token. This utility composite can be invoked within the IBM Streams applications that make use of this toolkit to perform speech to text transcription.
+
 ## v1.0.2:
 * Sep/24/2018
 * Added a .gitkeep file in the data, impl, include and lib empty folders.

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="ASCII"?>
+<function:functionModel xmlns:function="http://www.ibm.com/xmlns/prod/streams/spl/function">
+  <function:functionSet>
+    <function:headerFileName>CppUtilFunctions.h</function:headerFileName>
+    <function:cppNamespaceName>cpp_util_functions</function:cppNamespaceName>
+    <function:functions>
+      <function:function>
+        <function:description>It launches any command or utility or application.</function:description>
+        <function:prototype>public int32 launch_app(rstring appName, mutable rstring resultStringOutput)</function:prototype>
+      </function:function>
+    </function:functions>
+  </function:functionSet>
+</function:functionModel>
