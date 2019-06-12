@@ -1,8 +1,15 @@
 /*
 ==============================================
 # Licensed Materials - Property of IBM
-# Copyright IBM Corp. 2018
+# Copyright IBM Corp. 2018, 2019
 ==============================================
+*/
+
+/*
+============================================================
+First created on: Jul/01/2018
+Last modified on: Jun/11/2019
+============================================================
 */
 
 /* Additional includes go here */
@@ -62,7 +69,7 @@ public:
 	SPL::int32 maxAllowedConnectionAttempts;
 	bool sttLiveMetricsUpdateNeeded;
 	std::string uri;
-	std::string authToken;
+	std::string accessToken;
 	std::string baseLanguageModel;
 	std::string contentType;
 	SPL::int32 sttResultMode;
