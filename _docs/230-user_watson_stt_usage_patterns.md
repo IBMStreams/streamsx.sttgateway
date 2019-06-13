@@ -2,7 +2,7 @@
 title: "Operator Usage Patterns"
 permalink: /docs/user/WatsonSTTUsagePatterns/
 excerpt: "Describes the WatsonSTT operator usage patterns."
-last_modified_at: 2018-09-22T12:37:48+01:00
+last_modified_at: 2019-06-12T21:12:48+01:00
 redirect_from:
    - /theme-setup/
 sidebar:
@@ -12,13 +12,13 @@ sidebar:
 {%include editme %}
 
 ## Important details needed for using the WatsonSTT operator
-As described in the other documentation pages, the WatsonSTT operator uses the Websocket interface to connect to the IBM Watson Speech To Text service running on the IBM public cloud or on IBM Cloud Private (ICP). In order to use this operator, the following three values must be available with you at the time of launching your Streams application.
+As described in the other documentation pages, the WatsonSTT operator uses the Websocket interface to connect to the IBM Watson Speech To Text service running on the IBM public cloud or on IBM Cloud Pak (ICP). In order to use this operator, the following three values must be available with you at the time of launching the Streams application.
 
-1. Base language model name that you want to use for transcribing your audio data. Supported base language models are listed in this URL: [Base language models](https://console.bluemix.net/docs/services/speech-to-text/input.html#models)
+1. Base language model name that you want to use for transcribing your audio data. Supported base language models are listed in this URL: [Base language models](https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-input#models)
 
-2. Content type of your audio data. Supported content types are listed in this URL: [Content type](https://console.bluemix.net/docs/services/speech-to-text/audio-formats.html#audio-formats)
+2. Content type of your audio data. Supported content types are listed in this URL: [Content type](https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-audio-formats#audio-formats)
 
-3. Your authentication token for securely accessing the IBM Watson STT service. You must ensure that you have a valid authentication token obtained using the procedure as outlined in this URL: [Auth Token](https://console.bluemix.net/docs/services/speech-to-text/input.html#tokens)
+3. Your STT service instance's API key will have to be provided as a submission time parameter at the time of launching the IBM Streams application. That API key will be used by a utility SPL composite available in the streamsx.sttgateway toolkit to generate an IAM access token needed for securely accessing the IBM Watson STT service. You must ensure that you have a valid API key to provide as a submission time parameter value. The use of the IAM access token is outlined in this URL: [IAM Access Token](https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-websockets#WSopen)
 
 These three important values are passed via the corresponding operator parameters. There are also other STT optional parameters that you can configure for additional STT features that your application may require.
 
@@ -97,8 +97,8 @@ You can invoke one or more instances of the WatsonSTT operator depending on the 
 // this operator into a single PE. This will help in reducing the 
 // total number of CPU cores used in running the application.
 //
-@parallel(width = $numberOfSTTEngines)
-stream<STTResult_t> STTResult = WatsonSTT(AudioFileName as AFN) {
+@parallel(width = $numberOfSTTEngines, broadcast=[IAT])
+stream<STTResult_t> STTResult = WatsonSTT(AudioFileName as AFN; IamAccessToken as IAT) {
    logic
       state: {
          mutable int32 _conversationCnt = 0;
@@ -116,7 +116,6 @@ stream<STTResult_t> STTResult = WatsonSTT(AudioFileName as AFN) {
    // can be omitted unless you want to change the default behavior of them.
    param
       uri: $sttUri;
-      authToken: $sttAuthToken;
       baseLanguageModel: $sttBaseLanguageModel;
       contentType: $contentType;
       sttResultMode: $sttResultMode;
@@ -216,9 +215,9 @@ stream<STTResult_t> STTResult = WatsonSTT(AudioBlobContent as ABC) {
 ```
 
 ## Using the custom output functions in the WatsonSTT operator
-This operator does the automatic attribute value assignment from the input tuple to the output tuple for those matching output tuple attributes for which there is no explicit value assignment done in the output clause. Users can decide to assign values to the output tuple attributes via custom output functions as per the needs of the application. It is also important to note that many of the custom output functions that are applicable only at an utternace level will not be meaningful in the situations where the `sttResultMode` operator parameter is set to `3` to transcribe the entire audio as a whole instead of utterance by utterance. So, use the custom output functions appropriately depending on whether a choice is made to do the transcription at the utterance level or at the level of the entire audio as a whole. The description of the output functions will give indications about whether a given output function is utterance specific or not.
+This operator does the automatic attribute value assignment from the input tuple to the output tuple for those matching output tuple attributes for which there is no explicit value assignment done in the output clause. Users can decide to assign values to the output tuple attributes via custom output functions as per the needs of the application. It is also important to note that many of the custom output functions that are applicable only at an utterance level will not be meaningful in the situations where the `sttResultMode` operator parameter is set to `3` to transcribe the entire audio as a whole instead of utterance by utterance. So, use the custom output functions appropriately depending on whether a choice is made to do the transcription at the utterance level or at the level of the entire audio as a whole. The description of the output functions will give indications about whether a given output function is utterance specific or not.
 
-At the very basic level, users should call the very first three custom output functions shown below at all times. Rest of the custom output fumctions can be either called or omitted as dictated by your application requirements.
+At the very basic level, users should call the very first three custom output functions shown below at all times. Rest of the custom output functions can be either called or omitted as dictated by your application requirements.
 
 **getSTTErrorMessage()** is used to find out if there is any transcription error returned by the operator. It is applicable when the `sttResultMode` operator parameter is set to 1 or 2 or 3.
 
@@ -234,9 +233,9 @@ There are many other custom output functions available in this operator that can
 
 **getConfidence()** is used to find out the confidence score for a finalized utterance when the `sttResultMode` operator parameter is set to 1 or 2.
 
-**getUtteranceAlternatives()** is used to obtain the n-best utterance alternative hypotheses. It is applicable when the `sttResultMode` operator parameter is set to 1 or 2. It returns a list of rstring values. For more details, read [here](https://console.bluemix.net/docs/services/speech-to-text/output.html#max_alternatives).
+**getUtteranceAlternatives()** is used to obtain the n-best utterance alternative hypotheses. It is applicable when the `sttResultMode` operator parameter is set to 1 or 2. It returns a list of rstring values. For more details, read [here](https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-output#max_alternatives).
 
-**getWordAlternatives()** is used to obtain the Confusion Networks. It is applicable when the `sttResultMode` operator parameter is set to 1 or 2. It returns a nested list of rstring values. For more details, read [here](https://console.bluemix.net/docs/services/speech-to-text/output.html#word_alternatives).
+**getWordAlternatives()** is used to obtain the Confusion Networks. It is applicable when the `sttResultMode` operator parameter is set to 1 or 2. It returns a nested list of rstring values. For more details, read [here](https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-output#word_alternatives).
 
 **getWordAlternativesConfidences()** is used to obtain the confidences of the word alternatives (Confusion Networks) for a given utterance. It is applicable when the `sttResultMode` operator parameter is set to 1 or 2. It returns a nested list of float64 values. 
 
@@ -246,9 +245,9 @@ There are many other custom output functions available in this operator that can
 
 **getUtteranceWords()** is used to obtain all the words present in a given utterance. It is applicable when the `sttResultMode` operator parameter is set to 1 or 2. It returns a list of rstring values. 
 
-**getUtteranceWordsConfidences()** is used to obtain the confidence score for the individual words present in a given utterance. It is applicable when the `sttResultMode` operator parameter is set to 1 or 2. It returns a list of float64 values. For more details, read [here](https://console.bluemix.net/docs/services/speech-to-text/output.html#word_confidence).
+**getUtteranceWordsConfidences()** is used to obtain the confidence score for the individual words present in a given utterance. It is applicable when the `sttResultMode` operator parameter is set to 1 or 2. It returns a list of float64 values. For more details, read [here](https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-output#word_confidence).
 
-**getUtteranceWordsStartTimes()** is used to obtain the start times of the individual words present in a given utterance. It is applicable when the `sttResultMode` operator parameter is set to 1 or 2. It returns a list of float64 values. For more details, read [here](https://console.bluemix.net/docs/services/speech-to-text/output.html#word_timestamps).
+**getUtteranceWordsStartTimes()** is used to obtain the start times of the individual words present in a given utterance. It is applicable when the `sttResultMode` operator parameter is set to 1 or 2. It returns a list of float64 values. For more details, read [here](https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-output#word_timestamps).
 
 **getUtteranceWordsEndTimes()** is used to obtain the end times of the individual words present in a given utterance. It is applicable when the `sttResultMode` operator parameter is set to 1 or 2. It returns a list of float64 values.
 
@@ -256,11 +255,11 @@ There are many other custom output functions available in this operator that can
 
 **getUtteranceEndTime()** is used to get the utterance end time in the overall audio conversation. It is applicable when the `sttResultMode` operator parameter is set to 1 or 2.
 
-**getUtteranceWordsSpeakers()** is used to obtain the speaker ids present in a finalized utterance. It is applicable when the `sttResultMode` operator parameter is set to 1 or 2. It returns a list of int32 values. For more details, read [here](https://console.bluemix.net/docs/services/speech-to-text/output.html#speaker_labels).
+**getUtteranceWordsSpeakers()** is used to obtain the speaker ids present in a finalized utterance. It is applicable when the `sttResultMode` operator parameter is set to 1 or 2. It returns a list of int32 values. For more details, read [here](https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-output#speaker_labels).
 
-**getUtteranceWordsSpeakersConfidences()** is used to obtain the confidence score for the speacker ids present in a finalized utterance. It is applicable when the `sttResultMode` operator parameter is set to 1 or 2. It returns a list of float64 values.
+**getUtteranceWordsSpeakersConfidences()** is used to obtain the confidence score for the speaker ids present in a finalized utterance. It is applicable when the `sttResultMode` operator parameter is set to 1 or 2. It returns a list of float64 values.
 
-**getKeywordsSpottingResults()** is used to obtain the result of certain keywords to be spotted in the given audio conversation. It is applicable when the `sttResultMode` operator parameter is set to 1 or 2. It returns a `map<rstring, list<map<rstring, float64>>>`. This map contains all the rstring matching keywords as its keys. For every such key, it will hold a list containing another map which will have an rstring key and a float64 value. In this inner map, it will have these as keys along with their corresponding values: `start_time, end_time and confidence`. For more details, read [here](https://console.bluemix.net/docs/services/speech-to-text/output.html#keyword_spotting).
+**getKeywordsSpottingResults()** is used to obtain the result of certain keywords to be spotted in the given audio conversation. It is applicable when the `sttResultMode` operator parameter is set to 1 or 2. It returns a `map<rstring, list<map<rstring, float64>>>`. This map contains all the rstring matching keywords as its keys. For every such key, it will hold a list containing another map which will have an rstring key and a float64 value. In this inner map, it will have these as keys along with their corresponding values: `start_time, end_time and confidence`. For more details, read [here](https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-output#keyword_spotting).
 
 ## Using customized Language Model (LM) and Acoustic Model (AM) in the WatsonSTT operator
 In addition to using the base language model provided by the IBM Watson STT service, users can do their own customization for Language model (LM) and Acoustic Model (AM). This will help to increase the transcription accuracy by reducing the word error rate (WER). This can be done via the published tools and techniques supported by the IBM Watson STT service. After completing the customization, users can obtain the customization ids for their custom LM and AM and pass them to the WatsonSTT operator via the following parameters.
@@ -280,8 +279,8 @@ acousticCustomizationId: $acousticCustomizationId;
 customizationWeight: $customizationWeight;
 ```
 
-For the steps required to create your own custom language model (LM), read [here](https://console.bluemix.net/docs/services/speech-to-text/language-create.html#languageCreate).
-For the steps required to create your own custom acoustic model (AM), read [here](https://console.bluemix.net/docs/services/speech-to-text/acoustic-create.html#acoustic).
+For the steps required to create your own custom language model (LM), read [here](https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-languageCreate#languageCreate).
+For the steps required to create your own custom acoustic model (AM), read [here](https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-acoustic#acoustic).
 
 ## Custom metrics available in the WatsonSTT operator
 This operator provides the following custom metrics that can be queried via the IBM Streams REST/JMX APIs or viewed via the commonly used utilities such as streamtool and Streams Web Console. The Counter kind metrics (1 and 4 below) will be updated when the operator starts. But, the Gauge kind metrics (2 and 3 below) will be updated live during transcription only when the sttLiveMetricsUpdateNeeded operator parameter is set to true.
@@ -302,7 +301,7 @@ There are two working examples included within this toolkit. You can use them as
 ```
 cd   streamsx.sttgateway/samples/AudioFileWatsonSTT
 make
-st  submitjob  -d  <YOUR_STREAMS_DOMAIN>  -i  <YOUR_STREAMS_INSTANCE>  output/com.ibm.streamsx.sttgateway.sample.watsonstt.AudioFileWatsonSTT.sab  -P  sttAuthToken=<YOUR_WATSON_STT_SERVICE_AUTH_TOKEN>
+st  submitjob  -d  <YOUR_STREAMS_DOMAIN>  -i  <YOUR_STREAMS_INSTANCE>  output/com.ibm.streamsx.sttgateway.sample.watsonstt.AudioFileWatsonSTT.sab  -P  sttApiKey=<YOUR_WATSON_STT_SERVICE_API_KEY>
 ```
 
 2. To override the default values with your own as needed for the various STT options:
@@ -310,7 +309,7 @@ st  submitjob  -d  <YOUR_STREAMS_DOMAIN>  -i  <YOUR_STREAMS_INSTANCE>  output/co
 ```
 cd   streamsx.sttgateway/samples/AudioRawWatsonSTT
 make
-st submitjob  -d  <YOUR_STREAMS_DOMAIN>  -i  <YOUR_STREAMS_INSTANCE>  output/com.ibm.streamsx.sttgateway.sample.watsonstt.AudioRawWatsonSTT.sab -P  sttAuthToken=<YOUR_WATSON_STT_SERVICE_AUTH_TOKEN>  -P sttResultMode=2   -P sttBaseLanguageModel=en-US_NarrowbandModel  -P contentType="audio/wav"    -P filterProfanity=true   -P keywordsSpottingThreshold=0.294   -P keywordsToBeSpotted="['country', 'learning', 'IBM', 'model']"   -P smartFormattingNeeded=true   -P identifySpeakers=true   -P wordTimestampNeeded=true   -P wordConfidenceNeeded=true   -P wordAlternativesThreshold=0.251   -P maxUtteranceAlternatives=5   -P audioBlobFragmentSize=32768   -P audioDir=<YOUR_AUDIO_FILES_DIRECTORY>   -P numberOfSTTEngines=100
+st submitjob  -d  <YOUR_STREAMS_DOMAIN>  -i  <YOUR_STREAMS_INSTANCE>  output/com.ibm.streamsx.sttgateway.sample.watsonstt.AudioRawWatsonSTT.sab -P  sttApiKey=<YOUR_WATSON_STT_SERVICE_API_KEY>  -P sttResultMode=2   -P sttBaseLanguageModel=en-US_NarrowbandModel  -P contentType="audio/wav"    -P filterProfanity=true   -P keywordsSpottingThreshold=0.294   -P keywordsToBeSpotted="['country', 'learning', 'IBM', 'model']"   -P smartFormattingNeeded=true   -P identifySpeakers=true   -P wordTimestampNeeded=true   -P wordConfidenceNeeded=true   -P wordAlternativesThreshold=0.251   -P maxUtteranceAlternatives=5   -P audioBlobFragmentSize=32768   -P audioDir=<YOUR_AUDIO_FILES_DIRECTORY>   -P numberOfSTTEngines=100
 ```
 
 ## Conclusion

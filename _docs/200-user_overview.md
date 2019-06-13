@@ -2,7 +2,7 @@
 title: "Toolkit Usage Overview"
 permalink: /docs/user/overview/
 excerpt: "How to use this toolkit."
-last_modified_at: 2018-09-22T12:37:48+01:00
+last_modified_at: 2019-06-12T18:32:48+01:00
 redirect_from:
    - /theme-setup/
 sidebar:
@@ -12,7 +12,7 @@ sidebar:
 {%include editme %}
 
 ## Satisfying the toolkit requirements
-As explained in the "Toolkit Overview [Technical]" section, this toolkit requires network connectivity to the Watson STT service and a user specific authentication token to access the Watson STT serice. In addition, it also requires you to download and install the boost_1_67_0 or a higher version as well as the websocketpp version 0.8.1 on the IBM Streams application development machine where the application code is compiled to create the application bundle. These two C++ libraries form the major external dependency for this toolkit. 
+As explained in the "Toolkit Overview [Technical]" section, this toolkit requires network connectivity to the Watson STT service and a user specific IAM access token to invoke the Watson STT service. In order to generate and refresh the IAM access token, this toolkit uses the Linux curl command. So, it is necessary to have the curl command working on all the IBM Streams application machines. In addition, it also requires you to download and install the boost_1_67_0 or a higher version as well as the websocketpp version 0.8.1 on the IBM Streams application development machine where the application code is compiled to create the application bundle. These two C++ libraries form the major external dependency for this toolkit. 
 
 Bulk of the Websocket logic in this toolkit's operator relies on the following open source C++ Websocket header only library.
 [websocket++](https://github.com/zaphoyd/websocketpp)
@@ -79,6 +79,8 @@ i. You must add this toolkit as a dependency in your application.
    - In Streams Studio, you can add this toolkit location in the Streams Explorer view and then add this toolkit as a dependency inside your application project's Dependencies section.
        
    - In a command line compile mode, simply add the -t option to point to this toolkit's top-level or its parent directory.
+
+   - This toolkit provides secure access to the STT service by generating an IAM access token via a utility SPL composite that can be invoked within a Streams application. That composite IAMAccessTokenGenerator has a dependency on the streamsx.json toolkit. So, it is necessary to have the streamsx.json (v1.4.6 or higher) toolkit on your development machine where you will build your application. In a command line compile mode, you have to add the -t option to point to your streamsx.json toolkit directory.
        
 ii. In Streams studio, you must double click on the BuildConfig of your application's main composite and then select "Other" in the dialog that is opened. In the "C++ compiler options", you must add the following.
    - `-I <Full path to your com.ibm.streamsx.sttgateway toolkit>/impl/include`
@@ -87,7 +89,9 @@ ii. In Streams studio, you must double click on the BuildConfig of your applicat
    - In Streams studio, you must double click on the BuildConfig of your application's main composite and then select "Other" in the dialog that is opened. In the "Additional SPL compiler options", you must add the following.
       - --c++std=c++11
        
-   - If you are building your application from the command line, please refer to the Makefile provided in the AudioFileWatsonSTT example shipped with this toolkit. Before using that Makefile, you must set the STREAMS_STTGATEWAY_TOOLKIT environment variable to point to the full path of your streamsx.sttgateway/com.ibm.streamsx.sttgateway directory. To build your own applications, you can do the same as done in that Makefile.
+   - If you are building your application from the command line, please refer to the Makefile provided in the AudioFileWatsonSTT example shipped with this toolkit. Before using that Makefile, you must set the STREAMS_STTGATEWAY_TOOLKIT environment variable to point to the full path of your streamsx.sttgateway/com.ibm.streamsx.sttgateway directory. Similarly, you must set the STREAMS_JSON_TOOLKIT environment variable to point to the full path of your streamsx.json (v1.4.6 or higher) toolkit directory. To build your own applications, you can do the same as done in that Makefile.
+
+   - Please note that your IBM cloud STT instance's API key will have to be provided via a submission time parameter into your application so that your API key can be used to generate a new IAM access token within the utility composite IAMAccessTokenGenerator mentioned above. Since the IAM access tokens will expire after a certain time period, it is necessary to keep refreshing it periodically. That utility composite does that as well.
 
 ## Example usage of this toolkit inside a Streams application:
 Here is a code snippet that shows how to invoke the WatsonSTT operator available in this toolkit for the basic features. For using the advanced features of the Watson STT service, please refer to another example code snippet shown in the Operator Usage Patterns section.
@@ -108,11 +112,10 @@ this operator into a single PE. This will help in reducing the
 total number of CPU cores used in running the application.
 */
 @parallel(width = $numberOfSTTEngines, 
-partitionBy=[{port=ABC, attributes=[conversationId]}])
-(stream<STTResult_t> STTResult) as STT = WatsonSTT(AudioBlobContent as ABC) {
+partitionBy=[{port=ABC, attributes=[conversationId]}], broadcast=[IAT])
+(stream<STTResult_t> STTResult) as STT = WatsonSTT(AudioBlobContent as ABC; IamAccessToken as IAT) {
    param
       uri: $sttUri;
-      authToken: $sttAuthToken;
       baseLanguageModel: $sttBaseLanguageModel;
 			
    output
@@ -133,7 +136,7 @@ A built-in example inside this toolkit can be compiled and launched with the def
 ```
 cd   streamsx.sttgateway/samples/AudioFileWatsonSTT
 make
-st  submitjob  -d  <YOUR_STREAMS_DOMAIN>  -i  <YOUR_STREAMS_INSTANCE>  output/com.ibm.streamsx.sttgateway.sample.watsonstt.AudioFileWatsonSTT.sab  -P  sttAuthToken=<YOUR_WATSON_STT_SERVICE_AUTH_TOKEN>
+st  submitjob  -d  <YOUR_STREAMS_DOMAIN>  -i  <YOUR_STREAMS_INSTANCE>  output/com.ibm.streamsx.sttgateway.sample.watsonstt.AudioFileWatsonSTT.sab  -P  sttApiKey=<YOUR_WATSON_STT_SERVICE_API_KEY>
 ```
 
 Following IBM Streams job sumission command shows how to override the default values with your own as needed for the various the STT options:
@@ -141,11 +144,11 @@ Following IBM Streams job sumission command shows how to override the default va
 ```
 cd   streamsx.sttgateway/samples/AudioRawWatsonSTT
 make
-st submitjob  -d  <YOUR_STREAMS_DOMAIN>  -i  <YOUR_STREAMS_INSTANCE>  output/com.ibm.streamsx.sttgateway.sample.watsonstt.AudioRawWatsonSTT.sab -P  sttAuthToken=<YOUR_WATSON_STT_SERVICE_AUTH_TOKEN>  -P sttResultMode=2   -P sttBaseLanguageModel=en-US_NarrowbandModel  -P contentType="audio/wav"    -P filterProfanity=true   -P keywordsSpottingThreshold=0.294   -P keywordsToBeSpotted="['country', 'learning', 'IBM', 'model']"   -P smartFormattingNeeded=true   -P identifySpeakers=true   -P wordTimestampNeeded=true   -P wordConfidenceNeeded=true   -P wordAlternativesThreshold=0.251   -P maxUtteranceAlternatives=5   -P audioBlobFragmentSize=32768   -P audioDir=<YOUR_AUDIO_FILES_DIRECTORY>   -P numberOfSTTEngines=100
+st submitjob  -d  <YOUR_STREAMS_DOMAIN>  -i  <YOUR_STREAMS_INSTANCE>  output/com.ibm.streamsx.sttgateway.sample.watsonstt.AudioRawWatsonSTT.sab -P  sttApiKey=<YOUR_WATSON_STT_SERVICE_API_KEY>  -P sttResultMode=2   -P sttBaseLanguageModel=en-US_NarrowbandModel  -P contentType="audio/wav"    -P filterProfanity=true   -P keywordsSpottingThreshold=0.294   -P keywordsToBeSpotted="['country', 'learning', 'IBM', 'model']"   -P smartFormattingNeeded=true   -P identifySpeakers=true   -P wordTimestampNeeded=true   -P wordConfidenceNeeded=true   -P wordAlternativesThreshold=0.251   -P maxUtteranceAlternatives=5   -P audioBlobFragmentSize=32768   -P audioDir=<YOUR_AUDIO_FILES_DIRECTORY>   -P numberOfSTTEngines=100
 ```
 
 ### Working examples shipped with this toolkit
-As explained in the previous section, there are two examples available within this toolkit directory that can be compiled and tested by using your valid authentication token required to connect to the Watson STT service. Within the same streamsx.sttgateway/samples directory where these two examples are present, there is also a directory named audio-files that contains a few test audio files useful for testing these two examples. 
+As explained in the previous section, there are two examples available within this toolkit directory that can be compiled and tested by using a valid IAM access token (generated via your STT service instance's API key) required to connect to the Watson STT service. The streamsx.sttgateway toolkit provides a utility composite operator named IAMAccessTokenGenerator that can be used within any Streams application to generate and refresh an IAM access token that is valid at all times. Without a valid IAM access token, this toolkit will not be able to function correctly. So, it is necessary to understand the importance of the IAM access token. The two examples provided in this toolkit will show you how to use the utility composite operator to generate/refresh the IAM access token and send it to the WatsonSTT operator. Within the same streamsx.sttgateway/samples directory where these two examples are present, there is also a directory named audio-files that contains a few test audio files useful for testing these two examples. 
 
 * [AudioFileWatsonSTT](https://github.com/IBMStreams/streamsx.sttgateway/tree/master/samples/AudioFileWatsonSTT)
 * [AudioRawWatsonSTT](https://github.com/IBMStreams/streamsx.sttgateway/tree/master/samples/AudioRawWatsonSTT)

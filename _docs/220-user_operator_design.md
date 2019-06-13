@@ -2,7 +2,7 @@
 title: "Operator Design"
 permalink: /docs/user/OperatorDesign/
 excerpt: "Describes the design of the Message Hub toolkit operators."
-last_modified_at: 2018-09-21T12:37:48+01:00
+last_modified_at: 2019-06-12T21:08:48+01:00
 redirect_from:
    - /theme-setup/
 sidebar:
@@ -11,7 +11,7 @@ sidebar:
 {% include toc %}
 {%include editme %}
 
-This IBM Watson STT Gateway toolkit contains the following operator to enable the Speech To Text feature inside the Streams applications via the IBM Watson STT public/private cloud service.
+This IBM Watson STT Gateway toolkit contains the following operator to enable the Speech To Text feature inside the Streams applications via the IBM Watson STT public and cloud pak service.
 
  * **WatsonSTT** - this operator is a Websocket based C++ operator that will perform the Speech To Text transcription.
 
@@ -38,7 +38,6 @@ Following are the parameters accepted by the WatsonSTT operator. Some parameters
 | Parameter Name | Type | Default | Description |
 | --- | --- | --- | --- |
 | uri | `rstring` | `User must provide this value. No default.` | This parameter specifies the Watson STT web socket service URI. |
-| authToken | `rstring` | `User must provide this value. No default.` | This parameter specifies the auth token needed to access the Watson STT service. |
 | baseLanguageModel | `rstring` | `User must provide this value. No default.` | This parameter specifies the name of the Watson STT base language model that should be used. |
 | contentType | `rstring` | `audio/wav` | This parameter specifies the content type to be used for transcription. |
 | sttResultMode | `int32` | `3` | This parameter specifies what type of STT result is needed: 1 to get partial utterances, 2 to get completed utterance, 3 to get the full text after transcribing the entire audio. |

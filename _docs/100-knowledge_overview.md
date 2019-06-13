@@ -2,7 +2,7 @@
 title: "Toolkit Overview [Technical]"
 permalink: /docs/knowledge/overview/
 excerpt: "Basic knowledge of the toolkit's technical domain."
-last_modified_at: 2018-09-23T12:37:48+01:00
+last_modified_at: 2019-06-12T18:20:48+01:00
 redirect_from:
    - /theme-setup/
 sidebar:
@@ -13,7 +13,7 @@ sidebar:
 
 ## Purpose of this toolkit
 
-The streamsx.sttgateway toolkit provides an operator that helps you to integrate IBM Streams applications with the [IBM Watson Speech To Text (STT) cloud service](https://www.ibm.com/watson/services/speech-to-text/). This toolkit lets you send audio data to the Watson STT service and get back the transcription results. This toolkit is designed to work with the IBM Watson STT service available on IBM public cloud and on IBM Cloud Private (ICP). It uses the Websocket communication API interface provided by that Watson STT service. It can take audio data either from the real-time speech conversations or from the prerecorded speech conversations that are stored in files.
+The streamsx.sttgateway toolkit provides an operator that helps you to integrate IBM Streams applications with the [IBM Watson Speech To Text (STT) cloud service](https://www.ibm.com/watson/services/speech-to-text/). This toolkit lets you send audio data to the Watson STT service and get back the transcription results. This toolkit is designed to work with the IBM Watson STT service available on IBM public cloud and on IBM Cloud Pak (ICP). It uses the Websocket communication API interface provided by that Watson STT service. It can take audio data either from the real-time speech conversations or from the prerecorded speech conversations that are stored in files.
 
 ## Technical positioning of this toolkit
 At a very high level, this toolkit shares the same design goal as the other IBM Streams toolkit named com.ibm.streams.speech2text to convert speech data into text. But, they both work very differently to realize that design goal. IBM Streams users can select either of these two toolkits depending on their application and hardware infrastructure needs. So, it is important to know the following major comparisons between these two toolkits before choosing the suitable one for a given situation.
@@ -36,8 +36,10 @@ At a very high level, this toolkit shares the same design goal as the other IBM 
 ## Requirements for this toolkit
 There are certain important requirements that need to be satisfied in order to use the IBM Streams STT Gateway toolkit in Streams applications. Such requirements are explained below.
 
-1. Network connectivity to the Watson Speech To Text (STT) service running either on the public or the private cloud is needed from the IBM Streams Linux machines where this toolkit will be used.
+1. Network connectivity to the Watson Speech To Text (STT) service running either on the public or on the cloud pak is needed from the IBM Streams Linux machines where this toolkit will be used.
    
-2. A valid authentication token is needed to use the Watson STT service. This toolkit uses Websocket to communicate with the Watson STT cloud service. For that Websocket interface, one must use the auth tokens and not the usual cloud service credentials. So, users of this toolkit must generate their own authentication token and provide it when launching the Streams application(s) that will have a dependency on this toolkit. To generate your own auth token, please do more reading from [here](https://console.bluemix.net/docs/services/speech-to-text/input.html#tokens).
+2. A valid IAM access token is needed to use the Watson STT service. This toolkit uses Websocket to communicate with the Watson STT cloud service. For that Websocket interface, one must use the IAM access token and not the usual cloud service credentials. So, users of this toolkit must provide their STT service instance's API key when launching the Streams application(s) that will have a dependency on this toolkit. Using that API key, a utility SPL composite named IAMAccessTokenGenerator available in this toolkit will be able to generate the IAM access token and then subsequently refresh that token to keep it valid. A Streams application employing this toolkit can make use of that utility composite to generate the necessary IAM access token. Please do more reading about the IAM access token from [here](https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-websockets#WSopen).
 
-3. On the IBM Streams application development machine (where the application code is compiled to create the application bundle), it is necessary to download and install the boost_1_67_0 or a higher version as well as the websocketpp version 0.8.1. Please note that this is not needed on the Streams application execution machines. For the necessary steps to meet this requirement, please refer to the section titled "Toolkit Usage Overview".
+3. On the IBM Streams application machines, please ensure that you can run the Linux curl command. The utility composite mentioned in the previous paragraph will use the Linux curl command to generate and refresh the IAM access token. So, curl command should work on all the Streams application machines.
+
+4. On the IBM Streams application development machine (where the application code is compiled to create the application bundle), it is necessary to download and install the boost_1_67_0 or a higher version as well as the websocketpp version 0.8.1. Please note that this is not needed on the Streams application execution machines. For the necessary steps to meet this requirement, please refer to the section titled "Toolkit Usage Overview".
