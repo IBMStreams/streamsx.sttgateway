@@ -1,6 +1,6 @@
 ============================================================
 First created on: July/01/2018
-Last modified on: June/12/2019
+Last modified on: September/05/2019
 
 Purpose of this toolkit
 -----------------------
@@ -9,8 +9,8 @@ integrate IBM Streams with the IBM Speech To Text (STT) cloud service.
 (https://www.ibm.com/watson/services/speech-to-text/)
 This toolkit lets you send audio data to the Watson STT service and 
 get back the transcription results. This toolkit is designed to work 
-with the IBM Watson STT service available on IBM public cloud and on 
-IBM Cloud Pak (ICP). It uses the Websocket communication API interface 
+with the IBM Watson STT service available on IBM public cloud or on 
+IBM Cloud Pak for Data (CP4D). It uses the Websocket communication API interface 
 provided by the Watson STT service. It can take audio data either from the 
 real-time speech conversations or from the prerecorded speech conversations 
 that are stored in files. 
@@ -45,7 +45,7 @@ the suitable one for a given situation.
    --> In com.ibm.streamsx.sttgateway, Audio content will 
        go outside of this toolkit via the network to the 
        external service that can run either on the IBM public cloud 
-       or inside your own private network in an ICP container.
+       or inside your own private network in a Cloud Pak for Data (CP4D) cluster.
 
 4) Ease of customizing the LM and AM models.
    --> In com.ibm.streams.speech2text, model customization 
@@ -140,6 +140,38 @@ the suitable one for a given situation.
        can optionally provide a few value added features in addition to
        the core speech to text capabilities. Such features include
        smart formatting, profanity filtering, keywords spotting etc.
+
+Requirements for this toolkit
+-----------------------------
+1. Network connectivity to the IBM Watson Speech To Text (STT) service running 
+either on the public cloud or on the Cloud Pak for Data (CP4D) is needed from 
+the IBM Streams Linux machines where this toolkit will be used.
+   
+2. This toolkit uses Websocket to communicate with the Watson STT service. 
+A valid IAM access token is needed to use the Watson STT service on the 
+public cloud and a valid access token to use the Watson STT service on the CP4D. 
+So, users of this toolkit must provide their public cloud STT service instance's 
+API key or the CP4D STT service instance's access token when launching the Streams 
+application(s) that will have a dependency on this toolkit. When using the API key 
+from the public cloud, a utility SPL composite named IAMAccessTokenGenerator 
+available in this toolkit will be able to generate the IAM access token and then 
+subsequently refresh that token to keep it valid. A Streams application employing 
+this toolkit can make use of that utility composite to generate the necessary 
+IAM access token needed in the public cloud. Please do more reading about the 
+IAM access token from here: 
+https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-websockets#WSopen
+
+3. On the IBM Streams application development machine (where the application code is 
+compiled to create the application bundle), it is necessary to download and install 
+the boost_1_67_0 or a higher version as well as the websocketpp version 0.8.1. 
+Please note that this is not needed on the Streams application execution machines.
+For the essential steps to meet this requirement, please refer to the above-mentioned 
+documentation URL or a file named sttgateway-tech-brief.txt available at this 
+tooolkit's top-level directory.
+
+4. On the IBM Streams application machines, please ensure that you can run the 
+Linux curl command. This is required by this toolkit to generate and refresh the 
+IAM access token which is a must for the STT service on public cloud.
 
 Major external dependency for this toolkit
 ------------------------------------------
@@ -253,10 +285,10 @@ a) You must add this toolkit as a dependency in your application.
        point to this toolkit's top-level or its parent directory.
 
    --> This toolkit provides secure access to the STT service by
-       generating an IAM access token via a utility SPL composite that
-       can be invoked within a Streams application. That composite
-       IAMAccessTokenGenerator has a dependency on the streamsx.json 
-       toolkit. So, it is necessary to have the streamsx.json 
+       generating an IAM access token needed in the public cloud via a 
+       utility SPL composite that can be invoked within a Streams application. 
+       That composite IAMAccessTokenGenerator has a dependency on the 
+       streamsx.json toolkit. So, it is necessary to have the streamsx.json 
        (v1.4.6 or higher) toolkit on your development machine where you 
        will build your application. In a command line compile mode, you 
        have to add the -t option to point to your streamsx.json toolkit directory.
@@ -286,13 +318,16 @@ b) --> In Streams studio, you must double click on the BuildConfig of
        the full path of your streamsx.json (v1.4.6 or higher) toolkit directory.
        To build your own applications, you can do the same as done in that Makefile.
        
-   --> Please note that your IBM cloud STT instance's API key will have to be
+   --> Please note that your IBM public cloud STT instance's API key will have to be
        provided via a submission time parameter into your application so that 
        your API key can be used to generate a new IAM access token within 
        the utility composite IAMAccessTokenGenerator mentioned above. 
        Since the IAM access tokens will expire after a certain time period, 
        it is necessary to keep refreshing it periodically. That utility composite 
-       does that as well.
+       does that as well. This API Key is needed only when using the STT service on
+       public cloud. If the STT service on the IBM Cloud Pak for Data (CP4D) is used,
+       then the API key is not needed. Instead, a never expiring access token
+       obtained from the CP4D STT service instance's web console should be used.
 
 Common log messages generated by the Websocket library
 ------------------------------------------------------

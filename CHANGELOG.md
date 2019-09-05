@@ -1,5 +1,10 @@
 Changes
 =======
+## v1.0.4:
+* Sep/05/2019
+* Made changes for the user to provide either the API key for public cloud or the access token for IBM Cloud Pak for Data.
+* Made the necessary changes to use either the STT service on public cloud or the STT service on the IBM Cloud Pak for Data (CP4D).
+
 ## v1.0.3:
 * Jun/12/2019
 * Replaced the use of the auth token with the IAM access token.

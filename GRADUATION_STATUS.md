@@ -13,7 +13,7 @@ Incubation for projects is covered here: https://github.com/IBMStreams/administr
 - [ ] :white_check_mark: Project has samples and instructions to help users get started easily
   * Status: Multiple working samples exist
 - [ ] :large_orange_diamond: Sufficient testing
-  * Status: Scale tests for an UDP parallel width of 1200 were completed. If a higher number of parallel channels needs to be supported, then that testing has not yet been done. In addition, a thorough functional and scale testing of this toolkit with the IBM Watson STT on IBM Cloud Private (ICP) is still pending.
+  * Status: Scale tests for an UDP parallel width of 1200 were completed. If a higher number of parallel channels needs to be supported, then that testing has not yet been done. In addition, functional tests were completed with the IBM Watson STT on IBM Cloud Pak for Data (CP4D).
 - [ ] :white_check_mark: Instructions on how to get started with development and contributing to project
   * Status: Clear description exists to get started with this toolkit.
 - [ ] :white_check_mark: Website that contains information and documentation of the project
