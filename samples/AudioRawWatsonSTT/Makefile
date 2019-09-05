@@ -4,7 +4,7 @@
 
 STREAMS_STTGATEWAY_TOOLKIT ?= $(PWD)/../../com.ibm.streamsx.sttgateway
 # You must change the following line to point to your
-# correct streamsx.json toolkit directory (v1.4.6 or abovee needed).
+# correct streamsx.json toolkit directory (v1.4.6 or above needed).
 STREAMS_JSON_TOOLKIT ?= $(HOME)/streamsx.json
 
 ifeq ($(STREAMS_STUDIO_BUILDING), 1)
