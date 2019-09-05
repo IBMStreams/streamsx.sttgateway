@@ -55,12 +55,12 @@ partitionBy=[{port=ABC, attributes=[conversationId]}], broadcast=[AT])
 }
 ```
 
-A built-in example inside this toolkit can be compiled and launched with the default STT options as shown below:
+A built-in example inside this toolkit can be compiled and launched with the default STT options to use the STT service on public cloud as shown below:
 
 ```
 cd   streamsx.sttgateway/samples/AudioFileWatsonSTT
 make
-st  submitjob  -d  <YOUR_STREAMS_DOMAIN>  -i  <YOUR_STREAMS_INSTANCE>  output/com.ibm.streamsx.sttgateway.sample.watsonstt.AudioFileWatsonSTT.sab  -P  sttApiKey=<YOUR_WATSON_STT_SERVICE_API_KEY>  -P audioDir=<YOUR_AUDIO_FILES_DIRECTORY>
+st  submitjob  -d  <YOUR_STREAMS_DOMAIN>  -i  <YOUR_STREAMS_INSTANCE>  output/com.ibm.streamsx.sttgateway.sample.watsonstt.AudioFileWatsonSTT.sab  -P  sttApiKey=<YOUR_WATSON_STT_SERVICE_API_KEY> 
 ```
 
 Following IBM Streams job sumission command shows how to override the default values with your own as needed for the various STT options:
@@ -74,7 +74,7 @@ st submitjob  -d  <YOUR_STREAMS_DOMAIN>  -i  <YOUR_STREAMS_INSTANCE>  output/com
 Following is another way to run the same application to access the STT service on the IBM Cloud Pak for Data (CP4D). STT URI shown below is for an illustrative purpose and you must use a valid STT URI from your CP4D cluster.
 
 ```
-st  submitjob  -d  <YOUR_STREAMS_DOMAIN>  -i  <YOUR_STREAMS_INSTANCE>  output/com.ibm.streamsx.sttgateway.sample.watsonstt.AudioFileWatsonSTT.sab  -P  sttOnCP4DAccessToken=<YOUR_CP4D_STT_SERVICE_ACCESS_TOKEN>  -P  sttUri=wss://b0610b07:31843/speech-to-text/ibm-wc/instances/1567608964/api/v1/recognize  -P audioDir=<YOUR_AUDIO_FILES_DIRECTORY>
+st  submitjob  -d  <YOUR_STREAMS_DOMAIN>  -i  <YOUR_STREAMS_INSTANCE>  output/com.ibm.streamsx.sttgateway.sample.watsonstt.AudioFileWatsonSTT.sab  -P  sttOnCP4DAccessToken=<YOUR_CP4D_STT_SERVICE_ACCESS_TOKEN>  -P  sttUri=wss://b0610b07:31843/speech-to-text/ibm-wc/instances/1567608964/api/v1/recognize 
 ```
 
 ## WHATS NEW
