@@ -2,7 +2,7 @@
 title: "Operator Usage Patterns"
 permalink: /docs/user/WatsonSTTUsagePatterns/
 excerpt: "Describes the WatsonSTT operator usage patterns."
-last_modified_at: 2019-09-05T11:23:48+01:00
+last_modified_at: 2019-09-05T14:12:48+01:00
 redirect_from:
    - /theme-setup/
 sidebar:
@@ -99,8 +99,8 @@ You can invoke one or more instances of the WatsonSTT operator depending on the 
 // this operator into a single PE. This will help in reducing the 
 // total number of CPU cores used in running the application.
 //
-@parallel(width = $numberOfSTTEngines, broadcast=[IAT])
-stream<STTResult_t> STTResult = WatsonSTT(AudioFileName as AFN; IamAccessToken as IAT) {
+@parallel(width = $numberOfSTTEngines, broadcast=[AT])
+stream<STTResult_t> STTResult = WatsonSTT(AudioFileName as AFN; IamAccessToken, AccessTokenForCP4D as AT) {
    logic
       state: {
          mutable int32 _conversationCnt = 0;
