@@ -2,7 +2,7 @@
 title: "Operator Design"
 permalink: /docs/user/OperatorDesign/
 excerpt: "Describes the design of the Message Hub toolkit operators."
-last_modified_at: 2019-06-12T21:08:48+01:00
+last_modified_at: 2019-09-05T11:17:48+01:00
 redirect_from:
    - /theme-setup/
 sidebar:
@@ -11,7 +11,7 @@ sidebar:
 {% include toc %}
 {%include editme %}
 
-This IBM Watson STT Gateway toolkit contains the following operator to enable the Speech To Text feature inside the Streams applications via the IBM Watson STT public and cloud pak service.
+This IBM Watson STT Gateway toolkit contains the following operator to enable the Speech To Text feature inside the Streams applications via the IBM Watson STT service on public cloud or on the Cloud Pak for Data CP4D i.e. private cloud.
 
  * **WatsonSTT** - this operator is a Websocket based C++ operator that will perform the Speech To Text transcription.
 

@@ -2,7 +2,7 @@
 title: "Operator Usage Patterns"
 permalink: /docs/user/WatsonSTTUsagePatterns/
 excerpt: "Describes the WatsonSTT operator usage patterns."
-last_modified_at: 2019-06-12T21:12:48+01:00
+last_modified_at: 2019-09-05T11:23:48+01:00
 redirect_from:
    - /theme-setup/
 sidebar:
@@ -12,15 +12,17 @@ sidebar:
 {%include editme %}
 
 ## Important details needed for using the WatsonSTT operator
-As described in the other documentation pages, the WatsonSTT operator uses the Websocket interface to connect to the IBM Watson Speech To Text service running on the IBM public cloud or on IBM Cloud Pak (ICP). In order to use this operator, the following three values must be available with you at the time of launching the Streams application.
+As described in the other documentation pages, the WatsonSTT operator uses the Websocket interface to connect to the IBM Watson Speech To Text service running on the IBM public cloud or on IBM Cloud Pak for Data (CP4D i.e. private cloud). In order to use this operator, the following three values must be available with you at the time of launching the Streams application.
 
 1. Base language model name that you want to use for transcribing your audio data. Supported base language models are listed in this URL: [Base language models](https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-input#models)
 
 2. Content type of your audio data. Supported content types are listed in this URL: [Content type](https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-audio-formats#audio-formats)
 
-3. Your STT service instance's API key will have to be provided as a submission time parameter at the time of launching the IBM Streams application. That API key will be used by a utility SPL composite available in the streamsx.sttgateway toolkit to generate an IAM access token needed for securely accessing the IBM Watson STT service. You must ensure that you have a valid API key to provide as a submission time parameter value. The use of the IAM access token is outlined in this URL: [IAM Access Token](https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-websockets#WSopen)
+3. Your public cloud STT service instance's API key or a CP4D access token will have to be provided as a submission time parameter at the time of launching the IBM Streams application. That API key will be used by a utility SPL composite available in the streamsx.sttgateway toolkit to generate an IAM access token needed for securely accessing the IBM Watson STT service on public cloud. You must ensure that you have a valid API key for public cloud or an access token for CP4D to provide as a submission time parameter value. The use of the IAM access token is outlined in this URL: [IAM Access Token](https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-websockets#WSopen)
 
-These three important values are passed via the corresponding operator parameters. There are also other STT optional parameters that you can configure for additional STT features that your application may require.
+4. If you are using the STT service on Cloud Pak for Data (CP4D), then you must also provide your STT service instance URI obtained specifically from your CP4D web console.
+
+These four important values are passed via the corresponding operator parameters. There are also other STT optional parameters that you can configure for additional STT features that your application may require.
 
 ## WatsonSTT operator's result mode parameter
 WatsonSTT operator can process the given audio data and return the transcription results in one of the following three configurable modes. This is controlled by the operator parameter named `sttResultMode` which takes a value of 1 or 2 or 3 as explained below in that order.
