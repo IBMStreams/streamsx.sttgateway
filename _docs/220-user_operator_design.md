@@ -2,7 +2,7 @@
 title: "Operator Design"
 permalink: /docs/user/OperatorDesign/
 excerpt: "Describes the design of the Message Hub toolkit operators."
-last_modified_at: 2019-09-05T11:17:48+01:00
+last_modified_at: 2019-10-22T15:52:48+01:00
 redirect_from:
    - /theme-setup/
 sidebar:
@@ -11,9 +11,53 @@ sidebar:
 {% include toc %}
 {%include editme %}
 
-This IBM Watson STT Gateway toolkit contains the following operator to enable the Speech To Text feature inside the Streams applications via the IBM Watson STT service on public cloud or on the Cloud Pak for Data CP4D i.e. private cloud.
+This IBM Watson STT Gateway toolkit contains the following operators to enable the Speech To Text feature inside the Streams applications via the IBM Watson STT service on public cloud or on the Cloud Pak for Data CP4D i.e. private cloud.
 
- * **WatsonSTT** - this operator is a Websocket based C++ operator that will perform the Speech To Text transcription.
+1. IBMVoiceGatewaySource
+2. WatsonSTT
+
+In a Streams application, these two operators can either be used together or independent of each other. In a real-time speech analytics scenario for transcribing live voice calls into text, both of these operators can be used as part of a Streams application graph. In a batch mode operation to convert a set of prerecorded audio files stored in a file system directory into text, WatsonSTT operator can be used on its own in a Streams application graph. So, your application requirements will determine whether you will need only one or both of those operators. In the section below, you will see a detailed explanation of both the operators.
+
+*******************************
+
+* **IBMVoiceGatewaySource** - this is a Websocket server based C++ source operator that can receive the speech data in binary format from many concurrent live voice calls happening between different pairs of speakers e-g: customers and call center agents.
+
+Main goal of this operator is to receive speech data from the iBM Voice Gateway. This operator internally runs a Websocket server that can accept persistent bidirectional client connections made by the IBM Voice Gateway and receive the speech data from the beginning to the end of any given voice call. It then emits chunks of the speech conversations received from the IBM Voice Gateway into output tuples to be consumed by the downstream operators for speech to text transcription. This operator is designed to work with the IBM Voice Gateway v1.0.3.0 and higher. In order to make this operator work well with the IBM Voice Gateway, there must be certain configuration that needs to be done in the IBM Voice Gateway. It includes enabling the voice call metadata transfer to the IBM Streams application, pointing to the Websocket URL endpoint of the IBM Streams application, creating a TLS/SSL certificate and pointing it in both the IBM Voice Gateway and the IBM Streams application etc. These steps must be performed before this source operator can be used in the context of an IBM Streams application. For clear instructions about this required configuration, please refer to a previous chapter titled "Toolkit Overview [Technical]" and focus on step 5 of one of its sections titled "Requirements for this toolkit".
+
+The IBMVoiceGatewaySource operator is designed to ingest speech data from the IBM Voice Gateway product. This speech data is ingested in binary format from the IBM Voice Gateway into this operator via the Websocket interface. Such speech data arrives here in multiple fragments directly from a live voice call. This operator is capable of receiving speech data from multiple calls that can all happen at the very same time between different pairs of speakers. For every voice call it handles in real-time, the IBM Voice Gateway product will open two Websocket connections into this operator and start sending the live speech data on both of those connections. One of those connections will carry the speech data of the agent and the other connection will carry the speech data of the customer. This operator will keep sending the audio chunks received on those two Websocket connections via its output stream for consumption by the downstream operators. At the end of the any given call, IBM Voice Gateway will close the two WebSocket connections it opened into this operator. This operator has a second output port that produces periodic output tuples to give an indication about the end of a specific speaker (i.e. channel) in a voice call that was in progress moments ago for the given IBM Voice Gateway session id. Downstream operators can make use of this "End Of Voice Call" signal as they see fit.
+
+### IBMVoiceGatewaySource operator parameters
+Following are the parameters accepted by the IBMVoiceGatewaySource operator. Some parameters are mandatory with user-provided values and others are optional with default values assigned within the C++ operator logic.
+
+| Parameter Name | Type | Default | Description |
+| --- | --- | --- | --- |
+| tlsPort | `uint32` | `443` | This parameter specifies the WebSocket TLS port number. |
+| certificateFileName | `rstring` | `etc/ws-server.pem present inside the Streams application` | This parameter specifies the full path of the WebSocket server PEM certificate file name. |
+| nonTlsEndpointNeeded | `boolean` | `false` | This parameter specifies whether a WebSocket (plain) non-TLS endpoint is needed. |
+| nonTlsPort | `uint32` | `80` | This parameter specifies the WebSocket (plain) non-TLS port number. |
+| initDelay | `float64` | `0.0` | This parameter specifies a one time delay in seconds for which this source operator should wait before start generating its first tuple. |
+| vgwLiveMetricsUpdateNeeded | `boolean` | `true` | This parameter specifies whether live update for this operator's custom metrics is needed. |
+| websocketLoggingNeeded | `boolean` | `false` | This parameter specifies whether logging is needed from the WebSocket library. |
+| vgwSessionLoggingNedded | `boolean` | `false` | This parameter specifies whether logging is needed when the IBM Voice Gateway session is in progress with this operator. |
+| vgwStaleSessionPurgeInterval | `uint32` | `10800` | This parameter specifies periodic time interval in seconds during which any stale Voice Gateway sessions should be purged to free up memory usage. |
+
+### IBMVoiceGatewaySource operator's custom output functions
+Following are the custom output functions supported by the IBMVoiceGatewaySource operator. These functions can be called as needed within the output clause of this operator's SPL invocation code.
+
+| Output function name | Description |
+| --- | --- |
+| `rstring getIBMVoiceGatewaySessionId()` | Returns an rstring value indicating the IBM Voice Gateway session id that corresponds to the current output tuple. |
+| `boolean isCustomerSpeechData()` | Returns a boolean value to indicate if this is a customer's speech data or not. |
+| `int32 getTupleCnt()` | Returns an int32 value indicating the total number of output tuples emitted so far for the given channel in a IBM Voice Gateway session id. |
+| `int32 getTotalSpeechDataBytesReceived()` | Returns an int32 value indicating the total number of speech data bytes received so far for the given channel in a IBM Voice Gateway session id. |
+| `int32 getVoiceChannelNumber()` | Returns an int32 value indicating the voice channel number in which the speech data bytes were received for a IBM Voice Gateway session id. |
+| `rstring getCallerPhoneNumber()` | Returns an rstring value with details about the caller's phone number. |
+| `rstring getAgentPhoneNumber()` | Returns an rstring value with details about the agent's phone number. |
+
+
+*******************************
+
+ * **WatsonSTT** - this is a Websocket client based C++ analytic operator that can perform the Speech To Text transcription.
 
 Main goal of this operator is to make the task of the Speech To Text transcription as simple as possible for the user. With that goal in mind, this operator provides the following set of core features. High level description of such features is provided below and a detailed explanation is given in the next section titled "Operator Usage Patterns".
 

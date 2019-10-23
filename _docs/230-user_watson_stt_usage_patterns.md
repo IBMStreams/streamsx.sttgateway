@@ -2,7 +2,7 @@
 title: "Operator Usage Patterns"
 permalink: /docs/user/WatsonSTTUsagePatterns/
 excerpt: "Describes the WatsonSTT operator usage patterns."
-last_modified_at: 2019-09-05T14:12:48+01:00
+last_modified_at: 2019-10-22T18:22:48+01:00
 redirect_from:
    - /theme-setup/
 sidebar:
@@ -10,6 +10,136 @@ sidebar:
 ---
 {% include toc %}
 {%include editme %}
+
+## Important details needed for using the IBMVoiceGatewaySource operator
+The IBMVoiceGatewaySource operator uses the WebSocket server interface to accept multiple concurrent client connections opened by the IBM Voice Gateway product. Single connection per voice call is opened and kept alive for the entire lifetime of that voice call. Before using this operator, it is important to install and configure the IBM Voice Gateway product such that your telephony infrastructure (SBC - Session Border Controller and SIPREC components) can send the speech data to the IBM Voice Gateway. During the deployment of the IBM Voice Gateway, it is necessary to configure it to send the speech data to your IBM Streams application. The details about that configuration is already discussed in an earlier chapter. Please refer to that chapter titled "Toolkit Overview [Technical]" and focus on step 5 of one of its sections titled "Requirements for this toolkit". It is also recommended that users read the official documentation of the IBM Voice Gateway product [here](https://www.ibm.com/support/knowledgecenter/SS4U29/whatsnew.html).
+
+In order to use this operator in your Streams application, the following values must be with you at the time of launching the Streams application.
+
+1. TLS (a.k.a SSL) port for the Websocket server in the IBMVoiceGatewaySource that you want to use. By default, this operator will use the TLS port 443. If you want to override that default port number, you should decide which port number to use.
+
+2. You should also decide about the total number of WatsonSTT operator instances you want to start. A rule of thumb is to have two WatsonSTT operator instances to process two speakers in every given concurrent voice call. To meet the need for handling maximum number of expected concurrent calls at peak time, you should plan ahead of time and start the maximum required WatsonSTT operator instances. You don't want to end up in a situation where you will run out of all the STT engines being busy when you have a new voice call not getting assigned to an idle pair of STT engines.
+
+3. TLS (SSL) certificate file name that you want the Websocket server in the IBMVoiceGatewaySource operator to use. You must generate either a self signed or a root CA signed certificate in PEM format (containing both your private key and your certificate) and give the full path of that file while starting your Streams application. Alternately, you can also copy your certificate file in your Streams application's etc sub-directory as ws-server.pem and then let the IBMVoiceGatewaySource operator use that file by default.
+
+4. Audio format that should be used when sending the data received from the IBM Voice Gateway to the IBM Watson Speech To Text service. Since the IBM Voice Gateway sends the data to IBM Streams in the mulaw format, it is necessary that you set the contentType in the WatsonSTT operator to "audio/mulaw;rate=8000".
+
+These four important values are passed via the corresponding operator parameters. There are also other optional parameters for this operator that you can configure for additional features that your application may require.
+
+## Configuration parameters for the IBMVoiceGatewaySource operator
+This operator provides nine parameters to configure the way in which this operator will function to return different values in the output tuples containing the raw binary speech data. For the normal usage, you can simply use only the important parameters as discussed above on this page. For debug logs, enforcing an initial delay etc., you will have to use the other operator parameters as listed in the previous page.
+
+## Output stream schema for the IBMVoiceGatewaySource operator
+At the full scope of this operator, output stream schema can be as shown below with all possible attributes. It is shown here to explain the basic and additional features of this operator. Not all real life applications will need all these attributes. You can decide to include or omit these attributes based on the specific features your application will need. Trimming the unused attributes will also help in reducing the message processing overhead and in turn help in receiving the speech data fragments faster.
+
+```
+// The following is the schema of the first output stream for the
+// IBMVoiceGatewaySource operator. The first four attributes are
+// very important and the other ones are purely optional if some
+// scenarios really require them.
+type BinarySpeech_t =
+   blob speech, // Speech fragment sent by the IBM Voice Gateway
+   rstring vgwSessionId, // Unique identifier of a voice call
+   boolean isCustomerSpeechData, // Is it customer's speech?
+   int32 vgwVoiceChannelNumber, // Voice channel number of this speech data
+   rstring callerPhoneNumber, 
+   rstring agentPhoneNumber,
+   int32 speechDataFragmentCnt, // How many speech fragments on this channel so far?
+   int32 totalSpeechDataBytesReceived, // How many speech data bytes on this channel so far?
+   int32 sttEngineId, // Which WatsonSTT engine id is processing this channel? 
+   int32 sttResultProcessorId; // Which result processor id is handling the STT result for this call?
+```
+
+```
+// The following schema is for the second output stream of the
+// IBMVoiceGatewaySource operator. It has three attributes indicating
+// the speaker channel (vgwVoiceChannelNumber) of a given voice call (vgwSessionId) who
+// got completed with the call as well as an indicator (isCustomerSpeechData) to 
+// denote whether the speech data we received on this channel belonged
+// to a caller or an agent.
+type EndOfCallSignal_t =
+   rstring vgwSessionId, 
+   boolean isCustomerSpeechData,
+   int32 vgwVoiceChannelNumber;
+```
+
+## Invoking the IBMVoiceGatewaySource operator
+In your SPL application, this operator can be invoked with either all operator parameters or a subset of the operator parameters. Similarly, in the output clause of the operator body, you can either call all the available custom output functions or a subset of those custom output functions to do your output stream attribute assignments. You can decide on the total number of operator parameters and the total number of custom output functions to use based on the real needs of your application.
+
+```
+(stream<BinarySpeech_t> BinarySpeechData as BSD;
+ stream<EndOfCallSignal_t> EndOfCallSignal as EOCS) as VoiceGatewayInferface = IBMVoiceGatewaySource() {
+    logic
+       state: {
+          // Initialize the default TLS certificate file name if the 
+          // user didn't provide his or her own.
+          rstring _certificateFileName = 
+             ($certificateFileName != "") ?
+              $certificateFileName : getThisToolkitDir() + "/etc/ws-server.pem";
+       }
+				
+       param
+		   tlsPort: $tlsPort;
+		   certificateFileName: _certificateFileName;
+		   nonTlsEndpointNeeded: $nonTlsEndpointNeeded;
+		   nonTlsPort: $nonTlsPort;
+		   // Initial delay before generating the very first tuple.
+		   initDelay: $initDelayBeforeSendingDataToSttEngines;
+		   vgwLiveMetricsUpdateNeeded: $vgwLiveMetricsUpdateNeeded;
+		   websocketLoggingNeeded: $vgwWebsocketLoggingNeeded;
+		   vgwSessionLoggingNedded: $vgwSessionLoggingNedded;
+		   vgwStaleSessionPurgeInterval: $vgwStaleSessionPurgeInterval;
+			
+       // Get these values via custom output functions	provided by this operator.
+	   output
+			BSD: vgwSessionId = getIBMVoiceGatewaySessionId(),
+					isCustomerSpeechData = isCustomerSpeechData(),
+					vgwVoiceChannelNumber = getVoiceChannelNumber(),
+					callerPhoneNumber = getCallerPhoneNumber(),
+					agentPhoneNumber = getAgentPhoneNumber(),
+					speechDataFragmentCnt = getTupleCnt(),
+					totalSpeechDataBytesReceived = getTotalSpeechDataBytesReceived();
+}
+```
+
+## Using the custom output functions in the IBMVoiceGatewaySource operator
+This operator does the automatic attribute value assignment from the input tuple to the output tuple for those matching output tuple attributes for which there is no explicit value assignment done in the output clause. Users can decide to assign values to the output tuple attributes via custom output functions as per the needs of the application.
+
+At the very basic level, users should call the very first three custom output functions shown below at all times. Rest of the custom output functions can be either called or omitted as dictated by your application requirements.
+
+**getIBMVoiceGatewaySessionId()** is used to get  the unique session id for a given voice call.
+
+**isCustomerSpeechData()** is used to find out if the speech data received was spoken by the customer or the agent.
+
+**getVoiceChannelNumber()** is used to get which of the two voice channels in which the speech data arrived.
+
+**getCallerPhoneNumber()** is used to get the caller's phone number.
+
+**getAgentPhoneNumber()** is used to get the agent's phone number.
+
+**getTupleCnt()** is used to get the number of speech tuples received so far on the given voice channel.
+
+**getTotalSpeechDataBytesReceived ()** is used to get the total number of speech data bytes received so far  on the given voice channel.
+
+## Custom metrics available in the IBMVoiceGatewaySource operator
+This operator provides the following custom metrics that can be queried via the IBM Streams REST/JMX APIs or viewed via the commonly used utilities such as streamtool and Streams Web Console. These Gauge kind metrics will be updated live during the reception of the speech data only when the vgwLiveMetricsUpdateNeeded operator parameter is set to true.
+
+1. **nVoiceCallsProcessed**: It shows the total number of voice calls processed by this operator instance.
+
+2. **nSpeechDataBytesReceived**: It shows the total number of speech data bytes received by this operator instance.
+
+3. **nOutputTuplesSent**: It shows the total number of output tuples emitted by this operator instance.
+
+## Running the example application that use the IBMVoiceGatewaySource operator
+There is a working example included within this toolkit. You can use it as a reference to learn more about putting this operator to use in your own applications. You can use similar streamtool submitjob commands as shown below in your own applications.
+
+```
+cd   streamsx.sttgateway/samples/VoiceGatewayToStreamsToWatsonSTT
+make
+st  submitjob  -d  <YOUR_STREAMS_DOMAIN>  -i  <YOUR_STREAMS_INSTANCE>  output/com.ibm.streamsx.sttgateway.sample.watsonstt.VoiceGatewayToStreamsToWatsonSTT.sab -P tlsPort=9443  -P numberOfSTTEngines=14  -P sttApiKey=<YOUR_WATSON_STT_SERVICE_API_KEY>  -P sttResultMode=2   -P contentType="audio/mulaw;rate=8000"
+```
+
+*******************************
 
 ## Important details needed for using the WatsonSTT operator
 As described in the other documentation pages, the WatsonSTT operator uses the Websocket interface to connect to the IBM Watson Speech To Text service running on the IBM public cloud or on IBM Cloud Pak for Data (CP4D i.e. private cloud). In order to use this operator, the following three values must be available with you at the time of launching the Streams application.
@@ -38,9 +168,9 @@ Users can specify a suitable value for the `sttResultMode` parameter in their op
 ## Required input data for the WatsonSTT operator
 This operator has one input port where it will receive incoming tuples and one output port where it will send its output tuples to the downstream operators. Crucial input data for this operator is the actual speech/audio data that needs to be transcribed. Applications invoking this operator must provide details about the speech data via the input port of the WatsonSTT operator. Input port schema for this operator must have an attribute named `speech`. This attribute must adhere to the following description.
 
-* **speech** (required, rstring/blob) - In the case of file based input (.wav, .mp3 etc. for batch workload), the expected value will be an absolute path of a file as an rstring. In the case of RAW audio data (received from a network switch for real-time workload), the expected input is of type blob. 
+* **speech** (required, rstring/blob) - In the case of file based input (.wav, .mp3 etc. for batch workload), the expected value will be an absolute path of a file as an rstring. In the case of RAW audio data (received from a telephony infrastructure for real-time workload), the expected input is of type blob. 
 
-**Note:** _Raw audio data belonging to a given speech/audio conversation can be sent in full as a single blob to this operator or it can be sent in partial blob fragments via multiple input tuples. After sending the entire raw audio of an ongoing speech/audio conversation, the application code must send a tuple with an empty blob to indicate the end of that conversation. It is very important to send exactly ONLY ONE empty blob at the end of transmitting all the non-empty blob content (either in full or in partial fragments) belonging to a given audio conversation. This operator relies on this empty blob to inform the Watson STT service about the end of an ongoing audio conversation. So, remember to do this whether you are sending the audio blob data after reading it from a file or receiving it from a network switch._
+**Note:** _Raw audio data belonging to a given speech/audio conversation can be sent in full as a single blob to this operator or it can be sent in partial blob fragments via multiple input tuples. After sending the entire raw audio of an ongoing speech/audio conversation, the application code must send a tuple with an empty blob to indicate the end of that conversation. It is very important to send exactly ONLY ONE empty blob at the end of transmitting all the non-empty blob content (either in full or in partial fragments) belonging to a given audio conversation. This operator relies on this empty blob to inform the Watson STT service about the end of an ongoing audio conversation. So, remember to do this whether you are sending the audio blob data after reading it from a file or receiving it from a telephony infrastructure._
 
 In addition to the mandatory `speech` attribute, one can have any number of other optional attributes as needed in the tuples sent to this operator. A commonly used optional attribute is the one shown below which is an application-specific speech conversation id. It will be useful in correlating the transcription results with the corresponding audio conversation later in the other downstream operators. It can also serve as a partition key inside a parallel region configured with multiple WatsonSTT operator instances to achieve concurrent Speech To Text processing of many audio conversations. Such a partition key will provide affinity (stickiness) between an ongoing audio conversation and an operator instance inside a parallel region that must keep processing that audio conversation from beginning to end. 
 
@@ -56,8 +186,7 @@ At the very basic level, input stream schema can be as shown below with just two
 
 __For a file based batch workload:__ `type AudioInput_t = rstring conversationId, rstring speech;`
 
-__For a network switch based real-time workload:__ `type AudioInput_t = rstring conversationId, blob speech;`
-
+__For a telephony infrastructure based real-time workload:__ `type AudioInput_t = rstring conversationId, blob speech, int32 vgwVoiceChannelNumber, int32 sttEngineId;`
 
 ## Output stream schema for the WatsonSTT operator
 At the full scope of this operator, output stream schema can be as shown below with all possible attributes. It is shown here to explain the basic and very advanced features of the Watson STT service. Not all real life applications will need all these attributes. You can decide to include or omit these attributes based on the specific STT features your application will need. Trimming the unused attributes will also help in reducing the STT processing overhead and in turn help in receiving the STT results faster.
@@ -87,9 +216,9 @@ type STTResult_t =
 ## Invoking the WatsonSTT operator
 In your SPL application, this operator can be invoked with either all operator parameters or a subset of the operator parameters. Similarly, in the output clause of the operator body, you can either call all the available custom output functions or a subset of those custom output functions to do your output stream attribute assignments. You can decide on the total number of operator parameters and the total number of custom output functions to use based on the real needs of your application.
 
-You can invoke one or more instances of the WatsonSTT operator depending on the total amount of speech data available for transcription. You can send the audio data for a given audio file or an ongoing audio conversation to this operator all at once or you can send the audio data for the live usecase as it becomes available from your telephony network switch in multiple blob fragments.
+You can invoke one or more instances of the WatsonSTT operator depending on the total amount of speech data available for transcription. You can send the audio data for a given audio file or an ongoing audio conversation to this operator all at once or you can send the audio data for the live usecase as it becomes available from your telephony infrastructure in multiple blob fragments.
 
-**NOTE:** The WatsonSTT operator allows fusing multiple instances of this operator into a single PE. This will help in reducing the total number of CPU cores used in running your application. If you use multiple operator instances inside a Streams parallel region, you can decide to enable the partitioning feature for the parallel channels via a partition key e-g: by using an application-specific conversationId as a partition key. In general, audio data ingested from files will not require partitioning of the parallel channels. It will make better sense to use the partitioning of the parallel channels for real-time usecases where audio data is received from a network switch as several blob fragments for an ongoing audio conversation.
+**NOTE:** The WatsonSTT operator allows fusing multiple instances of this operator into a single PE. This will help in reducing the total number of CPU cores used in running your application. If you use multiple operator instances inside a Streams parallel region, you can decide to enable the partitioning feature for the parallel channels via a partition key e-g: by using an application-specific conversationId as a partition key. In general, audio data ingested from files will not require partitioning of the parallel channels. It will make better sense to use the partitioning of the parallel channels for real-time usecases where audio data is received from a telephony infrastructure as several blob fragments for an ongoing audio conversation.
 
 ```
 // Invoke one or more instances of the WatsonSTT operator.
@@ -204,7 +333,7 @@ stream<STTResult_t> STTResult = WatsonSTT(AudioFileName as AFN; IamAccessToken, 
 
 ```
 
-The operator invocation code snippet shown above is ideally suited for a batch workload where the audio data is made available through files. If it is a real-time workload where the audio data is streamed via a network switch, then the operator invocation head will be slightly different and the rest of the code will be similar to what is done above for a file based audio input. That slightly different operator invocation head is shown below. You can notice the difference in the input stream (AudioFileName versus AudioBlobContent) as well as in the use of a partition key within the parallel region annotation code segment.
+The operator invocation code snippet shown above is ideally suited for a batch workload where the audio data is made available through files. If it is a real-time workload where the audio data is streamed via a telephony infrastructure, then the operator invocation head will be slightly different and the rest of the code will be similar to what is done above for a file based audio input. That slightly different operator invocation head is shown below. You can notice the difference in the input stream (AudioFileName versus AudioBlobContent) as well as in the use of a partition key within the parallel region annotation code segment.
 
 ```
 @parallel(width = $numberOfSTTEngines, 
@@ -315,6 +444,6 @@ st submitjob  -d  <YOUR_STREAMS_DOMAIN>  -i  <YOUR_STREAMS_INSTANCE>  output/com
 ```
 
 ## Conclusion
-As explained in the chapters thus far, this operator is a powerful one to integrate the IBM Streams applications with the IBM Watson STT service in a highly scalable and secure manner. It fully enables Speech To Text transcription of the audio data stored in files (batch mode) or received from a network switch (real-time mode). 
+As explained in the chapters thus far, those two operators are powerful ones to integrate the IBM Streams applications with the IBM Voice Gateway and the IBM Watson STT service in a highly scalable and secure manner. It fully enables Speech To Text transcription of the audio data stored in files (batch mode) or received from a telephony infrastructure (real-time mode). 
 
 **Cheers and good luck in finding impactful insights from your audio data.**
