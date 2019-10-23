@@ -3,9 +3,9 @@
 .PHONY: build all distributed clean
 
 STREAMS_STTGATEWAY_TOOLKIT ?= $(PWD)/../../com.ibm.streamsx.sttgateway
-# You must change the following line to point to your
-# correct streamsx.json toolkit directory (v1.4.6 or above needed).
-STREAMS_JSON_TOOLKIT ?= $(HOME)/streamsx.json
+# You must ensure that the following line points to your
+# correct JSON toolkit directory that is of v1.4.6 or above.
+STREAMS_JSON_TOOLKIT ?= $(STREAMS_INSTALL)/toolkits/com.ibm.streamsx.json
 
 ifeq ($(STREAMS_STUDIO_BUILDING), 1)
     $(info Building from Streams Studio, use env vars set by studio)

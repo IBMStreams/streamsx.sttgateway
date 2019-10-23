@@ -8,7 +8,7 @@
 /*
 ============================================================
 First created on: Jul/01/2018
-Last modified on: Jun/12/2019
+Last modified on: Oct/07/2019
 
 Please refer to the sttgateway-tech-brief.txt file in the 
 top-level directory of this toolkit to read about 
@@ -1029,8 +1029,8 @@ void MY_OPERATOR::ws_init() {
 			// configured this operator.
 			if (websocketLoggingNeeded == true) {
 				// Enable certain error logging channels and certain access logging channels.
-				wsClient->clear_access_channels(websocketpp::log::alevel::frame_header);
-				wsClient->clear_access_channels(websocketpp::log::alevel::frame_payload);				
+				wsClient->set_access_channels(websocketpp::log::alevel::frame_header);
+				wsClient->set_access_channels(websocketpp::log::alevel::frame_payload);				
 			} else {
 				// Turn off both the access and error logging channels completely.
 				wsClient->clear_access_channels(websocketpp::log::alevel::all);

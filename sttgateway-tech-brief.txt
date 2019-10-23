@@ -1,19 +1,50 @@
 ============================================================
 First created on: July/01/2018
-Last modified on: September/05/2019
+Last modified on: October/23/2019
 
 Purpose of this toolkit
 -----------------------
-The streamsx.sttgateway toolkit provides an operator that helps you to 
-integrate IBM Streams with the IBM Speech To Text (STT) cloud service.
-(https://www.ibm.com/watson/services/speech-to-text/)
-This toolkit lets you send audio data to the Watson STT service and 
-get back the transcription results. This toolkit is designed to work 
-with the IBM Watson STT service available on IBM public cloud or on 
-IBM Cloud Pak for Data (CP4D). It uses the Websocket communication API interface 
-provided by the Watson STT service. It can take audio data either from the 
-real-time speech conversations or from the prerecorded speech conversations 
-that are stored in files. 
+The streamsx.sttgateway toolkit provides the following two operators
+that can help you to integrate an IBM Streams applicaion with the
+IBM Voice Gateway product v1.0.3.0 or higher 
+(https://www.ibm.com/support/knowledgecenter/SS4U29/whatsnew.html) at 
+the point of data ingestion and with the IBM Watson Speech To Text (STT) 
+cloud service (https://www.ibm.com/watson/services/speech-to-text/) at 
+the analytic stage(s) of that application pipeline.
+
+1) IBMVoiceGatewaySource
+2) WatsonSTT
+
+IBMVoiceGatewaySource is a source operator that can be used to
+ingest speech data from multiple live telephone conversations
+happening between different pairs of speakers
+e-g: customers and call center agents.
+
+WatsonSTT is an analytic operator that can be used to transcribe
+speech data into text either in real-time or in batch mode.
+
+In a Streams application, these two operators can either be
+used together or independent of each other. In a real-time
+speech analytics scenario for transcribing live voice calls into
+text, both of these operators can be used as part of a
+Streams application graph. In a batch mode operation to
+convert a set of prerecorded audio files stored in a
+file system directory into text, WatsonSTT operator can be
+used on its own in a Streams application graph. So, your
+application requirements will determine whether you will need
+only one or both of those operators.
+
+This toolkit excels at ingesting speech data from an enterprise
+telephony infrastructure and from audio files (wav, mp3 etc.) as well
+as in sending the speech data to the Watson STT service and
+get back the transcription results. Based on the user preference,
+this toolkit is designed to work with the IBM Watson STT service
+available on the IBM public cloud or on the hybrid cloud ready
+IBM Cloud Pak for Data (CP4D). It uses the Websocket communication
+API interface to interact with both the IBM Voice Gateway and
+the Watson STT service. So, processing of the audio data either from 
+the real-time speech conversations or from the prerecorded speech 
+conversations that are stored in files can be accomplished by this toolkit.
 
 Technical positioning of this toolkit
 -------------------------------------
@@ -28,8 +59,13 @@ the suitable one for a given situation.
 1) Namespace for them are different.
    --> com.ibm.streams.speech2text.watson (Wraps Rapid libraries)
    --> com.ibm.streamsx.sttgateway.watson (Invokes the IBM Watson STT cloud service)
+
+2) Full scope versus partial scope speech analytics.
+   --> com.ibm.streams.speech2text.watson (Can only do speech to text)
+   --> com.ibm.streamsx.sttgateway.watson (Supports both
+       live speech data ingestion and speech to text)
    
-2) Self contained versus external service invocation.
+3) Self contained versus external service invocation.
    --> com.ibm.streams.speech2text is self contained. It includes
        the speech to text core libraries and a small number of base language 
        model files that are necessary to do the speech to text conversion.
@@ -38,7 +74,7 @@ the suitable one for a given situation.
        STT service. It contains the necessary code to communicate with
        the external STT service to get the speech to text conversion done.
        
-3) Speech data stays within your application versus going outside.
+4) Speech data stays within your application versus going outside.
    --> In com.ibm.streams.speech2text, audio content
        will not have to go outside of this toolkit.
        
@@ -47,10 +83,10 @@ the suitable one for a given situation.
        external service that can run either on the IBM public cloud 
        or inside your own private network in a Cloud Pak for Data (CP4D) cluster.
 
-4) Ease of customizing the LM and AM models.
+5) Ease of customizing the LM and AM models.
    --> In com.ibm.streams.speech2text, model customization 
-       (for both LM and AM) requires the user to do the customization either
-       on the IBM public cloud or on-prem and then copy the generated
+       (for both LM and AM) requires the user to do the customization 
+       on the IBM public cloud and then copy the generated
        custom model patch files into the Streams machine so that they are
        locally accessible by the Streams application.
        
@@ -61,7 +97,7 @@ the suitable one for a given situation.
        copies of the generated custom model patch files into the
        Streams application machine.
        
-5) Ease of switching between different language models and minimizing toolkit upgrade cycles.
+6) Ease of switching between different language models and minimizing toolkit upgrade cycles.
    --> In com.ibm.streams.speech2text, it is necessary to 
        package relevant language base models (English, Spanish, French etc.) as
        part of this toolkit. This also implies that a toolkit upgrade will be
@@ -76,14 +112,14 @@ the suitable one for a given situation.
        the newer versions of the speech engine libraries as they become
        available in the external Watson STT service.
        
-6) Ease of using different audio formats.
+7) Ease of using different audio formats.
    --> In com.ibm.streams.speech2text, it may be possible to
        use only WAV formatted audio data.
        
    --> In com.ibm.streamsx.sttgateway, any supported audio
-       format by the STT service can be used (mp3, WAV, FLAC etc.)
+       format by the STT service can be used (mp3, WAV, FLAC, mulaw etc.)
 
-7) Speech to text conversion performance.
+8) Speech to text conversion performance.
    --> In the lab tests, both toolkits seem to provide the same
        level of performance in terms of the total time
        taken to complete the transcription of the given audio content.
@@ -91,22 +127,20 @@ the suitable one for a given situation.
        batch workloads, the com.ibm.streamsx.sttgateway seems to complete
        the transcription faster than the com.ibm.streams.speech2text.
        
-8) Operator names.
-   --> In com.ibm.streams.speech2text, WatsonS2T is the
-       operator name.
+9) Operator names.
+   --> In com.ibm.streams.speech2text, WatsonS2T is the operator name.
        
-   --> In com.ibm.streamsx.sttgateway, WatsonSTT is the
-       operator name.
+   --> In com.ibm.streamsx.sttgateway, IBMVoiceGatewaySource and 
+       WatsonSTT are the operator names.
 
-9) RPM dependency.
+10) RPM dependency.
    --> In com.ibm.streams.speech2text, atlas and atlas-devel 
        RPMs for Linux must be installed in all the 
        Streams machines where the WatsonS2T is running.
        
-   --> In com.ibm.streamsx.sttgateway, there is no such 
-       RPM dependency.
+   --> In com.ibm.streamsx.sttgateway, there is no such RPM dependency.
        
-10) CPU core usage.
+11) CPU core usage.
    --> In com.ibm.streams.speech2text, every instance of the
        WatsonS2T operator must run on its own PE (a.k.a Linux process).
        Multiple instances of that operator can't be fused to 
@@ -120,7 +154,7 @@ the suitable one for a given situation.
        use of the CPU cores by requiring fewer CPU cores to have
        a bank of WatsonSTT operators to achieve data parallelism.
 
-11) Transcription result options.
+12) Transcription result options.
    --> In com.ibm.streams.speech2text, the WatsonS2T operator can
        only return one full utterance at a time.
        
@@ -132,7 +166,7 @@ the suitable one for a given situation.
        3) (default) Full text containing all the finalized 
           utterances after transcribing the entire audio.
        
-12) Value added features.
+13) Value added features.
    --> In com.ibm.streams.speech2text, the WatsonS2T operator can
        only provide the core speech to text capabilities.
 
@@ -141,15 +175,31 @@ the suitable one for a given situation.
        the core speech to text capabilities. Such features include
        smart formatting, profanity filtering, keywords spotting etc.
 
+14) Limited versus free availability
+   --> In com.ibm.streams.speech2text, the toolkit package containing the
+       WatsonS2T operator can be downloaded only by the customers
+       who possess active Streams licenses.
+
+   --> In com.ibm.streamsx.sttgateway, the toolkit package containing
+       the IBMVoiceGatewaySource and the WatsonSTT operators can be 
+       downloaded by anyone for free from the IBMStreams GitHub web site.
+
 Requirements for this toolkit
 -----------------------------
+There are certain important requirements that need to be satisfied in order to 
+use the IBM Streams STT Gateway toolkit in Streams applications. 
+Such requirements are explained below.
+
 1. Network connectivity to the IBM Watson Speech To Text (STT) service running 
 either on the public cloud or on the Cloud Pak for Data (CP4D) is needed from 
-the IBM Streams Linux machines where this toolkit will be used.
+the IBM Streams Linux machines where this toolkit will be used. The
+same is true to integrate with the IBM Voice Gateway product for the
+use cases involving speech data ingestion for live voice calls.
    
-2. This toolkit uses Websocket to communicate with the Watson STT service. 
-A valid IAM access token is needed to use the Watson STT service on the 
-public cloud and a valid access token to use the Watson STT service on the CP4D. 
+2. This toolkit uses Websocket to communicate with the IBM Voice
+Gateway and the Watson STT service. A valid IAM access token is needed
+to use the Watson STT service on the public cloud and a valid access
+token to use the Watson STT service on the CP4D. 
 So, users of this toolkit must provide their public cloud STT service instance's 
 API key or the CP4D STT service instance's access token when launching the Streams 
 application(s) that will have a dependency on this toolkit. When using the API key 
@@ -163,7 +213,7 @@ https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-websocke
 
 3. On the IBM Streams application development machine (where the application code is 
 compiled to create the application bundle), it is necessary to download and install 
-the boost_1_67_0 or a higher version as well as the websocketpp version 0.8.1. 
+the boost_1_69_0 as well as the websocketpp version 0.8.1. 
 Please note that this is not needed on the Streams application execution machines.
 For the essential steps to meet this requirement, please refer to the above-mentioned 
 documentation URL or a file named sttgateway-tech-brief.txt available at this 
@@ -173,6 +223,49 @@ tooolkit's top-level directory.
 Linux curl command. This is required by this toolkit to generate and refresh the 
 IAM access token which is a must for the STT service on public cloud.
 
+5. For the IBM Streams and the IBM Voice Gateway products to work together, 
+certain configuration steps must be done as explained here.
+
+a) In order to make the IBM Voice Gateway send the speech data from the 
+live voice calls, it is necessary to set the following environment variable in
+the deployment configuration of the IBM Voice Gateway's SIP Orchestrator at the 
+time of deploying it.
+
+{
+   "name": "SEND_SIPREC_METADATA_TO_STT",
+   "value": "true"
+}
+
+b) It is also necessary to set the following environment variable in the 
+IBM Voice Gateway's Media Relay deployment configuration to point to the 
+URL at which the IBMVoiceGatewaySource operator is running.
+
+{
+   "name": "WATSON_STT_URL",
+   "value": "https://<IP-Address-Or-The-Streams-Machine-Name-Where-IBMVoiceGatewaySource-Is-Running>:<Port>"
+}
+
+c) It is necessary to create a self signed or Root CA signed TLS/SSL certificate 
+in PEM format and point to that certificate file at the time of starting the 
+IBM Streams application that invokes the IBMVoiceGatewaySource operator present 
+in this toolkit. If you don't want to keep pointing to your TLS/SSL certificate 
+file everytime you start the IBM Streams application, you can also copy the full 
+certificate file to your Streams application's etc directory as ws-server.pem 
+and compile your application which will then be used by default.
+
+d) You should also extract just the certificate portion without your private key 
+from your full TLS/SSL certificate PEM file that you created in the previous step 
+and then create a security credential in the IBM Voice Gateway container as 
+explained in that product's documentation. After that, you should point to that 
+security credential in the deployment configuration of the IBM Voice Gateway's 
+Media Relay.
+
+e) If you are comfortable with using a self signed TLS/SSL certificate file in 
+your environment, you can follow the instructions given in the following file 
+that is shipped with this toolkit to create your own self signed SSL certificate.
+
+<YOUR_STTGATEWAY_TOOLKIT_HOME>/samples/VoiceGatewayToStreamsToWatsonSTT/etc/creating-a-self-signed-certificate.txt
+
 Major external dependency for this toolkit
 ------------------------------------------
 Bulk of the Websocket logic in this toolkit's operator relies on the
@@ -180,7 +273,8 @@ following open source C++ Websocket header only library.
 https://github.com/zaphoyd/websocketpp
 
 Much of the Websocket logic here also follows the
-sample code from this URL: https://gist.github.com/zaphoyd/6021634
+Websocket client and server usage techniques explained in the
+sample code snippets from the above mentioned websocketpp URL.
 
 A great source of learning for Websocket++ is here:
 https://docs.websocketpp.org/index.html
@@ -194,16 +288,16 @@ done only on the Linux machine(s) where the Streams application development
 i.e. coding, compiling and packaging is done. Only after doing that,
 users can use this toolkit in their Streams applications.
 
-1) boost_1_67_0 or a higher version
-   [IMPORTANT: Substitute your higher version number as needed in place of 1_67_0 below.]
-   [Check the current official boost version from here: https://www.boost.org/]
+1) boost_1_69_0
+   --> Obtain the official boost version boost_1_69_0 from here:
+           https://www.boost.org/users/history/version_1_69_0.html
    
-   --> A few .so files from the boost_1_67_0/lib directory are
+   --> A few .so files from the boost_1_69_0/lib directory are
        copied into the impl/lib directory of this toolkit.
        (It is needed for the dynamic loading of these .so files
         when the Streams application using this toolkit is launched.)
        
-   --> The entire boost_1_67_0/include directory is copied into
+   --> The entire boost_1_69_0/include directory is copied into
        the impl/include directory of this toolkit. [Around 200 MB in size]
        (It is needed for a successful compilation of the 
        Streams application that uses this toolkit. Please note that
@@ -220,36 +314,33 @@ users can use this toolkit in their Streams applications.
        application's SAB file  since the impl/include directory will not be
        part of the SAB file.)
 
-Downloading and building boost_1_67_0 or a higher version
----------------------------------------------------------
-[IMPORTANT: Substitute your higher version number as needed in place of 1_67_0 below.]
-[Check the current official boost version from here: https://www.boost.org/]
+Downloading and building boost_1_69_0
+----------------------------------
+a) Download and build boost 1_69_0 in the user's home directory by using the --prefix option as shown below:
 
-a) Download and build boost 1_67_0 or a higher version in the user's home directory by using the --prefix option as shown below:
-
-Download boost_1_67_0 in your home directory: 
+Download boost_1_69_0 from this URL into your home directory: 
 mkdir <YOUR_HOME_DIRECTORY>/boost-install-files
 cd <YOUR_HOME_DIRECTORY>/boost-install-files
-wget https://dl.bintray.com/boostorg/release/1.67.0/source/boost_1_67_0.tar.gz   [Approximately 1 minute]
+wget https://dl.bintray.com/boostorg/release/1.69.0/source/boost_1_69_0.tar.gz   [Approximately 1 minute]
 
-Extract boost_1_67_0 in <YOUR_HOME_DIRECTORY>/boost-install-files:
+Extract boost_1_69_0 in <YOUR_HOME_DIRECTORY>/boost-install-files:
 cd <YOUR_HOME_DIRECTORY>/boost-install-files
-tar -xvzf <YOUR_HOME_DIRECTORY>/boost-install-files/boost_1_67_0.tar.gz    [Approximately 5 minutes]
+tar -xvzf <YOUR_HOME_DIRECTORY>/boost-install-files/boost_1_69_0.tar.gz    [Approximately 5 minutes]
 
-Bootstrap boost_1_67_0 and install it in your home directory using the --prefix option:
-cd <YOUR_HOME_DIRECTORY>/boost-install-files/boost_1_67_0
-./bootstrap.sh --prefix=<YOUR_HOME_DIRECTORY>/boost_1_67_0             [Approximately 1 minute]
-./b2 install --prefix=<YOUR_HOME_DIRECTORY>/boost_1_67_0 --with=all    [Approximately 25 minutes]
+Bootstrap boost_1_69_0 and install it in your home directory using the --prefix option:
+cd <YOUR_HOME_DIRECTORY>/boost-install-files/boost_1_69_0
+./bootstrap.sh --prefix=<YOUR_HOME_DIRECTORY>/boost_1_69_0             [Approximately 1 minute]
+./b2 install --prefix=<YOUR_HOME_DIRECTORY>/boost_1_69_0 --with=all    [Approximately 25 minutes]
 cd <YOUR_HOME_DIRECTORY>
 rm -rf <YOUR_HOME_DIRECTORY>/boost-install-files         [Approximately 2 minutes]
 
 Instructions shown above are from this URL:
 https://gist.github.com/1duo/2d1d851f76f8297be264b52c1f31a2ab
 
-b) After that, copy a few .so files from the <YOUR_HOME_DIRECTORY>/boost_1_67_0/lib
+b) After that, copy a few .so files from the <YOUR_HOME_DIRECTORY>/boost_1_69_0/lib
    directory into the impl/lib directory of this toolkit.
-   (libboost_chrono.so.1.67.0, libboost_random.so.1.67.0, 
-    libboost_system.so.1.67.0, libboost_thread.so.1.67.0)
+   (libboost_chrono.so.1.69.0, libboost_random.so.1.69.0, 
+    libboost_system.so.1.69.0, libboost_thread.so.1.69.0)
     
    For all those .so files you copied, you must also create a 
    symbolic link within the impl/lib directory of this toolkit.
@@ -257,12 +348,12 @@ b) After that, copy a few .so files from the <YOUR_HOME_DIRECTORY>/boost_1_67_0/
    execute the Linux symbolic link command as shown below for every
    .so file you copied into that directory.
    
-   e-g: ln -s libboost_chrono.so.1.67.0 libboost_chrono.so
+   e-g: ln -s libboost_chrono.so.1.69.0 libboost_chrono.so
 
-c) Move the entire <YOUR_HOME_DIRECTORY>/boost_1_67_0/include/boost directory into the
+c) Move the entire <YOUR_HOME_DIRECTORY>/boost_1_69_0/include/boost directory into the
    impl/include directory of this toolkit.
    
-d) At this time, you may delete the <YOUR_HOME_DIRECTORY>/boost_1_67_0 directory.
+d) At this time, you may delete the <YOUR_HOME_DIRECTORY>/boost_1_69_0 directory.
 
 Downloading websocketpp 0.8.1
 -----------------------------
