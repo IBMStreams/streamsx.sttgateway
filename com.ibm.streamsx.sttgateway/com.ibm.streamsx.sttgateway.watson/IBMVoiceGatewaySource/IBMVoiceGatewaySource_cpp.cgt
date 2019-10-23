@@ -1,0 +1,1236 @@
+/*
+==============================================
+# Licensed Materials - Property of IBM
+# Copyright IBM Corp. 2019
+==============================================
+*/
+
+/*
+============================================================
+First created on: Sep/20/2019
+Last modified on: Oct/22/2019
+
+Please refer to the sttgateway-tech-brief.txt file in the 
+top-level directory of this toolkit to read about 
+what this toolkit does, how it can be built and 
+how it can be used in the Streams applications.
+
+This particular operator (IBMVoiceGatewaySource) is used to
+integrate IBM Streams with the IBM Voice Gateway product for
+receiving the live voice calls typically in a call center
+environment.
+
+The IBMVoiceGatewaySource operator is designed to ingest speech data from the 
+IBM Voice Gateway product version 1.0.3.0 or above. This speech data is 
+ingested in binary format from the IBM Voice Gateway into this operator 
+via the Websocket interface. Such speech data arrives here in multiple 
+fragments directly from a live voice call. This operator is capable of 
+receiving speech data from multiple calls that can all happen at the 
+very same time between different pairs of speakers. For every voice call 
+it handles in real-time, the IBM Voice Gateway product will open two 
+Websocket connections into this operator and start sending the live 
+speech data on both of those connections. One of those connections will 
+carry the speech data of the agent and the other connection will 
+carry the speech data of the customer. This operator will keep sending 
+the audio chunks received on those two Websocket connections via its 
+output stream for consumption by the downstream operators. At the end of 
+the any given call, IBM Voice Gateway will close the two 
+WebSocket connections it opened into this operator.
+============================================================
+*/
+#include <SPL/Runtime/ProcessingElement/ProcessingElement.h>
+
+/* Additional includes go here */
+// https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-websockets#advantages
+// https://docs.websocketpp.org/index.html
+// This operator heavily relies on the Websocket++ header only library.
+// This C++11 library code does the asynchronous full duplex Websocket communication with
+// the IBM Voice Gatwway via a series of event handlers (a.k.a callback methods).
+// Bulk of the logic in this operator class appears in those event handler methods below.
+#include <websocketpp/config/asio.hpp>
+#include <websocketpp/server.hpp>
+
+#include <boost/algorithm/string/predicate.hpp>
+#include <boost/exception/to_string.hpp>
+#include <boost/thread/thread.hpp>
+
+// A nice read in this URL about using property_tree for JSON parsing:
+// http://zenol.fr/blog/boost-property-tree/en.html
+#include <boost/property_tree/ptree.hpp>
+#include <boost/property_tree/json_parser.hpp>
+
+// Short alias for this namespace
+namespace pt = boost::property_tree;
+
+using websocketpp::lib::placeholders::_1;
+using websocketpp::lib::placeholders::_2;
+using websocketpp::lib::bind;
+
+// Verify the input tuple attribute name and then read the operator parameters.
+<%
+	# Check the output port 0 i.e. the first output port. 
+	my $outputPort1 = $model->getOutputPortAt(0);
+	my $outputTupleName1 = $outputPort1->getCppTupleName();
+	my $audioOutputAsBlob = undef;	
+	my $outputAttrs1 = $outputPort1->getAttributes();
+	my $speechAttributeFound = 0;
+	
+	foreach my $outputAttr (@$outputAttrs1) {
+		my $outAttrName = $outputAttr->getName();
+		my $outAttrType = $outputAttr->getSPLType();
+		
+		if ($outAttrName eq "speech") {
+			$speechAttributeFound = 1;
+			
+			if ($outAttrType eq "blob") {
+				# This tuple attribute will carry a blob containing the speech data.
+				$audioOutputAsBlob = 1;
+			}
+		}
+	}
+	
+	if ($speechAttributeFound == 0 ) {
+		SPL::CodeGen::exitln("IBMVoiceGatewaySource_cpp.cgt: The required output tuple attribute 'speech' is missing in the first output port.");
+	}
+	
+	if (!(defined($audioOutputAsBlob))) {
+		SPL::CodeGen::exitln("IBMVoiceGatewaySource_cpp.cgt: The required output tuple attribute 'speech' is not of type 'blob' in the first output port.");
+	}
+	
+	# Check the output port number 1 i.e. the second output port.
+	my $outputPort2 = $model->getOutputPortAt(1);
+	my $outputTupleName2 = $outputPort2->getCppTupleName();
+	my $vgwSessionIdAsString = undef;	
+	my $outputAttrs2 = $outputPort2->getAttributes();
+	my $vgwSessionIdAttributeFound = 0;
+	my $isCustomerSpeechDataAsBoolean = undef;	
+	my $isCustomerSpeechDataAttributeFound = 0;
+	my $vgwVoiceChannelNumberAsInt32 = undef;	
+	my $vgwVoiceChannelNumberAttributeFound = 0;
+	
+	foreach my $outputAttr2 (@$outputAttrs2) {
+		my $outAttrName2 = $outputAttr2->getName();
+		my $outAttrType2 = $outputAttr2->getSPLType();
+		
+		if ($outAttrName2 eq "vgwSessionId") {
+			$vgwSessionIdAttributeFound = 1;
+			
+			if ($outAttrType2 eq "rstring") {
+				# This tuple attribute will carry the Voice Gateway Session Id.
+				$vgwSessionIdAsString = 1;
+			}
+		}
+		
+		if ($outAttrName2 eq "isCustomerSpeechData") {
+			$isCustomerSpeechDataAttributeFound = 1;
+			
+			if ($outAttrType2 eq "boolean") {
+				# This tuple attribute will indicate whether the
+				# given channel of a given voice call carried the 
+				# speech data of a customer or an agent.
+				$isCustomerSpeechDataAsBoolean = 1;
+			}
+		}
+
+		if ($outAttrName2 eq "vgwVoiceChannelNumber") {
+			$vgwVoiceChannelNumberAttributeFound = 1;
+			
+			if ($outAttrType2 eq "int32") {
+				# This tuple attribute will indicate the
+				# channel number of given voice call.
+				$vgwVoiceChannelNumberAsInt32 = 1;
+			}
+		}
+	}
+	
+	if ($vgwSessionIdAttributeFound == 0 ) {
+		SPL::CodeGen::exitln("IBMVoiceGatewaySource_cpp.cgt: The required output tuple attribute 'vgwSessionId' is missing in the second output port.");
+	}
+	
+	if (!(defined($vgwSessionIdAsString))) {
+		SPL::CodeGen::exitln("IBMVoiceGatewaySource_cpp.cgt: The required output tuple attribute 'vgwSessionId' is not of type 'rstring' in the second output port.");
+	}
+
+	if ($isCustomerSpeechDataAttributeFound == 0 ) {
+		SPL::CodeGen::exitln("IBMVoiceGatewaySource_cpp.cgt: The required output tuple attribute 'isCustomerSpeechData' is missing in the second output port.");
+	}
+	
+	if (!(defined($isCustomerSpeechDataAsBoolean))) {
+		SPL::CodeGen::exitln("IBMVoiceGatewaySource_cpp.cgt: The required output tuple attribute 'isCustomerSpeechData' is not of type 'boolean' in the second output port.");
+	}
+
+	if ($vgwVoiceChannelNumberAttributeFound == 0 ) {
+		SPL::CodeGen::exitln("IBMVoiceGatewaySource_cpp.cgt: The required output tuple attribute 'vgwVoiceChannelNumber' is missing in the second output port.");
+	}
+	
+	if (!(defined($vgwVoiceChannelNumberAsInt32))) {
+		SPL::CodeGen::exitln("IBMVoiceGatewaySource_cpp.cgt: The required output tuple attribute 'vgwVoiceChannelNumber' is not of type 'int32' in the second output port.");
+	}
+	
+	# Following are the operator parameters.
+    my $tlsPort = $model->getParameterByName("tlsPort");
+	# Default: 443
+    $tlsPort = $tlsPort ? $tlsPort->getValueAt(0)->getCppExpression() : 443;
+
+    my $certificateFileName = $model->getParameterByName("certificateFileName");
+	# Default: Default is to read ws-server.pem from the etc sub-directory of the application.
+    $certificateFileName = $certificateFileName ? $certificateFileName->getValueAt(0)->getCppExpression() : "";
+        
+    my $nonTlsEndpointNeeded = $model->getParameterByName("nonTlsEndpointNeeded");
+	# Default: 0
+    $nonTlsEndpointNeeded = $nonTlsEndpointNeeded ? $nonTlsEndpointNeeded->getValueAt(0)->getCppExpression() : 0;    
+
+    my $nonTlsPort = $model->getParameterByName("nonTlsPort");
+	# Default: 80
+    $nonTlsPort = $nonTlsPort ? $nonTlsPort->getValueAt(0)->getCppExpression() : 80;
+
+    my $initDelay = $model->getParameterByName("initDelay");
+	# Default: 0.0
+    $initDelay = $initDelay ? $initDelay->getValueAt(0)->getCppExpression() : 0.0;
+        
+    my $vgwLiveMetricsUpdateNeeded = $model->getParameterByName("vgwLiveMetricsUpdateNeeded");
+	# Default: 1
+    $vgwLiveMetricsUpdateNeeded = $vgwLiveMetricsUpdateNeeded ? $vgwLiveMetricsUpdateNeeded->getValueAt(0)->getCppExpression() : 1;    
+
+    my $websocketLoggingNeeded = $model->getParameterByName("websocketLoggingNeeded");
+	# Default: 0
+    $websocketLoggingNeeded = $websocketLoggingNeeded ? $websocketLoggingNeeded->getValueAt(0)->getCppExpression() : 0;    
+
+    my $vgwSessionLoggingNedded = $model->getParameterByName("vgwSessionLoggingNedded");
+	# Default: 0
+    $vgwSessionLoggingNedded = $vgwSessionLoggingNedded ? $vgwSessionLoggingNedded->getValueAt(0)->getCppExpression() : 0;
+ 
+    my $vgwStaleSessionPurgeInterval = $model->getParameterByName("vgwStaleSessionPurgeInterval");
+	# Default: 3*60*60 seconds
+    $vgwStaleSessionPurgeInterval = $vgwStaleSessionPurgeInterval ? $vgwStaleSessionPurgeInterval->getValueAt(0)->getCppExpression() : 3*60*60;
+    %>
+
+<%SPL::CodeGen::implementationPrologue($model);%>
+
+// Constructor
+MY_OPERATOR::MY_OPERATOR()
+{
+	// Custom metrics for this operator are already defined in the operator model XML file. 
+	// Hence, there is no need to explicitly create them here.
+	// Simply get the custom metrics already defined for this operator. 
+	// We will update the Counter kind custom metrics when the operator starts.
+	// We will update the Gauge kind custom metrics during transcription only when the 
+	// sttLiveMetricsUpdateNeeded optional operator parameter is set to true.
+	OperatorMetrics  & opm = getContext().getMetrics();
+	nVoiceCallsProcessedMetric = & opm.getCustomMetricByName("nVoiceCallsProcessed");
+	nSpeechDataBytesReceivedMetric = & opm.getCustomMetricByName("nSpeechDataBytesReceived");
+	nOutputTuplesSentMetric = & opm.getCustomMetricByName("nOutputTuplesSent");
+
+	// Initialize the member variables as needed from the operator parameter values read above.	
+	tlsPort = <%=$tlsPort%>;
+	nonTlsEndpointNeeded = <%=$nonTlsEndpointNeeded%>;
+	nonTlsPort = <%=$nonTlsPort%>;
+	initDelay = <%=$initDelay%>;
+	vgwLiveMetricsUpdateNeeded = <%=$vgwLiveMetricsUpdateNeeded%>;
+	websocketLoggingNeeded = <%=$websocketLoggingNeeded%>;
+	vgwSessionLoggingNedded = <%=$vgwSessionLoggingNedded%>;
+	vgwStaleSessionPurgeInterval = <%=$vgwStaleSessionPurgeInterval%>;
+	certificateFileName = <%=$certificateFileName%>;
+	
+	if (certificateFileName == "") {
+		// User didn't provide a PEM file. We are going to read 
+		// ws-server.pem from the etc directory of the application.
+		certificateFileName = ProcessingElement::pe().getApplicationDirectory() + "/etc/ws-server.pem";
+	}
+	
+	tlsEndpointStarted = false;
+	nonTlsEndpointStarted = false;
+}
+
+// Destructor
+MY_OPERATOR::~MY_OPERATOR() 
+{
+    // Finalization code goes here
+}
+
+// Notify port readiness
+void MY_OPERATOR::allPortsReady() 
+{
+    // Notifies that all ports are ready. No tuples should be submitted before
+    // this. Source operators can use this method to spawn threads.
+	operatorPhysicalName = getContext().getName();
+	// This operator is most likely not going to be in an 
+	// UDP parallel region due to the need by the IBM Voice Gateway's 
+	// need to connect to a single URL (machine name and port).
+	// So, this variable here may not carry much value.
+	udpChannelNumber = getContext().getChannel();
+	
+	//
+	// This is a source operator. Let us create a thread.
+	createThreads(1); // Create source thread
+}
+ 
+// Notify pending shutdown
+void MY_OPERATOR::prepareToShutdown() 
+{
+	// As this operator is about to be shutdown, we will tell the 
+	// WebSocket++ endpoints not to accept any more new client connections.
+	if (tlsEndpointStarted == true) {
+		endpoint_tls.stop_listening();
+	}
+	
+	if (nonTlsEndpointStarted == true) {
+		endpoint_plain.stop_listening();
+	}
+	
+	// We must properly close the client connections that are currently active.
+	// That will allow them to be closed normally on their end. Otherwise, clients will end up
+	// with limbo (dangling) connections which will lead to unnecessary broken TCP or
+	// unclean disconnect or timeouts in the remote end.
+	// In addition, it also causes undesirable behaviors by not cleanly terminating the
+	// asio run loop in the process method below.
+	// So, we must go through the client connections map and 
+	// close such existing active client connections in a proper way.
+	// This will initiate the WebSocket closing handshake for 
+	// these active client connections.
+	con_map::iterator it = client_connections_map.begin();
+	
+	while(it != client_connections_map.end()) {
+		websocketpp::connection_hdl hdl = it->first;
+		
+		// Properly close the client connection now.
+		std::string closeReason = 
+			"Normal close by streamsx.sttgateway due to the shutdown of the IBMVoiceGatewaySource operator.";
+		websocketpp::lib::error_code ec;
+		
+		// Check if this connection handle is based on a TLS endpoint.
+		// During the websocket++ connection creation, we have cached the 
+		// TLS based connection handles in an std::set. We can look up in that set now.
+		bool is_tls_connection = 
+			tls_connections_set.find(hdl) != tls_connections_set.end();
+		
+		// This connection closing technique is discussed in these URLs:
+		// https://stackoverflow.com/questions/25260852/shut-down-websocket-connection
+		// https://github.com/zaphoyd/websocketpp/issues/803
+		// https://mayaposch.wordpress.com/2015/09/16/creating-a-websocket-server-with-websocket/
+		if (is_tls_connection == true) {
+			endpoint_tls.close(hdl, websocketpp::close::status::normal,
+				closeReason, ec);
+		} else { 
+			endpoint_plain.close(hdl, websocketpp::close::status::normal,
+				closeReason, ec);
+		}
+		
+		it++;
+	}
+
+	// This operator is being shutdown now.
+	// We can empty the following containers.
+	tls_connections_set.clear();
+	client_connections_map.clear();
+	vgw_session_id_map.clear();
+}
+
+// Processing for source and threaded operators   
+void MY_OPERATOR::process(uint32_t idx)
+{
+	// If the user provided an initDelay parameter value,
+	// then, we will do a one time wait here before doing anything else.
+	if (initDelay > 0.0) {
+		SPL::Functions::Utility::block(initDelay);
+	}
+	
+	// Initialize this value to current time.
+	// This is mainly used inside the on_message method to
+	// remove any stale VGW sessions.
+	timeOfPreviousStaleSessionRemoval = 
+		SPL::Functions::Time::getSeconds(SPL::Functions::Time::getTimestamp());
+	
+	// Initialize this source operator's custom metrics variables.
+	nVoiceCallsProcessed = 0;
+	nSpeechDataBytesReceived = 0;
+	nOutputTuplesSent = 0;
+	
+	// A typical implementation will loop until shutdown.
+	// In the code below, boost ASIO run method will block forever until
+	// the server socket is closed. We will take measures for closing the
+	// server socket in the prepareToShutdown method above when the operator is 
+	// about to be shutdown. So, we need not go in a while loop as commonly
+	// done in other source operators.
+	// Hence, I commented out the following while loop line and its
+	// corresponding close brace at the end of the coce block below.
+	//
+	// while(!getPE().getShutdownRequested()) {
+		// Set up an external io_service to run both endpoints on. This is not
+		// strictly necessary, but simplifies thread management a bit.
+		boost::asio::io_service ios;
+
+		// If the user opted for an additional non-TLS (plain) 
+		// Websocket endpoint, let us create that as well.
+		// This plain insecure endpoint is here for a very 
+		// remote possibility of this getting used for any future use cases.
+		// It is fine to provide both plain and TLS ports as it is
+		// supported by the WebSocket++ library.
+		if (nonTlsEndpointNeeded == true) {
+			// Set up a plain endpoint without TLS.
+			// Initialize asio with our external io_service rather than an internal one.
+			endpoint_plain.init_asio(&ios);
+			endpoint_plain.set_open_handler(bind(&MY_OPERATOR::on_open,this,::_1));
+			endpoint_plain.set_message_handler(
+				bind(&MY_OPERATOR::on_message<server_plain>,this,&endpoint_plain,::_1,::_2));
+			endpoint_plain.set_close_handler(bind(&MY_OPERATOR::on_close,this,::_1));
+			
+			// https://docs.websocketpp.org/reference_8logging.html
+			// Set the logging policy as needed
+			// Turn off or turn on selectively all the Websocket++ access interface and 
+			// error interface logging channels. Do this based on how the user has
+			// configured this operator.
+			if (websocketLoggingNeeded == true) {
+				// Enable certain error logging channels and certain access logging channels.
+				endpoint_plain.set_access_channels(websocketpp::log::alevel::frame_header);
+				endpoint_plain.set_access_channels(websocketpp::log::alevel::frame_payload);				
+			} else {
+				// Turn off both the access and error logging channels completely.
+				endpoint_plain.clear_access_channels(websocketpp::log::alevel::all);
+				endpoint_plain.clear_error_channels(websocketpp::log::elevel::all);
+			}
+			
+			// Plain (non-TLS) endpoint listens on its own port.
+			endpoint_plain.listen(nonTlsPort);
+			endpoint_plain.start_accept();
+			nonTlsEndpointStarted = true;
+		}
+
+		// Set up a TLS endpoint at all times since the 
+		// IBM Voice Gateway product will only use a secure endpoint.
+		endpoint_tls.init_asio(&ios);
+		endpoint_tls.set_open_handler(bind(&MY_OPERATOR::on_open,this,::_1));
+		endpoint_tls.set_message_handler(
+			bind(&MY_OPERATOR::on_message<server_tls>,this,&endpoint_tls,::_1,::_2));
+		endpoint_tls.set_close_handler(bind(&MY_OPERATOR::on_close,this,::_1));
+		// TLS endpoint has an extra handler for the tls init
+		endpoint_tls.set_tls_init_handler(bind(&MY_OPERATOR::on_tls_init,this,::_1));
+
+		if (websocketLoggingNeeded == true) {
+			// Enable certain error logging channels and certain access logging channels.
+			endpoint_tls.set_access_channels(websocketpp::log::alevel::frame_header);
+			endpoint_tls.set_access_channels(websocketpp::log::alevel::frame_payload);
+		} else {
+			// Turn off both the access and error logging channels completely.
+			endpoint_tls.clear_access_channels(websocketpp::log::alevel::all);
+			endpoint_tls.clear_error_channels(websocketpp::log::elevel::all);
+		}		
+		
+		// TLS endpoint listens on a different port
+		endpoint_tls.listen(tlsPort);
+		endpoint_tls.start_accept();
+		tlsEndpointStarted = true;
+
+		// Start the Boost ASIO io_service run loop that can handle both endpoints.
+		// This will block until the server socket gets closed.
+		// For additional details, please refer to the commentary and 
+		// logic in the prepareToShutdown method
+		ios.run();
+	// }
+}
+
+// This method sets up the TLS for a given client connection handle.
+MY_OPERATOR::context_ptr MY_OPERATOR::on_tls_init(websocketpp::connection_hdl hdl) {
+	bool vgwSessionLoggingDone = false;
+	
+	if (vgwSessionLoggingNedded == true) {
+		SPLAPPTRC(L_ERROR, "on_tls_init called with hdl: " << hdl.lock().get(), "on_tls_init");
+		vgwSessionLoggingDone = true;
+	}
+	
+	if (vgwSessionLoggingDone == false) {
+		SPLAPPTRC(L_INFO, "on_tls_init called with hdl: " << hdl.lock().get(), "on_tls_init");
+	}
+	
+	context_ptr ctx(new boost::asio::ssl::context(boost::asio::ssl::context::tlsv1));
+
+	try {
+		ctx->set_options(boost::asio::ssl::context::default_workarounds |
+			boost::asio::ssl::context::no_sslv2 |
+			boost::asio::ssl::context::no_sslv3 |
+			boost::asio::ssl::context::single_dh_use);
+		ctx->set_password_callback(bind(&MY_OPERATOR::get_password, this));
+		ctx->use_certificate_chain_file(certificateFileName.c_str());
+		ctx->use_private_key_file(certificateFileName.c_str(), boost::asio::ssl::context::pem);
+		// Let us keep track of all the connection handles that use TLS context.
+		// This will be useful in the prepareToShutdown method above to
+		// distinguish between TLS endpoint and non-TLS (plain) endpoint.
+		// Because, to close the active client connections at the time of the
+		// operator shutdown, we have to call the close method on an 
+		// appropriate endpoint.
+		tls_connections_set.insert(hdl);
+	} catch (std::exception& e) {
+		std::cout << e.what() << std::endl;
+	}
+    
+	return ctx;
+}
+
+// When a client establishes a new Websocket connection, this callback method is run.
+void MY_OPERATOR::on_open(websocketpp::connection_hdl hdl) {
+	bool vgwSessionLoggingDone = false;
+	
+	if (vgwSessionLoggingNedded == true) {
+		SPLAPPTRC(L_ERROR, "on_open called for hdl: " << 
+			hdl.lock().get(), "on_open");
+		vgwSessionLoggingDone = true;
+	}
+	
+	if(vgwSessionLoggingDone == false) {
+		SPLAPPTRC(L_INFO, "on_open called for hdl: " << 
+			hdl.lock().get(), "on_open");
+	}
+
+	// Add this newly opened client connection to the associative container.
+	connection_metadata con_metadata;
+	con_metadata.vgwSessionStatus = VGW_OPENED_A_WS_CONNECTION;
+	con_metadata.vgwSessionStartTime = 
+		SPL::Functions::Time::getSeconds(SPL::Functions::Time::getTimestamp());
+	con_metadata.speechPacketsReceivedCnt = 0;
+	con_metadata.speechDataBytesReceived = 0;
+	con_metadata.vgwSessionId = "";
+	con_metadata.vgwSIPCallID = "";
+	con_metadata.vgwParticipantURI = "";
+	con_metadata.vgwTenantID = "";
+	con_metadata.vgwSIPToURI = "";
+	con_metadata.vgwIsCaller = false;
+	con_metadata.vgwVoiceChannelNumber = 0;
+	client_connections_map[hdl] = con_metadata;
+}
+
+// This recursive templatized function with c++11 syntax is from the 
+// C++ boost Q&A (how-to) technical discussion here:
+// https://stackoverflow.com/questions/48407925/boostproperty-treeptree-accessing-arrays-first-complex-element?noredirect=1&lq=1
+// It helps us to directly index an element in a JSON array sent by the IBM Voice Gateway.
+// To use c++11 syntax in a Streams C++ operator, it is required to add this
+// sc (Streams Compiler) option: --c++std=c++11
+template <typename Tree>
+Tree query(Tree& pt, typename Tree::path_type path) {
+    if (path.empty())
+        return pt;
+
+    auto const head = path.reduce();
+
+    auto subscript = head.find('[');
+    auto name      = head.substr(0, subscript);
+    auto index     = std::string::npos != subscript && head.back() == ']'
+        ? std::stoul(head.substr(subscript+1))
+        : 0u;
+
+    auto matches = pt.equal_range(name);
+    if (matches.first==matches.second)
+        throw std::out_of_range("name:" + name);
+
+    for (; matches.first != matches.second && index; --index)
+        ++matches.first;
+
+    if (index || matches.first==matches.second)
+        throw std::out_of_range("index:" + head);
+
+    return query(matches.first->second, path);
+}
+
+// The shared on_message handler takes a template parameter so the function can
+// resolve any endpoint dependent types like message_ptr or connection_ptr
+template <typename EndpointType>
+void MY_OPERATOR::on_message(EndpointType* s, websocketpp::connection_hdl hdl,
+    typename EndpointType::message_ptr msg) {
+	bool vgwSessionLoggingDone = false;
+	
+	if (vgwSessionLoggingNedded == true) {
+		SPLAPPTRC(L_ERROR, "on_message called with hdl: " << hdl.lock().get()
+			<< " with a message size of: " << msg->get_payload().size() << " bytes.", "on_message");
+		vgwSessionLoggingDone = true;
+	}
+	
+	if (vgwSessionLoggingDone == false) {
+		SPLAPPTRC(L_INFO, "on_message called with hdl: " << hdl.lock().get()
+			<< " with a message size of: " << msg->get_payload().size() << " bytes.", "on_message");
+	}
+	
+	// Get the metadata details for this connection handle from our client connections map.
+	connection_metadata& con_metadata = get_con_metadata_from_hdl(hdl);
+	
+	// IBM Voice Gateway will send messages via a given client connection
+	// either with textual data or with binary data. 
+	// Textual data will be sent at the time of the session start and 
+	// session end. At all other times, it will send binary information 
+	// containing the raw speech data. 
+	// Let us first determine if the received message contains textual or binary data.
+	if (msg->get_opcode() == websocketpp::frame::opcode::text) {
+		// Create a boost property tree root
+		std::string action = "";
+		pt::ptree root;
+		std::stringstream ss;
+		ss << msg->get_payload();
+		
+		try {
+			// Load the json data in the boost ptree
+			pt::read_json(ss, root);
+		} catch (std::exception const& e) {
+			if (vgwSessionLoggingNedded == true) {
+				SPLAPPTRC(L_ERROR, "Operator " << operatorPhysicalName <<
+					"-->Channel " << boost::to_string(udpChannelNumber) <<
+					"-->X1 Received text content is in an unexpected format: " <<
+					msg->get_payload() << 
+					". So, this message from the IBM Voice Gateway is ignored when " <<
+					"the current session status is " << con_metadata.vgwSessionStatus <<
+					".", "on_message");
+			}
+			
+			return;
+		}
+		
+		// Read the action element.
+		try {
+			action = query(root, "action").get_value<std::string>();
+		} catch (std::exception const& e) {
+			if (vgwSessionLoggingNedded == true) {
+				SPLAPPTRC(L_ERROR, "Operator " << operatorPhysicalName <<
+					"-->Channel " << boost::to_string(udpChannelNumber) <<
+					"-->X1 JSON parsing error when reading the field : " << e.what() <<
+					", IBM Voice Gateway sent this message: " << msg->get_payload(), "on_message");
+			}
+			
+			// Without the action field, we can't do anything.
+			return;
+		}
+		
+		// Let us check if it is start session or end session message.
+		if (con_metadata.vgwSessionStatus == VGW_OPENED_A_WS_CONNECTION) {
+			// With this particular session status, the next text based message allowed 
+			// for the IBM Voice Gateway is for it to send us the start session message.
+			// Let us ensure that is the case here.
+			// A start session message from the IBM Voice Gateway will look like this.
+			/*
+			// ===========================================================
+			{
+			  "action": "start",
+			  "siprecMetadata": {
+			      "vgwSessionID" : "8443572187904004@192.168.208.5",
+			      "vgwSIPCallID" : "8443572187904004@192.168.208.5",
+			      "vgwParticipantURI" : "sip:alice@10.10.10.7",
+			      "vgwIsCaller" : true
+			  }
+			}
+			// ===========================================================
+			*/
+			if (action == "start") {
+				// It is a start session message sent by the IBM Voice Gateway.
+				// Parse the metadata from the received JSON and 
+				// populate our internal data structure.
+				//
+				// Look for vgwSessionId
+				try {
+					// This is an important metadata that identiies
+					// every unique voice call. It must be present.
+					con_metadata.vgwSessionId = query(root, 
+						"siprecMetadata.vgwSessionID").get_value<std::string>();
+				}  catch (std::exception const& e) {
+					if (vgwSessionLoggingNedded == true) {
+						SPLAPPTRC(L_ERROR, "Operator " << operatorPhysicalName <<
+							"-->Channel " << boost::to_string(udpChannelNumber) <<
+							"-->X1 JSON parsing error when reading the field : " << e.what() <<
+							", IBM Voice Gateway sent this message: " << msg->get_payload(), "on_message");
+					}
+					
+					// An important field is not present.
+					return;
+				}
+				
+				if (con_metadata.vgwSessionId == "") {
+					// We can't do much with an empty vgwSessionId.
+					SPLAPPTRC(L_ERROR, "Operator " << operatorPhysicalName <<
+						"-->Channel " << boost::to_string(udpChannelNumber) <<
+						"-->X1 JSON start session message from the IBM Voice Gateway doesn't have a non-empty vgwSessionId field. So, ignoring this start session message." <<
+						", IBM Voice Gateway sent this message: " << msg->get_payload(), "on_message");
+					return;
+				}
+
+				// Look for vgwIsCaller
+				try {
+					// This is also an important metadata that identiies
+					// whether this connection (channel) carries the 
+					// customer's (a.k.a Caller) speech rather than the agent's speech.
+					con_metadata.vgwIsCaller = query(root, 
+						"siprecMetadata.vgwIsCaller").get_value<bool>();
+				}  catch (std::exception const& e) {
+					// We can't do much without knowing about this important field.
+					SPLAPPTRC(L_ERROR, "Operator " << operatorPhysicalName <<
+						"-->Channel " << boost::to_string(udpChannelNumber) <<
+						"-->X1 JSON start session message from the IBM Voice Gateway doesn't have the vgwIsCaller field. So, ignoring this start session message." <<  
+						", IBM Voice Gateway sent this message: " << msg->get_payload(), "on_message");
+					return;
+				}
+								
+				// Look for vgwSIPCallID
+				try {
+					// It is fine even if this field is not present in the JSON message.
+					con_metadata.vgwSIPCallID = query(root, 
+						"siprecMetadata.vgwSIPCallID").get_value<std::string>();
+				}  catch (std::exception const& e) {
+					if (vgwSessionLoggingNedded == true) {
+						SPLAPPTRC(L_ERROR, "Operator " << operatorPhysicalName <<
+							"-->Channel " << boost::to_string(udpChannelNumber) <<
+							"-->X1 JSON parsing error when reading the field : " << e.what() <<
+							", IBM Voice Gateway sent this message: " << msg->get_payload(), "on_message");
+					}					
+				}
+
+				// Look for vgwParticipantURI
+				try {
+					// It is fine even if this field is not present in the JSON message.
+					con_metadata.vgwParticipantURI = query(root, 
+						"siprecMetadata.vgwParticipantURI").get_value<std::string>();
+				}  catch (std::exception const& e) {
+					if (vgwSessionLoggingNedded == true) {
+						SPLAPPTRC(L_ERROR, "Operator " << operatorPhysicalName <<
+							"-->Channel " << boost::to_string(udpChannelNumber) <<
+							"-->X1 JSON parsing error when reading the field : " << e.what() <<
+							", IBM Voice Gateway sent this message: " << msg->get_payload(), "on_message");
+					}					
+				}
+
+				// Look for vgwTenantID
+				try {
+					// It is fine even if this field is not present in the JSON message.
+					con_metadata.vgwTenantID = query(root, 
+						"siprecMetadata.vgwTenantID").get_value<std::string>();
+				}  catch (std::exception const& e) {
+					if (vgwSessionLoggingNedded == true) {
+						SPLAPPTRC(L_ERROR, "Operator " << operatorPhysicalName <<
+							"-->Channel " << boost::to_string(udpChannelNumber) <<
+							"-->X1 JSON parsing error when reading the field : " << e.what() <<
+							", IBM Voice Gateway sent this message: " << msg->get_payload(), "on_message");
+					}					
+				}
+
+				// Look for vgwSIPToURI
+				try {
+					// It is fine even if this field is not present in the JSON message.
+					con_metadata.vgwSIPToURI = query(root, 
+						"siprecMetadata.vgwSIPToURI").get_value<std::string>();
+				}  catch (std::exception const& e) {
+					if (vgwSessionLoggingNedded == true) {
+						SPLAPPTRC(L_ERROR, "Operator " << operatorPhysicalName <<
+							"-->Channel " << boost::to_string(udpChannelNumber) <<
+							"-->X1 JSON parsing error when reading the field : " << e.what() <<
+							", IBM Voice Gateway sent this message: " << msg->get_payload(), "on_message");
+					}					
+				}
+								
+				// If we reached this far, then we can give an 
+				// affirmative response back to the IBM Voice Gateway for 
+				// its session start message.
+				try {
+					std::string response = "{\"state\": \"listening\"}";
+					s->send(hdl, response, msg->get_opcode());
+				} catch (websocketpp::exception const & e) {
+					SPLAPPTRC(L_ERROR, "Failure while sending the affirmative " <<
+						"response to the IBM Voice Gateway for its start session message. Error: " << 
+						"(" << e.what() << ")", "on_message");
+					// In this case, IBM Voice Gateway can try to send the "Start Session" message again.
+					return;
+			    }
+				
+				// At this point, we can claim that the IBM Voice Gateway 
+				// started an STT session. So, we can transition this connection's 
+				// status to the next logical state.
+				con_metadata.vgwSessionStatus = VGW_STARTED_AN_STT_SESSION;
+				// Update it in the client connections map.
+				client_connections_map[hdl] = con_metadata;
+				
+				if (vgwSessionLoggingNedded == true) {
+					SPLAPPTRC(L_ERROR, "Operator " << operatorPhysicalName <<
+						"-->Channel " << boost::to_string(udpChannelNumber) <<
+						"-->X1 Received and processed a start session message for the vgwSessionId " <<
+						con_metadata.vgwSessionId <<
+						", vgwIsCaller=" << con_metadata.vgwIsCaller << 
+						", vgwSIPCallID=" << con_metadata.vgwSIPCallID <<
+						", vgwParticipantURI=" << con_metadata.vgwParticipantURI <<
+						", vgwTenantID=" << con_metadata.vgwTenantID <<
+						", vgwSIPToURI=" << con_metadata.vgwSIPToURI << 
+						".", "on_message");
+				}					
+
+				return;
+			} else {
+				if (vgwSessionLoggingNedded == true) {
+					SPLAPPTRC(L_ERROR, "Operator " << operatorPhysicalName <<
+						"-->Channel " << boost::to_string(udpChannelNumber) <<
+						"-->X1 Received an invalid action: " <<
+						action << 
+						". So, this message from the IBM Voice Gateway is ignored when " <<
+						"the current session status is VGW_OPENED_A_WS_CONNECTION. " <<
+						"Only 'action':'start' is allowed at this time. " <<
+						", IBM Voice Gateway sent this message: " << msg->get_payload(),
+						"on_message");
+				}					
+				
+				return;
+			} // End of if (action == "start")
+		} // End of if (con_metadata.vgwSessionStatus == VGW_OPENED_A_WS_CONNECTION)
+		
+		if (con_metadata.vgwSessionStatus == VGW_STARTED_AN_STT_SESSION) {
+			// With this particular session status, the next text based message allowed 
+			// for the IBM Voice Gateway is for it to send us the stop session message.
+			// Let us ensure that is the case here.
+			// A stop session message from the IBM Voice Gateway will look like this.
+			/*
+			// ===========================================================
+			{
+			  "action": "stop",
+			}
+			// ===========================================================
+			*/
+			if (action == "stop") {
+				// Update this metric.
+				nSpeechDataBytesReceived += (uint64_t)con_metadata.speechDataBytesReceived;
+				nOutputTuplesSent += (uint64_t)con_metadata.speechPacketsReceivedCnt;
+
+				// It is a stop session message sent by the IBM Voice Gateway.
+				// We can delete this connection's meta data cached in our
+				// client connection map.
+				if (vgwSessionLoggingNedded == true) {
+					SPLAPPTRC(L_ERROR, "Operator " << operatorPhysicalName <<
+						"-->Channel " << boost::to_string(udpChannelNumber) <<
+						"-->X3 Received and processed a stop session message for the vgwSessionId " << 
+						con_metadata.vgwSessionId << 
+						", vgwIsCaller=" << con_metadata.vgwIsCaller << 
+						", vgwVoiceChannelNumber=" << con_metadata.vgwVoiceChannelNumber <<
+						".", "on_message");
+				}					
+
+				// There may be more than one channel in the voice call for this
+				// vgwSessionId. All we know is that this particular channel (i.e. connection)
+				// that we have here is ending its STT session. We will go ahead and send an
+				// "End of Voice Call" signal to the downstream operator in order for it to 
+				// free up the necessary things handling this speaker of a given 
+				// voice call i.e. vgwSessionId_vgwVoiceChannelNumber combo. 
+				// If this happens to be the very last channel doing the "End session" in a 
+				// multi-channel voice call, we will also do the following cleanup.
+				// [Most of the voice calls will have two different channels: 
+				//  one for the customer speech and the other for the agent speech.]
+				bool vgwSessionIdFoundInMap = 
+					vgw_session_id_map.find(con_metadata.vgwSessionId) != vgw_session_id_map.end();
+				
+				if (vgwSessionIdFoundInMap == true) {
+					// Send the "End of Voice Call" signal now for this
+					// vgwSessionId_vgwVoiceChannelNumber combo.
+					OPort1Type oTuple;
+					oTuple.set_vgwSessionId(con_metadata.vgwSessionId);
+					oTuple.set_isCustomerSpeechData(con_metadata.vgwIsCaller);
+					oTuple.set_vgwVoiceChannelNumber(con_metadata.vgwVoiceChannelNumber);
+					submit(oTuple, 1);
+					
+					if (vgwSessionLoggingNedded == true) {
+						SPLAPPTRC(L_ERROR, "Operator " << operatorPhysicalName <<
+							"-->Channel " << boost::to_string(udpChannelNumber) <<
+							"-->X3 Sent an 'End of Voice Call' signal for vgwSessionId=" << 
+							con_metadata.vgwSessionId << 
+							", vgwVoiceChannelNumber=" <<
+							con_metadata.vgwVoiceChannelNumber << ".", "on_message");
+					}					
+
+					// Make the adjustment by removing the 
+					// last entry in the list being held inside this map. 
+					vgw_session_id_map[con_metadata.vgwSessionId].pop_back();
+					
+					if (vgw_session_id_map[con_metadata.vgwSessionId].size() <= 0) {
+						// There are no more active channels for this vgwSessionId.
+						// This channel is the very last one in this voice call to end the session.
+						// So, let us remove it from the map.
+						vgw_session_id_map.erase(con_metadata.vgwSessionId);
+
+						// A voice call is fully completed now. Update this metric.
+						nVoiceCallsProcessed++;
+						// Update the operator metric only if the user asked for a live update.
+						if (vgwLiveMetricsUpdateNeeded == true) {
+							nVoiceCallsProcessedMetric->setValueNoLock(nVoiceCallsProcessed);
+							nSpeechDataBytesReceivedMetric->setValueNoLock(nSpeechDataBytesReceived);
+							nOutputTuplesSentMetric->setValueNoLock(nOutputTuplesSent);
+						}						
+					} // End of if (vgw_session_id_map[con_metadata.vgwSessionId] <= 0)
+				} // End of if (vgwSessionIdFoundInMap == true)
+
+				if (vgwStaleSessionPurgeInterval > 0) {
+					// PERIODIC STALE SESSION AND STALE CONNECTION REMOVAL.
+					// Do this only if the user provided a non-zero purge interval.
+					// We should be prepared for a condition where the
+					// "Stop STT session" message never arrives for some reason.
+					// One reason this can happen is due to an abnormal crash or
+					// an abnormal exit/closure on the VGW side of things.
+					// In that case, it will leave us with left over map entries.
+					// So, we will have to purge those left over map entries.
+					// Similarly, any unclosed client connection (which is 
+					// extremely rare) will also leave stale entries in the map.
+					// We will remove all such things here periodically.
+					int64_t currentTimeInSeconds = 
+						SPL::Functions::Time::getSeconds(SPL::Functions::Time::getTimestamp());
+					
+					if (currentTimeInSeconds - timeOfPreviousStaleSessionRemoval >=
+						vgwStaleSessionPurgeInterval) {
+						// Time elapsed. Time to check for stale entries.
+						std::list<std::string> staleList;
+						staleList.clear();
+								
+						// Let us first check inside the VGW session id map.
+						for(std::map<std::string, SPL::list<int64_t>>::iterator it = vgw_session_id_map.begin();
+							it != vgw_session_id_map.end(); it++) {
+							// SPL::list is nothing but an std::vector behind the scenes.
+							SPL::list<int64_t> myList = it->second;
+							
+							// Loop through this list and check every voice channel's start time.
+							for(SPL::list<int64_t>::iterator it2 = myList.begin();
+								it2 != myList.end(); it2++) {
+								if (currentTimeInSeconds - *it2 >=
+									vgwStaleSessionPurgeInterval) {
+									// This is a stale entry. Store the VGW session id.
+									staleList.push_back(it->first);
+									break;
+								}
+							}
+						}
+						
+						// Now, we can remove the stale entries if any.
+						for(std::list<std::string>::iterator it = staleList.begin();
+							it != staleList.end(); it++) {
+							vgw_session_id_map.erase(*it);
+							
+							if (vgwSessionLoggingNedded == true) {
+								SPLAPPTRC(L_ERROR, "Operator " << operatorPhysicalName <<
+									"-->Channel " << boost::to_string(udpChannelNumber) <<
+									"-->X4 Removed a stale VGW session id. " <<
+									*it, "on_message");
+							}
+						}
+						
+						std::list<websocketpp::connection_hdl> staleList2;
+						staleList2.clear();
+						
+						// Let us now check the client connections map.
+						// Stale entries happening in this map is a rarity just because
+						// on_close handler is almost always gets invoked during the
+						// normal as well as abnormal client connection closures.
+						for(con_map::iterator it = client_connections_map.begin();
+							it != client_connections_map.end(); it++) {
+							connection_metadata cmd = it->second;
+							
+							if(currentTimeInSeconds - cmd.vgwSessionStartTime > 
+								vgwStaleSessionPurgeInterval) {
+								// This is a stale entry. Store the connection handle.
+								staleList2.push_back(it->first);
+							}
+						}
+	
+						int32_t stale2RemovedCnt = 0;
+						// Now, we can remove the stale entries if any.
+						for(std::list<websocketpp::connection_hdl>::iterator it = staleList2.begin();
+							it != staleList2.end(); it++) {
+							client_connections_map.erase(*it);
+							stale2RemovedCnt++;
+						}
+	
+						if (vgwSessionLoggingNedded == true && stale2RemovedCnt > 0) {
+							SPLAPPTRC(L_ERROR, "Operator " << operatorPhysicalName <<
+								"-->Channel " << boost::to_string(udpChannelNumber) <<
+								"-->X4 Removed a few stale client connection handles. Removed count=" <<
+								stale2RemovedCnt, "on_message");
+						}
+						
+						// Set it to the current time so that we can do our next 
+						// stale sesion data removal at the required time interval.
+						timeOfPreviousStaleSessionRemoval = currentTimeInSeconds;
+					}
+				} // End of if (vgwStaleSessionPurgeInterval > 0)
+
+				return;
+			} else {
+				if (vgwSessionLoggingNedded == true) {
+					SPLAPPTRC(L_ERROR, "Operator " << operatorPhysicalName <<
+						"-->Channel " << boost::to_string(udpChannelNumber) <<
+						"-->X3 Received an invalid action: " <<
+						action << 
+						". So, this message from the IBM Voice Gateway is ignored when " <<
+						"the current session status is VGW_STARTED_AN_STT_SESSION. " <<
+						"Only 'action':'stop' is allowed at this time." <<
+						", IBM Voice Gateway sent this message: " << msg->get_payload(),
+						"on_message");
+				}					
+				
+				return;
+			} // End of if (action == "stop")
+		} // End of if (con_metadata.vgwSessionStatus == VGW_STARTED_AN_STT_SESSION)
+		
+		return;
+	} // End of if (msg->get_opcode() == websocketpp::frame::opcode::text)
+	
+	// Check if the IBM Voice Gateway sent us binary speech data
+	// It is very important to note that the IBM Voice Gateway will keep
+	// sending the speech data of the caller and the agent on two 
+	// voice channels i.e. one for the caller and the other for the agent.
+	// Irrespective of those two speakers talk or remain silent during the
+	// call, their assigned voice channel will always carry some binary
+	// data. That means, there is no way to know who is currently
+	// talking. This constraint limits us from sending only one of the
+	// channel's data to a single STT engine at any given time.
+	// Instead, this constraint forces us to dedicate a single STT engine
+	// per voice channel in a given voice call and keep sending the
+	// data being received on that channel continuously to that
+	// dedicated STT engine irrespective of whether that channel carries
+	// silence or active speech data. In summary, we will need two
+	// STT engines to do the Speech To Text for every ongoing voice call.
+	if (msg->get_opcode() == websocketpp::frame::opcode::binary) {
+		// IBM Voice Gateway can send binary speech after it has 
+		// already started a session with us by sending its voice call meta data.
+		if (con_metadata.vgwSessionStatus == VGW_STARTED_AN_STT_SESSION) {
+			// With this particular session status, we can accept the
+			// binary data coming from the IBM Voice Gateway.
+			// We will receive the binary data and send it on this
+			// operator's first output port for consumption by the other
+			// downstream operators in the application flow graph.
+			//
+			// Update some of the counters we maintain in the con_metadata.
+			con_metadata.speechPacketsReceivedCnt++;
+			int32_t payloadSize = msg->get_payload().size();
+			con_metadata.speechDataBytesReceived += payloadSize;
+						
+			// If we received the very first speech packet for the given
+			// vgwSessionId via a given connection_hdl, that means the
+			// speech data has started arriving actively on this channel (i.e. connection).
+			// So, increment the map value to indicate the number of active 
+			// speech channels for the given vgwSessionId.
+			if (con_metadata.speechPacketsReceivedCnt == 1) {
+				bool vgwSessionIdFoundInMap = 
+					vgw_session_id_map.find(con_metadata.vgwSessionId) != vgw_session_id_map.end();
+				
+				if (vgwSessionIdFoundInMap == false) {
+					// This vgwSessionId is not there in this map.
+					// So, insert it freshly now.
+					// SPL::list is nothing but an std::vector behind the scenes.
+					SPL::list<int64_t> myList;
+					myList.push_back(con_metadata.vgwSessionStartTime);
+					vgw_session_id_map[con_metadata.vgwSessionId] = myList;
+					// This is the first voice channel in which the speech data bytes
+					// have started arriving for this particular VGW session id.
+					con_metadata.vgwVoiceChannelNumber = 1;
+				} else {
+					// This vgwSessionId is already present in the map.
+					// So, add a new entry to the list.
+					vgw_session_id_map[con_metadata.vgwSessionId].push_back(
+						con_metadata.vgwSessionStartTime);
+					// This is the second voice channel in which the speech data bytes
+					// have started arriving for this particular VGW session id.
+					con_metadata.vgwVoiceChannelNumber = 2;
+				}
+			} // End of if (con_metadata.speechPacketsReceivedCnt == 1)
+
+			// Update it in the client connections map.
+			client_connections_map[hdl] = con_metadata;
+			
+			// In WebSocket++, payload is in std::string format for both
+			// text and binary data. So, we can get the binary buffer from
+			// that string payload. This idea is discussed in this URL:
+			// https://github.com/zaphoyd/websocketpp/issues/412
+			const char* payload = msg->get_payload().data();
+			uint8_t const* payloadBuffer = 
+				reinterpret_cast<const uint8_t*>(payload);
+			// Let us create an output tuple and send it out.
+			// Create an SPL blob type.
+			SPL::blob speechBlob;
+			// This transfers (copies) the payload buffer into the 
+			// internal buffer hold by the blob. 
+			// The blob owns the copied data in memory.
+			speechBlob.setData((unsigned char*)payloadBuffer, (uint64_t)payloadSize);
+			OPort0Type oTuple;
+			oTuple.set_speech(speechBlob);
+			
+			// Now let us set any attributes that the caller of this operator is trying to
+			// assign through this operator's output functions.
+			<% 
+			  my $oport = $model->getOutputPortAt(0); 
+			  foreach my $attribute (@{$oport->getAttributes()}) { 
+				  my $name = $attribute->getName(); 
+				  my $paramValues = $attribute->getAssignmentOutputFunctionParameterValues();
+				  my $operation = $attribute->getAssignmentOutputFunctionName(); 
+
+				  if ($operation eq "getIBMVoiceGatewaySessionId") { 					  
+			%> 
+				  // Send the current vgwSessionId.
+				  oTuple.set_<%=$name%>( 
+						<%=$operation%>(con_metadata.vgwSessionId));
+				  <%} elsif ($operation eq "isCustomerSpeechData") { 
+			%> 
+				  oTuple.set_<%=$name%>( 
+						<%=$operation%>(con_metadata.vgwIsCaller));
+				  <%} elsif ($operation eq "getTupleCnt") { 
+			%> 
+				  oTuple.set_<%=$name%>( 
+						<%=$operation%>(con_metadata.speechPacketsReceivedCnt));
+				  <%} elsif ($operation eq "getTotalSpeechDataBytesReceived") { 
+			%> 
+			  	  oTuple.set_<%=$name%>( 
+			  			<%=$operation%>(con_metadata.speechDataBytesReceived));
+			  	  <%} elsif ($operation eq "getVoiceChannelNumber") { 
+			%> 
+				   oTuple.set_<%=$name%>( 
+						<%=$operation%>(con_metadata.vgwVoiceChannelNumber));
+		  	  	  <%} elsif ($operation eq "getAgentPhoneNumber") { 
+		    %> 
+			   	   oTuple.set_<%=$name%>( 
+			   	        <%=$operation%>(con_metadata.vgwParticipantURI));
+	  	  	  	  <%} elsif ($operation eq "getCallerPhoneNumber") { 
+	  	  	%> 
+		   	   	   oTuple.set_<%=$name%>( 
+		   	            <%=$operation%>(con_metadata.vgwSIPToURI));
+		  	  	  <%}	
+			}%>
+			
+			submit(oTuple, 0);
+
+			if (vgwSessionLoggingNedded == true) {
+				SPLAPPTRC(L_ERROR, "Operator " << operatorPhysicalName <<
+					"-->Channel " << boost::to_string(udpChannelNumber) <<
+					"-->X2 Received speech data from the vgwSessionId " << 
+					con_metadata.vgwSessionId << 
+					" and sent it via an output tuple. " <<
+					"vgwIsCaller=" << con_metadata.vgwIsCaller <<
+					", vgwVoiceChannelNumber=" << con_metadata.vgwVoiceChannelNumber <<
+					", speechPacketsReceivedCnt=" <<
+					con_metadata.speechPacketsReceivedCnt <<
+					", currentSpeechPacketSize=" << payloadSize <<
+					", totalSpeechDataBytesReceived=" <<
+					con_metadata.speechDataBytesReceived, "on_message");
+			}
+			
+			return;
+		} else {
+			if (vgwSessionLoggingNedded == true) {
+				SPLAPPTRC(L_ERROR, "Operator " << operatorPhysicalName <<
+					"-->Channel " << boost::to_string(udpChannelNumber) <<
+					"-->X2 Received binary content via connection handle " <<
+					hdl.lock().get() << 
+					" when it is not expected: " <<
+					msg->get_payload() << 
+					". So, this message from the IBM Voice Gateway is ignored when " <<
+					"the current session status is not VGW_STARTED_AN_STT_SESSION.", "on_message");
+			}		
+			
+			return;
+		} // End of if (con_metadata.vgwSessionStatus == VGW_STARTED_AN_STT_SESSION)
+	} // End of if (msg->get_opcode() == websocketpp::frame::opcode::binary)
+}
+
+// When a client's established connection closes, this callback method is run.
+void MY_OPERATOR::on_close(websocketpp::connection_hdl hdl) {
+	connection_metadata& con_metadata = get_con_metadata_from_hdl(hdl);
+	int64_t currentTimeInSeconds = 
+		SPL::Functions::Time::getSeconds(SPL::Functions::Time::getTimestamp());
+	int64_t sessionDuration = currentTimeInSeconds - con_metadata.vgwSessionStartTime;
+	
+	bool vgwSessionLoggingDone = false;
+	
+	if (vgwSessionLoggingNedded == true) {
+		SPLAPPTRC(L_ERROR, "on_close called for hdl: " << 
+			hdl.lock().get() << 
+			", vgwSessionId: " << con_metadata.vgwSessionId <<
+			", vgwIsCaller: " << con_metadata.vgwIsCaller <<
+			", sessionDuration: " << sessionDuration << " seconds.", "on_close");
+		vgwSessionLoggingDone = true;
+	}
+	
+	if (vgwSessionLoggingDone == false) {
+		SPLAPPTRC(L_INFO, "on_close called for hdl: " << 
+			hdl.lock().get() << 
+			", vgwSessionId: " << con_metadata.vgwSessionId <<
+			", vgwIsCaller: " << con_metadata.vgwIsCaller <<
+			", sessionDuration: " << sessionDuration << " seconds.", "on_close");
+	}
+	
+	// Delete this handle from our associative container.        
+	client_connections_map.erase(hdl);
+}
+
+// No change to TLS init methods from echo_server_tls
+std::string MY_OPERATOR::get_password() {
+	return "test";
+}
+
+// This is an utility method to get the client connection meta data for a given connection handle.
+MY_OPERATOR::connection_metadata& MY_OPERATOR::get_con_metadata_from_hdl(websocketpp::connection_hdl hdl) {
+	auto it = client_connections_map.find(hdl);
+        
+	if (it == client_connections_map.end()) {
+		std::ostringstream errorStringStream;
+		errorStringStream << 
+			"No connection metadata avaliable for a given connection handle: " << hdl.lock().get();
+		std::string error_string = errorStringStream.str();
+		// This connection is not in the list. This really shouldn't happen
+		// and probably means something else is wrong.
+		throw std::invalid_argument(error_string.c_str());
+	}
+        
+	return it->second;
+}
+
+// Tuple processing for mutating ports 
+void MY_OPERATOR::process(Tuple & tuple, uint32_t port)
+{
+    // Sample submit code
+    /* 
+      submit(otuple, 0); // submit to output port 0
+    */
+}
+
+// Tuple processing for non-mutating ports
+void MY_OPERATOR::process(Tuple const & tuple, uint32_t port)
+{
+    // Sample submit code
+    /* 
+      OPort0Type otuple;
+      submit(otuple, 0); // submit to output port 0
+    */
+}
+
+// Punctuation processing
+void MY_OPERATOR::process(Punctuation const & punct, uint32_t port)
+{
+    /*
+      if(punct==Punctuation::WindowMarker) {
+        // ...;
+      } else if(punct==Punctuation::FinalMarker) {
+        // ...;
+      }
+    */
+}
+
+// IBMVoiceGatewaySource Output Functions that are needed to set the output tuple attributes with their values.
+std::string MY_OPERATOR::getIBMVoiceGatewaySessionId(std::string const & vgwSessionId) {
+	return(vgwSessionId); 
+}
+
+bool MY_OPERATOR::isCustomerSpeechData(bool const & isThisSpeechDataFromCustomer) {
+	return(isThisSpeechDataFromCustomer);
+}
+
+int32_t MY_OPERATOR::getTupleCnt(int32_t const & emittedTupleCnt) {
+	return(emittedTupleCnt);
+}
+
+int32_t MY_OPERATOR::getTotalSpeechDataBytesReceived(int32_t const & totalSpeechDataBytesReceived) {
+	return(totalSpeechDataBytesReceived);
+}
+
+int32_t MY_OPERATOR::getVoiceChannelNumber(int32_t const & voiceChannelNumber) {
+	return(voiceChannelNumber);
+}
+
+std::string MY_OPERATOR::getAgentPhoneNumber(std::string const & agentPhoneNumber) {
+	return(agentPhoneNumber);
+}
+
+std::string MY_OPERATOR::getCallerPhoneNumber(std::string const & callerPhoneNumber) {
+	return(callerPhoneNumber);
+}
+
+<%SPL::CodeGen::implementationEpilogue($model);%>

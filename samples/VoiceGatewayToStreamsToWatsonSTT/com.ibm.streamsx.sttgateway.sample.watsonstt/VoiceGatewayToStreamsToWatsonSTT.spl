@@ -1,0 +1,931 @@
+/*
+==============================================
+# Licensed Materials - Property of IBM
+# Copyright IBM Corp. 2018, 2019
+==============================================
+*/
+
+/*
+==============================================
+First created on: Sep/25/2019
+Last modified on: Oct/22/2019
+
+This example demonstrates the integration of the following three products to
+achieve Real-Time Speech-To-Text transcription to get the text ready for
+any further analytics.
+
+1) IBM Voice Gateway
+2) IBM Streams
+3) IBM Watson Speech To Text (on Cloud Pak for Data or on IBM public cloud)
+
+These three products will work in the following sequence:
+
+Your SIPREC-->IBM Voice Gateway-->IBM Streams-->IBM Watson STT
+
+You can build this example from command line via the make command by using the
+Makefile available in the top-level directory of this example. It will be
+necessary to export the STREAMS_STTGATEWAY_TOOLKIT environment variable by
+pointing it to the full path of your 
+streamsx.sttgateway/com.ibm.streamsx.sttgateway directory.
+
+If you want to build this example inside the Streams Studio, there are certain
+build configuration settings needed. Please refer to the streamsx.sttgateway
+toolkit documentation to learn more about those Streams Studio configuration settings.
+==============================================
+*/
+namespace com.ibm.streamsx.sttgateway.sample.watsonstt;
+
+use com.ibm.streamsx.sttgateway.watson::*;
+
+// This is a schema that will get used in two different 
+// composites in this file. So, we have to define it
+// outside of those composites in order for the compiler to
+// resolve this type correctly.
+// 
+// This STT result type contains many attributes to
+// demonstrate all the basic and very advanced features of 
+// the Watson STT service. Not all real-life applications will need 
+// all these attributes. You can decide to include or omit these
+// attributes based on the specific STT features your application will need. 
+// Trimming the unused attributes will also help in 
+// reducing the STT processing overhead and in turn 
+// help in receiving the STT results faster.
+// Read the streamsx.sttgateway toolkit documentation to learn about
+// what features are available, how they work and how different attributes are 
+// related to those features.
+type STTResult_t = rstring vgwSessionId, boolean isCustomerSpeechData, 
+	int32 vgwVoiceChannelNumber, 
+	rstring callerPhoneNumber, rstring agentPhoneNumber,
+	int32 speechDataFragmentCnt, int32 totalSpeechDataBytesReceived, 
+	int32 sttEngineId, int32 sttResultProcessorId,
+	int32 utteranceNumber,
+	rstring utteranceText, boolean finalizedUtterance,
+	float32 confidence, rstring fullTranscriptionText,
+	rstring sttErrorMessage, boolean transcriptionCompleted,
+	list<rstring> utteranceAlternatives, 
+	list<list<rstring>> wordAlternatives,
+	list<list<float64>> wordAlternativesConfidences,
+	list<float64> wordAlternativesStartTimes,
+	list<float64> wordAlternativesEndTimes,
+	list<rstring> utteranceWords,
+	list<float64> utteranceWordsConfidences,
+	list<float64> utteranceWordsStartTimes,
+	list<float64> utteranceWordsEndTimes,
+	float64 utteranceStartTime,
+	float64 utteranceEndTime,
+	list<int32> utteranceWordsSpeakers,
+	list<float64> utteranceWordsSpeakersConfidences,
+	map<rstring, list<map<rstring, float64>>> keywordsSpottingResults;
+
+// This is the main composite for this application.
+composite VoiceGatewayToStreamsToWatsonSTT {
+	param
+		// IBM Voice Gateway related submission time values are defined below.
+		// TLS port on which this application will listen for
+		// communicating with the IBM Voice Gateway.
+		expression<uint32> $tlsPort : 
+			(uint32)getSubmissionTimeValue("tlsPort", "443");
+		// User can optionally specify whether they want a non-TLS endpoint.
+		expression<boolean> $nonTlsEndpointNeeded : 
+			(boolean)getSubmissionTimeValue("nonTlsEndpointNeeded", "false");
+		// Non-TLS (Plain) port on which this application will
+		// (optionally) listen for communicating with the IBM Voice Gateway.
+		expression<uint32> $nonTlsPort : 
+			(uint32)getSubmissionTimeValue("nonTlsPort", "80");
+		// Server side certificate (.pem) file for the WebSocket server.
+		// It is necessary for the users to create a Root CA signed 
+		// server side certificate file and point to that file at the time of
+		// starting this application. If the user doesn't point to this file
+		// at the time of starting the application, then the application will
+		// look for a default file named ws-server.pem inside the etc sub-directory
+		// of the application. This certificate will be presented to the
+		// IBM Voice Gateway for validation when it establishes a WebSocket 
+		// connection with this application. For doing quick tests, you may save
+		// time and effort needed in getting a proper Root CA signed certificate 
+		// by going with a simpler option of creating your own self-signed 
+		// certificate. Please ensure that using a self-signed certificate is 
+		// allowed in your environment. We have provided a set of instructions to
+		// create a self signed certificate. Please refer to the following
+		// file in the etc sub-directory of this application:
+		// etc/creating-a-self-signed-certificate.txt
+		expression<rstring> $certificateFileName :
+			getSubmissionTimeValue("certificateFileName", "");
+		// Is live metrics needed for the IBMVoiceGatewaySource operator?
+		expression<boolean> $vgwLiveMetricsUpdateNeeded : 
+			(boolean)getSubmissionTimeValue("vgwLiveMetricsUpdateNeeded", "true");
+		// Is WebSocket library low level logging needed?
+		expression<boolean> $vgwWebsocketLoggingNeeded : 
+			(boolean)getSubmissionTimeValue("vgwWebsocketLoggingNeeded", "false");
+		// Is IBM Voice Gateway message exchange logging needed for debugging?
+		expression<boolean> $vgwSessionLoggingNedded : 
+			(boolean)getSubmissionTimeValue("vgwSessionLoggingNedded", "false");
+		//
+		// IBM Watson STT related submission time values are defined below.
+		// IMPORTANT: The WatsonSTT operator uses Websocket to communicate with the 
+		// Watson STT cloud service. For the STT service on IBM Public Cloud, 
+		// one must use the unexpired IAM access token (generated by using your 
+		// IBM Public cloud STT service instance's API key). 
+		// So, user must provide here his/her API key. We have some logic below that 
+		// will use the user provided API key to generate the IAM access token and 
+		// send that to the WatsonSTT operator.
+		// There is additional logic available below to keep refreshing that
+		// IAM access token periodically in order for it to stay unexpired.
+		// You should leave this submission time value empty when not using STT on IBM public cloud.
+		// https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-websockets#WSopen
+		expression<rstring> $sttApiKey : getSubmissionTimeValue("sttApiKey", "");
+		// Specify either the public cloud IAM Token fetch/refresh URL.
+		expression<rstring> $sttIAMTokenURL : 
+			getSubmissionTimeValue("sttIAMTokenURL", "https://iam.cloud.ibm.com/identity/token");
+		// Specify the access token refresh interval in minutes.
+		expression<float64> $sttAccessTokenRefreshInterval :
+			(float64)getSubmissionTimeValue("sttAccessTokenRefreshInterval", "55.00");
+		// Specify the IBM STT on Cloud Pak for Data (CP4D i.e. private cloud) access token.
+		// You should leave this submission time value empty when not using STT on CP4D.
+		expression<rstring> $sttOnCP4DAccessToken : getSubmissionTimeValue("sttOnCP4DAccessToken", "");		
+		expression<int32> $numberOfSTTEngines :(int32)
+			getSubmissionTimeValue("numberOfSTTEngines", "10") ;
+		// Time in seconds to wait before sending data to the STT engines.
+		expression<float64> $initDelayBeforeSendingDataToSttEngines :
+			(float64)getSubmissionTimeValue("initDelayBeforeSendingDataToSttEngines", "15.0"); 
+		// Time interval in seconds during which the VGW source operator below should
+		// do memory cleanup of any Voice Gateway sessions that end abruptly in the
+		// middle of a voice call.
+		expression<uint32> $vgwStaleSessionPurgeInterval :(uint32)
+			getSubmissionTimeValue("vgwStaleSessionPurgeInterval", "10800");
+		// 
+		// Following are the WatsonSTT operator related submission time values.
+		//
+		expression<rstring> $sttUri : getSubmissionTimeValue("sttUri",
+			"wss://stream.watsonplatform.net/speech-to-text/api/v1/recognize");
+		expression<rstring> $sttBaseLanguageModel : 
+			getSubmissionTimeValue("sttBaseLanguageModel", "en-US_NarrowbandModel");
+		expression<rstring> $contentType : 
+			getSubmissionTimeValue("contentType", "audio/wav");
+		expression<rstring> $baseModelVersion : 
+			getSubmissionTimeValue("baseModelVersion", "");
+		expression<rstring> $customizationId : 
+			getSubmissionTimeValue("customizationId", "");
+		expression<rstring> $acousticCustomizationId : 
+			getSubmissionTimeValue("acousticCustomizationId", "");
+		expression<float64> $customizationWeight : 
+			(float64)getSubmissionTimeValue("customizationWeight", "0.30");
+		expression<int32> $sttResultMode : (int32)getSubmissionTimeValue("sttResultMode", "3");
+		expression<int32> $maxUtteranceAlternatives : 
+			(int32)getSubmissionTimeValue("maxUtteranceAlternatives", "1");	
+		expression<boolean> $sttRequestLogging : 
+			(boolean)getSubmissionTimeValue("sttRequestLogging", "false");
+		expression<boolean> $filterProfanity : 
+			(boolean)getSubmissionTimeValue("filterProfanity", "false");
+		expression<boolean> $sttJsonResponseDebugging : 
+			(boolean)getSubmissionTimeValue("sttJsonResponseDebugging", "false");
+		expression<float64> $wordAlternativesThreshold : 
+			(float64)getSubmissionTimeValue("wordAlternativesThreshold", "0.0");
+		expression<boolean> $wordConfidenceNeeded : 
+			(boolean)getSubmissionTimeValue("wordConfidenceNeeded", "false");
+		expression<boolean> $wordTimestampNeeded : 
+			(boolean)getSubmissionTimeValue("wordTimestampNeeded", "false");
+		expression<boolean> $identifySpeakers : 
+			(boolean)getSubmissionTimeValue("identifySpeakers", "false");
+		expression<boolean> $smartFormattingNeeded : 
+			(boolean)getSubmissionTimeValue("smartFormattingNeeded", "false");
+		expression<float64> $keywordsSpottingThreshold : 
+			(float64)getSubmissionTimeValue("keywordsSpottingThreshold", "0.0");
+		expression<list<rstring>> $keywordsToBeSpotted : 
+			(list<rstring>)getSubmissionTimeValue("keywordsToBeSpotted", "[]");	
+		expression<boolean> $sttWebsocketLoggingNeeded : 
+			(boolean)getSubmissionTimeValue("sttWebsocketLoggingNeeded", "false");
+		expression<float64> $cpuYieldTimeInAudioSenderThread : 
+			(float64)getSubmissionTimeValue("cpuYieldTimeInAudioSenderThread", "0.001");
+		expression<float64> $waitTimeBeforeSTTServiceConnectionRetry : 
+			(float64)getSubmissionTimeValue("waitTimeBeforeSTTServiceConnectionRetry", "3.0");
+		expression<int32> $maxAllowedConnectionAttempts : 
+			(int32)getSubmissionTimeValue("maxAllowedConnectionAttempts", "10");
+		expression<boolean> $sttLiveMetricsUpdateNeeded : 
+			(boolean)getSubmissionTimeValue("sttLiveMetricsUpdateNeeded", "true");
+
+	type
+		// The following is the schema of the first output stream for the
+		// IBMVoiceGatewaySource operator. The first four attributes are
+		// very important and the other ones are purely optional if some
+		// scenarios really require them.
+		// blob speech --> Speech fragments of a live conversation as captured and sent by the IBM Voice Gateway.
+		// rstring vgwSessionId --> Unique identifier of a voice call. 
+		// boolean isCustomerSpeechData --> Every voice call will have a customer channel and an agent channel.
+		//                                  This attribute tells whether this output stream carries customer speech data or not.
+		// int32 vgwVoiceChannelNumber --> This indicates the voice channel number i.e. 1 or 2.
+		//                                 Whoever (caller or agent) sends the first round of 
+		//                                 speech data bytes will get assigned a voice channel of 1. 
+		//                                 The next one to follow will get assigned a voice channel of 2.
+		// rstring callerPhoneNumber --> Details about the caller's phone number.
+		// rstring agentPhoneNumber --> Details about the agent's phone number.
+		// int32 speechDataFragmentCnt --> Number of fragments (tuples) emitted so far on a given channel (customer or agent) for a given vgwSessionId.
+		// int32 totalSpeechDataBytesReceived --> Number of speech bytes received so far on a given channel (customer or agent) for a given vgwSessionId.
+		// int32 sttEngineId --> This attribute will be set in the next operator. (Please, read the comments there.)
+		// int32 sttResultProcessorId --> This attribute will be set in the next operator. (Please, read the comments there.)
+		BinarySpeech_t = blob speech, rstring vgwSessionId, boolean isCustomerSpeechData, 
+			int32 vgwVoiceChannelNumber, rstring callerPhoneNumber,
+			rstring agentPhoneNumber, int32 speechDataFragmentCnt,
+			int32 totalSpeechDataBytesReceived, int32 sttEngineId, 
+			int32 sttResultProcessorId;
+		// The following schema is for the second output stream of the
+		// IBMVoiceGatewaySource operator. It has three attributes indicating
+		// the speaker channel (vgwVoiceChannelNumber) of a given voice call (vgwSessionId) who
+		// got completed with the call as well as an indicator (isCustomerSpeechData) to 
+		// denote whether the speech data we received on this channel belonged
+		// to a caller or an agent.
+		EndOfCallSignal_t = rstring vgwSessionId, 
+			boolean isCustomerSpeechData, int32 vgwVoiceChannelNumber;
+		
+	graph
+		// Ingest the speech data coming from the IBM Voice Gateway.
+		// Such speech data arrives here in multiple fragments directly from
+		// a live voice call. This operator is capable of receiving speech data
+		// from multiple calls that can all happen at the very same time between
+		// different pairs of speakers.
+		// It is very important to note that the IBM Voice Gateway will keep
+		// sending the speech data of the caller and the agent on two 
+		// voice channels i.e. one for the caller and the other for the agent.
+		// Irrespective of those two speakers talk or remain silent during the
+		// call, their assigned voice channel will always carry some binary
+		// data. That means, there is no way to know who is currently
+		// talking. This constraint limits us from sending only one of the
+		// channel's data to a single STT engine at any given time.
+		// Instead, this constraint forces us to dedicate a single STT engine
+		// per voice channel in a given voice call and keep sending the
+		// data being received on that channel continuously to that
+		// dedicated STT engine irrespective of whether that channel carries
+		// silence or active speech data. In summary, we will need two
+		// STT engines to do the Speech To Text for every ongoing voice call.
+		// So, you have to plan ahead of time about the number of STT engines
+		// you will start for handling the maximum number of concurrent calls.
+		// As an example, for handling a maximum of 100 concurrent voice calls,
+		// you will have to start 200 STT engines.
+		//
+		// In your own real-life applications, you may want to simply 
+		// copy and reuse the code from this example and then make the 
+		// changes only where it is really needed.
+		// This example presents the following application design pattern:
+		// IBMVoiceGatewaySource-->Speech Data Router-->STT Engine->STT Result Processor
+		// You should be fine to simply use the entire pattern as it is except for
+		// making changes in the STT Result Processor composite and beyond to address
+		// your own needs of further analytics on the STT results as well as
+		// specific ways of delivering the STT results to other 
+		// downstream systems rather than only writing to files as this example does below.
+		(stream<BinarySpeech_t> BinarySpeechData as BSD;
+		 stream<EndOfCallSignal_t> EndOfCallSignal as EOCS) as VoiceGatewayInferface = 
+			IBMVoiceGatewaySource() {
+			logic
+				state: {
+					// Initialize the default TLS certificate file name if the 
+					// user didn't provide his or her own.
+					rstring _certificateFileName = 
+						($certificateFileName != "") ?
+						$certificateFileName : getThisToolkitDir() + "/etc/ws-server.pem";
+				}
+				
+			param
+				tlsPort: $tlsPort;
+				certificateFileName: _certificateFileName;
+				nonTlsEndpointNeeded: $nonTlsEndpointNeeded;
+				nonTlsPort: $nonTlsPort;
+				// Initial delay before generating the very first tuple.
+				// This is a one time delay when this operator starts up.
+				// This delay should give sufficient time for the
+				// WatsonSTT operator(s) to come up and be ready to
+				// receive the speech data tuples sent by this operator.
+				initDelay: $initDelayBeforeSendingDataToSttEngines;
+				vgwLiveMetricsUpdateNeeded: $vgwLiveMetricsUpdateNeeded;
+				websocketLoggingNeeded: $vgwWebsocketLoggingNeeded;
+				vgwSessionLoggingNedded: $vgwSessionLoggingNedded;
+				vgwStaleSessionPurgeInterval: $vgwStaleSessionPurgeInterval;
+			
+			// Get these values via custom output functions	provided by this operator.
+			output
+				BSD: vgwSessionId = getIBMVoiceGatewaySessionId(),
+					isCustomerSpeechData = isCustomerSpeechData(),
+					vgwVoiceChannelNumber = getVoiceChannelNumber(),
+					callerPhoneNumber = getCallerPhoneNumber(),
+					agentPhoneNumber = getAgentPhoneNumber(),
+					speechDataFragmentCnt = getTupleCnt(),
+					totalSpeechDataBytesReceived = getTotalSpeechDataBytesReceived();
+		}
+
+		// We have to always route the speech data bytes (fragments) coming from  
+		// a given vgwSessionId_vgwVoiceChannelNumber to a particular 
+		// WatsonSTT operator instance available within a parallel region. 
+		// We already explained in detail in the previous operator's
+		// commentary section about why it must be done this way.
+		// This idea of pairing up a vgwSessionId_vgwVoiceChannelNumber combo
+		// to a particular parallel region channel is a must for the 
+		// speech data bytes of a given speaker in a voice call to always land in 
+		// the same WatsonSTT engine. This stickiness (a.k.a channel affinity) is
+		// important to continuously transcribe the speech data arriving on both the
+		// voice channels at all the time including the silence time of a speaker.
+		// This is needed because the IBM Voice Gateway keeps sending the 
+		// speech data bytes of both the speakers (whether active or silent) at 
+		// all the time on two voice channels by dedicating one channel to an
+		// agent and the other channel to the caller. So, this requires 
+		// extra logic to locate an unused parallel channel 
+		// i.e. an idle STT engine to be assigned for a 
+		// given vgwSessionId_vgwVoiceChannelNumber.
+		// That special logic happens inside this operator.
+		(stream<BinarySpeech_t> BinarySpeechDataFragment as BSDF) as
+			BinarySpeechDataRouter = Custom(BinarySpeechData as BSD;
+			EndOfCallSignal as EOCS) {
+			logic
+				state: {
+					// This map tells us which UDP channel is processing a 
+					// given vgwSessionId_vgwVoiceChannelNumber combo.
+					mutable map<rstring, int32> _vgwSessionIdToUdpChannelMap = {};
+					// This list tells us which UDP channels are 
+					// idle at any given time.
+					mutable list<int32> _idleUdpChannelsList = 
+						prepareIdleUdpChannelsList($numberOfSTTEngines);
+					// This map tells us which UDP channel is going to process
+					// the given voice call's (i.e. vgwSessionId) transcription
+					// results in the STTResultProcessor composite that appears
+					// below in this SPL source file.
+					mutable map<rstring, int32> _vgwSessionToResultProcessorChannelMap = {};
+					mutable BinarySpeech_t _oTuple = {};
+					mutable rstring _key = "";
+				}
+			
+				// Process the Binary Speech Data.
+				onTuple BSD: {
+					// Get the sessionId + channelNumber combo string.
+					_key = BSD.vgwSessionId + "_" + (rstring)BSD.vgwVoiceChannelNumber;
+					
+					// Check if this vgwSessionId_vgwVoiceChannelNumber combo already 
+					// has an STT engine allocated for it via an UDP channel.					
+					if (has(_vgwSessionIdToUdpChannelMap, _key) == true) {
+						// This is a speaker of an ongoing voice call who has 
+						// already been assigned to an STT engine.
+						// Always send this speaker's speech data fragment to 
+						// that same STT engine.
+						BSD.sttEngineId = _vgwSessionIdToUdpChannelMap[_key];
+						// We can always assume that there is a preselected 
+						// STT result processor UDP channel available for this 
+						// voice call (i.e. vgwSessionId). Because, it is already 
+						// done in the else block below when this voice call's 
+						// first speaker's speech data arrives here.
+						// Let us fetch and assign it here.
+						if (has(_vgwSessionToResultProcessorChannelMap, 
+							BSD.vgwSessionId) == true) {
+							BSD.sttResultProcessorId = 
+								_vgwSessionToResultProcessorChannelMap[BSD.vgwSessionId];
+						} else {
+							// This should never happen since the call will end
+							// for both the speakers almost at the same time after 
+							// which there will be no speech data from any of the
+							// speakers participating in a given voice call.
+							// Yhis else block is just part of defensive coding.
+							appTrc(Trace.error, 
+								"_XXXXX No STT result processor engine available at this time for the " +
+								"vgwSessionId_vgwVoiceChannelNumber: " + _key + 
+								". This should be a rare occurrence towards the very end of the call." + 
+								" We are not going to process the speech data bytes" +
+								" of this speaker in this voice call.");
+							return;
+						}
+					} else {
+						// If we are here, that means this is a brand new speaker of a
+						// voice call for whom we must find an idle UDP channel a.k.a
+						// an idle STT engine that can process this speaker's speech data.
+						int32 mySttEngineId = getAnIdleUdpChannel(_idleUdpChannelsList);
+						
+						if (mySttEngineId == -1) {
+							// This is not good and we should never end up in this situation.
+							// This means we have not provisioned sufficient number of STT engines to
+							// handle the maximum planned concurrent calls. We have to ignore this
+							// speech data fragment and hope that an idle UDP channel number will
+							// become available by the time the next speech data fragment for this
+							// particular vgwSessionId_vgwVoiceChannelNumber combo arrives here. 
+							if (BSD.speechDataFragmentCnt == 1) {
+								// Display this alert only for the very first data fragment of a 
+								// given speaker of a given voice call.
+								appTrc(Trace.error, "No idle STT engine available at this time for the " +
+									"vgwSessionId_vgwVoiceChannelNumber: " + _key + 
+									". There are " + (rstring)$numberOfSTTEngines +
+									" STT engines configured and they are all processing other" +
+									" voice calls at this time. Please start sufficient number of STT engines" +
+									" next time to handle your maximum expected concurrent calls." +
+									" A rule of thumb is to have two STT engines to process" +
+									" two speakers in every given concurrent voice call.");
+							}
+
+							return;	
+						} else {
+							// We got an idle STT engine.
+							BSD.sttEngineId = mySttEngineId;
+							// Insert into the state map for future reference.
+							insertM(_vgwSessionIdToUdpChannelMap, 
+								_key, mySttEngineId);
+								
+							// For this voice call (i.e. vgwSessionId), select a 
+							// single result processor UDP channel. Both speakers in this 
+							// same voice call will use that same result processor instance.
+							// This will ensure that the STT results for both the speakers 
+							// will reach the same result processor.
+							if (has(_vgwSessionToResultProcessorChannelMap, 
+								BSD.vgwSessionId) == false) {
+								insertM(_vgwSessionToResultProcessorChannelMap,
+									BSD.vgwSessionId, mySttEngineId);
+							} 
+							
+							// Set the STT result processor id.
+							BSD.sttResultProcessorId = 
+								_vgwSessionToResultProcessorChannelMap[BSD.vgwSessionId];
+						} // End of if (mySttEngineId == -1)
+					} // End of if (has(_vgwSessionIdToUdpChannelMap, _key)
+
+					appTrc(Trace.debug, "vgwSessionId=" + BSD.vgwSessionId +
+						", isCustomerSpeechData=" + (rstring)BSD.isCustomerSpeechData +
+						", vgwVoiceChannelNumber=" + (rstring)BSD.vgwVoiceChannelNumber +
+						", speechDataFragmentCnt=" + (rstring)BSD.speechDataFragmentCnt +
+						", totalSpeechDataBytesReceived=" + 
+						(rstring)BSD.totalSpeechDataBytesReceived +
+						", sttEngineId=" + (rstring)BSD.sttEngineId +
+						", sttResultProcessorId=" + (rstring)BSD.sttResultProcessorId); 
+					// Submit this tuple.
+					submit(BSD, BSDF);
+				} // End of onTuple BSD
+				
+				// Process the end of voice call signal.
+				// Since there are two channels in every voice call,
+				// those two channels will carry their own "End STT session"
+				// message from the Voice Gateway. The logic below takes care of
+				// handling two End of Call Signals for every voice call.
+				onTuple EOCS: {
+					// Get the allocated STT engine id for a given 
+					// vgwSessionId_vgwVoiceChannelNumber combo.
+					// We should always have an STT engine id. If not, that is a 
+					// case where the user didn't provision sufficient number of 
+					// STT engines and there was no idle STT engine available for that 
+					// given vgwSessionId_vgwVoiceChannelNumber combo. 
+					// This situation can be avoided by starting the application with a 
+					// sufficient number of STT engines needed for the anticipated 
+					// maximum concurrent voice calls. A rule of thumb is to have 
+					// two STT engines to process two speakers in every given 
+					// concurrent voice call.
+					//
+					// Get the sessionId + channelNumber combo string.
+					_key = EOCS.vgwSessionId + "_" + (rstring)EOCS.vgwVoiceChannelNumber;
+					
+					if (has(_vgwSessionIdToUdpChannelMap, _key) == true) {
+						// Let us send an empty blob to the WatsonSTT operator to indicate that
+						// this speaker of a given voice call is done.
+						_oTuple = (BinarySpeech_t){};
+						// Copy the three input tuple attributes that must
+						// match with that of the outgoing tuple.
+						assignFrom(_oTuple, EOCS);
+						// Assign the STT engine id where this voice channel was
+						// getting processed until now.
+						_oTuple.sttEngineId = _vgwSessionIdToUdpChannelMap[_key];
+						submit(_oTuple, BSDF);
+						// We are now done with this vgwSessionId_vgwVoiceChannelNumber combo.
+						// So, we can release the STT engine and add it to the idle UDP channels list.
+						removeM(_vgwSessionIdToUdpChannelMap, _key);
+						appendM(_idleUdpChannelsList, _oTuple.sttEngineId);
+					}
+					
+					// Since this voice call is ending, let us release the STT result processor 
+					// instance that was allocated above for this voice call.
+					if (has(_vgwSessionToResultProcessorChannelMap, 
+						EOCS.vgwSessionId) == true) {
+						removeM(_vgwSessionToResultProcessorChannelMap, EOCS.vgwSessionId);
+					}
+				}
+				
+			config
+				threadedPort: queue(BSD, Sys.Wait), queue(EOCS, Sys.Wait);
+		} // End of Custom operator.
+
+		// IMPORTANT: IBM STT service on public cloud requires
+		// an unexpired valid IAM access token to perform the 
+		// speech to text task in a secure manner. One way to meet this
+		// requirement is to invoke and use a non-main composite operator
+		// that is available as part of the streamsx.sttgateway. By invoking
+		// that composite operator, we can make it to generate a new 
+		// access token and then periodically refresh it. This composite
+		// operator expects three operator parameters for you to
+		// provide at the time of invoking it i.e. your
+		// STT service instance's API key, IAM token generation/refresh URL and
+		// the required IAM access token refresh interval.
+		// Output stream of this composite operator is connected to the
+		// second input stream of the WatsonSTT operator that is used below.
+		// If the sttAPIKey parameter below is set to an empty string,
+		// this composite will skip generating an IamAccessToken.
+		// For a correct STT operation, user must set only one of these two
+		// submission time parameters to a non-empty value: sttAPIKey or sttOnCP4DAccessToken.
+		(stream<IamAccessToken_t> IamAccessToken as IAT)
+			as IamAccessTokenGenerator = IAMAccessTokenGenerator() {
+			param
+				// This operator takes these four parameters.
+				sttApiKey: $sttApiKey;
+				sttIAMTokenURL: $sttIAMTokenURL;
+				sttAccessTokenRefreshInterval: $sttAccessTokenRefreshInterval;
+				// Initial delay before generating the IAM access token.
+				// This delay should give sufficient time for the
+				// WatsonSTT operator(s) to come up and be ready to
+				// receive the access token that will be sent from this composite.
+				initDelay: $initDelayBeforeSendingDataToSttEngines;
+		}
+		
+		// If the user provided an STT on CP4D access token, then send that to the WatsonSTT operator.
+		(stream<IamAccessToken_t> AccessTokenForCP4D as AT) as AccessTokenForCP4DSender = Custom() {
+			logic
+				onProcess: {
+					// Do this only if the user provided a non-empty access token for the STT on CP4D.
+					// Send this user provided STT on CP4D access token only once from this Custom source operator.
+					// Access token for the STT on CP4D will never expire.
+					if ($sttOnCP4DAccessToken != "") {
+						// Do a one time delay.
+						block($initDelayBeforeSendingDataToSttEngines);
+						// Send a single tuple with the STT on CP4D access token.
+						mutable IamAccessToken_t oTuple = {}; 
+						oTuple.access_token = $sttOnCP4DAccessToken;
+						submit(oTuple, AT);
+					}		
+				}				
+		}
+
+		// Invoke one or more instances of the IBMWatsonSpeechToText composite operator.
+		// You can send the audio data to this operator all at once or 
+		// you can send the audio data for the live-use case as it becomes
+		// available from your telephony network switch.
+		// Avoid feeding audio data coming from more than one data source into this 
+		// parallel region which may cause erroneous transcription results.
+		//
+		// NOTE: The WatsonSTT operator allows fusing multiple instances of
+		// this operator into a single PE. This will help in reducing the 
+		// total number of CPU cores used in running the application.
+		// First input stream into this operator is the audio blob content.
+		// Second input stream into this operator is your STT service instance's IAM access token.
+		// Please note that we are using an int32 value (exactly in the
+		// range of the available number of STT engines) as our
+		// UDP partition key. That will help us to always use that
+		// preselected partition for a given voice call thereby 
+		// avoiding cross talk and mix up of data from multiple 
+		// voice calls landing in a given parallel channel etc.
+		@parallel(width = $numberOfSTTEngines, 
+		partitionBy=[{port=BSDF, attributes=[sttEngineId]}], broadcast=[AT])
+		(stream<STTResult_t> MySTTResult) as SpeechToText = 
+			IBMWatsonSpeechToText(BinarySpeechDataFragment as BSDF;
+			IamAccessToken, AccessTokenForCP4D as AT) {
+			// If needed, you can decide not to fuse the WatsonSTT operator instances and
+			// keep each instance of this operator on its own PE (a.k.a Linux process) by
+			// removing the block comment around this config clause.
+			/*
+			config
+				placement : partitionExlocation("sttpartition");
+			*/
+		}
+
+		// Let us invoke the same number of STT result processors as 
+		// there are STT engines.
+		// Please note that we are using an int32 value (exactly in the
+		// range of the available number of STT engines) as our
+		// UDP partition key. That will help us to always use that
+		// preselected partition for a given voice call thereby 
+		// avoiding cross talk and mix up of data from multiple 
+		// voice calls landing in a given parallel channel etc.
+		@parallel(width = $numberOfSTTEngines, 
+		partitionBy=[{port=MSR, attributes=[sttResultProcessorId]}])
+		() as STTResultProcessorSink = STTResultProcessor(MySTTResult as MSR) {
+		}
+		
+		// =================================================================
+		// This code block is here purely for debugging purposes to 
+		// capture the raw audio data received in a given voice channel 
+		// for a given VGW session id. You have to remove the block comment
+		// below to activate this section of the code when you need it.
+		// The following block of code is good only for testing it with
+		// a single voice call. If you use the following section of code
+		// for multiple voice calls, then the speech data bytes from
+		// multiple calls will get mixed up. So, use it to debug the
+		// speech data contents for just a single voice call.
+		// In a real-life application, you will not have a need for
+		// this section of the code.
+		/*
+		(stream<BinarySpeech_t> BinarySpeechDataFragmentInVoiceChannel1;
+		 stream<BinarySpeech_t> BinarySpeechDataFragmentInVoiceChannel2)
+			as BinarySpeechDataFilterByVoiceChannel = 
+			Split(BinarySpeechDataFragment as BSDF) {
+			param
+				// We will only have either channel number 1 or 2.
+				// So, send the speech data received via channel number 1 to 
+				// output port index 0 (i.e. first port).
+				// Send the speech data received via channel number 2 to 
+				// output port index 1 (i.e. second port).
+				index: (BSDF.vgwVoiceChannelNumber == 1) ? 0 : 1;
+		}
+		
+		// Send only the blob part of the incoming tuple from voice channel 1.
+		(stream<blob speech> SpeechDataInVoiceChannel1 as SD1)
+			as SpeechDataFromVoiceChannel1 = 
+			Functor(BinarySpeechDataFragmentInVoiceChannel1) {	
+		}
+
+		// Send only the blob part of the incoming tuple from voice channel 2.
+		(stream<blob speech> SpeechDataInVoiceChannel2 as SD2)
+			as SpeechDataFromVoiceChannel2 = 
+			Functor(BinarySpeechDataFragmentInVoiceChannel2) {	
+		}
+		
+		// Write the speech data bytes received on voice channel 1 to its own binary file.
+		() as VoiceChannelSink1 = FileSink(SpeechDataInVoiceChannel1 as SD) {
+			param
+				// You can use this command to convert this 
+				// mulaw formatted audio file into a WAV file in order to
+				// play it using Audacity, QuickTime Player etc.:
+				file: "voice-channel1-speech-data.bin";
+				format: block;
+				flush: 1u;
+
+			config
+				threadedPort: queue(SD, Sys.Wait);
+		}
+
+		// Write the speech data bytes received on voice channel 2 to its own binary file.
+		() as VoiceChannelSink2 = FileSink(SpeechDataInVoiceChannel2 as SD) {
+			param
+				// You can use this command to convert this 
+				// mulaw formatted audio file into a WAV file in order to
+				// play it using Audacity, QuickTime Player etc.:
+				// ffmpeg -f mulaw -ar 8000 -i <raw data> -codec:a pcm_mulaw <wav-filename>
+				file: "voice-channel2-speech-data.bin";
+				format: block;
+				flush: 1u;
+
+			config
+				threadedPort: queue(SD, Sys.Wait);
+		}
+		*/
+		// =================================================================
+} // End of the main composite.
+
+// Following is a composite where we are going to perform the
+// logic to invoke the WatsonSTT operator for doing the
+// Speech To Text transcription.
+public composite IBMWatsonSpeechToText(input AudioBlobContent, AccessToken;
+	output STTResult) {
+	param
+		expression<rstring> $sttUri : getSubmissionTimeValue("sttUri",
+			"wss://stream.watsonplatform.net/speech-to-text/api/v1/recognize");
+		expression<rstring> $sttBaseLanguageModel : 
+			getSubmissionTimeValue("sttBaseLanguageModel", "en-US_NarrowbandModel");
+		expression<rstring> $contentType : 
+			getSubmissionTimeValue("contentType", "audio/wav");
+		expression<rstring> $baseModelVersion : 
+			getSubmissionTimeValue("baseModelVersion", "");
+		expression<rstring> $customizationId : 
+			getSubmissionTimeValue("customizationId", "");
+		expression<rstring> $acousticCustomizationId : 
+			getSubmissionTimeValue("acousticCustomizationId", "");
+		expression<float64> $customizationWeight : 
+			(float64)getSubmissionTimeValue("customizationWeight", "0.30");
+		expression<int32> $sttResultMode : (int32)getSubmissionTimeValue("sttResultMode", "3");
+		expression<int32> $maxUtteranceAlternatives : 
+			(int32)getSubmissionTimeValue("maxUtteranceAlternatives", "1");	
+		expression<boolean> $sttRequestLogging : 
+			(boolean)getSubmissionTimeValue("sttRequestLogging", "false");
+		expression<boolean> $filterProfanity : 
+			(boolean)getSubmissionTimeValue("filterProfanity", "false");
+		expression<boolean> $sttJsonResponseDebugging : 
+			(boolean)getSubmissionTimeValue("sttJsonResponseDebugging", "false");
+		expression<float64> $wordAlternativesThreshold : 
+			(float64)getSubmissionTimeValue("wordAlternativesThreshold", "0.0");
+		expression<boolean> $wordConfidenceNeeded : 
+			(boolean)getSubmissionTimeValue("wordConfidenceNeeded", "false");
+		expression<boolean> $wordTimestampNeeded : 
+			(boolean)getSubmissionTimeValue("wordTimestampNeeded", "false");
+		expression<boolean> $identifySpeakers : 
+			(boolean)getSubmissionTimeValue("identifySpeakers", "false");
+		expression<boolean> $smartFormattingNeeded : 
+			(boolean)getSubmissionTimeValue("smartFormattingNeeded", "false");
+		expression<float64> $keywordsSpottingThreshold : 
+			(float64)getSubmissionTimeValue("keywordsSpottingThreshold", "0.0");
+		expression<list<rstring>> $keywordsToBeSpotted : 
+			(list<rstring>)getSubmissionTimeValue("keywordsToBeSpotted", "[]");	
+		expression<boolean> $sttWebsocketLoggingNeeded : 
+			(boolean)getSubmissionTimeValue("sttWebsocketLoggingNeeded", "false");
+		expression<float64> $cpuYieldTimeInAudioSenderThread : 
+			(float64)getSubmissionTimeValue("cpuYieldTimeInAudioSenderThread", "0.001");
+		expression<float64> $waitTimeBeforeSTTServiceConnectionRetry : 
+			(float64)getSubmissionTimeValue("waitTimeBeforeSTTServiceConnectionRetry", "3.0");
+		expression<int32> $maxAllowedConnectionAttempts : 
+			(int32)getSubmissionTimeValue("maxAllowedConnectionAttempts", "10");
+		expression<boolean> $sttLiveMetricsUpdateNeeded : 
+			(boolean)getSubmissionTimeValue("sttLiveMetricsUpdateNeeded", "true");
+
+	graph
+		stream<STTResult_t> STTResult = 
+			WatsonSTT(AudioBlobContent as ABC; AccessToken as AT) {
+			logic
+				state: {
+					mutable int32 _conversationCnt = 0;
+					mutable rstring _conversationId = "";
+					mutable rstring _key = "";
+				}
+				
+				onTuple ABC: {
+					_key = ABC.vgwSessionId + "_" + 
+						(rstring)ABC.vgwVoiceChannelNumber;
+						
+					if (_conversationId != _key) {
+						// There may be many blob fragments arriving for a given audio conversation.
+						// So, display only when the very first blob fragment for a given audio arrives.
+						_conversationId = _key;
+						appTrc(Trace.error, "Channel " + (rstring)getChannel() + 
+							", Speech input " + (rstring)++_conversationCnt +
+							": " + _conversationId);
+					}
+				}
+
+			// Just to demonstrate, we are using all the operator parameters below.
+			// Except for the first three parameters, every other parameter is an
+			// optional one. In real-life applications, such optional parameters
+			// can be omitted unless you want to change the default behavior of them.				
+			param
+				uri: $sttUri;
+				baseLanguageModel: $sttBaseLanguageModel;
+				contentType: $contentType;
+				sttResultMode: $sttResultMode;
+				sttRequestLogging: $sttRequestLogging;
+				filterProfanity: $filterProfanity;
+				sttJsonResponseDebugging: $sttJsonResponseDebugging;
+				maxUtteranceAlternatives: $maxUtteranceAlternatives;
+				wordAlternativesThreshold: $wordAlternativesThreshold;
+				wordConfidenceNeeded: $wordConfidenceNeeded;
+				wordTimestampNeeded: $wordTimestampNeeded;
+				identifySpeakers: $identifySpeakers;
+				smartFormattingNeeded: $smartFormattingNeeded;
+				keywordsSpottingThreshold: $keywordsSpottingThreshold;
+				keywordsToBeSpotted: $keywordsToBeSpotted;
+				websocketLoggingNeeded: $sttWebsocketLoggingNeeded;
+				cpuYieldTimeInAudioSenderThread: $cpuYieldTimeInAudioSenderThread;
+				waitTimeBeforeSTTServiceConnectionRetry : $waitTimeBeforeSTTServiceConnectionRetry;
+				maxAllowedConnectionAttempts : $maxAllowedConnectionAttempts;
+				sttLiveMetricsUpdateNeeded : $sttLiveMetricsUpdateNeeded;
+								
+				// Use the following operator parameters as needed.
+				// Point to a specific version of the base model if needed.
+				//
+				// e-g: "en-US_NarrowbandModel.v07-06082016.06202016"
+				baseModelVersion: $baseModelVersion;
+				// Language model customization id to be used for the transcription.
+				// e-g: "74f4807e-b5ff-4866-824e-6bba1a84fe96"
+				customizationId: $customizationId;
+				// Acoustic model customization id to be used for the transcription.
+				// e-g: "259c622d-82a4-8142-79ca-9cab3771ef31"
+				acousticCustomizationId: $acousticCustomizationId;
+				// Relative weight to be given to the words in the custom Language model.
+				customizationWeight: $customizationWeight;
+
+			// Just for demonstrative purposes, we are showing below the output attribute
+			// assignments using all the available custom output functions. In your
+			// real-life applications, it is sufficient to do the assignments via
+			// custom output functions only as needed.
+			//
+			// Some of the important output functions that must be used to check
+			// the result of the transcription are:
+			// getSTTErrorMessage --> It tells whether the transcription succeeded or not.
+			// isFinalizedUtterance --> In sttResultMode 1, it tells whether this is a 
+			//                          partial utterance or a finalized utterance.
+			// isTranscriptionCompleted --> It tells whether the transcription is 
+			//                              completed for the current audio conversation or not.
+			//
+			output
+				STTResult: 
+					utteranceNumber = getUtteranceNumber(),
+					utteranceText = getUtteranceText(),
+					finalizedUtterance = isFinalizedUtterance(),
+					confidence = getConfidence(),
+					fullTranscriptionText = getFullTranscriptionText(),
+					sttErrorMessage = getSTTErrorMessage(),
+					transcriptionCompleted = isTranscriptionCompleted(),
+					// n-best utterance alternative hypotheses.
+					utteranceAlternatives = getUtteranceAlternatives(),
+					// Confusion networks (a.k.a. Consensus)
+					wordAlternatives = getWordAlternatives(),
+					wordAlternativesConfidences = getWordAlternativesConfidences(),
+					wordAlternativesStartTimes = getWordAlternativesStartTimes(),
+					wordAlternativesEndTimes = getWordAlternativesEndTimes(),
+					utteranceWords = getUtteranceWords(),
+					utteranceWordsConfidences = getUtteranceWordsConfidences(),
+					utteranceWordsStartTimes = getUtteranceWordsStartTimes(),
+					utteranceWordsEndTimes = getUtteranceWordsEndTimes(),
+					utteranceStartTime = getUtteranceStartTime(),
+					utteranceEndTime = getUtteranceEndTime(),
+					// Speaker label a.k.a. Speaker id
+					utteranceWordsSpeakers = getUtteranceWordsSpeakers(),
+					utteranceWordsSpeakersConfidences = getUtteranceWordsSpeakersConfidences(),
+					// Results from keywords spotting (matching) in an utterance.
+					keywordsSpottingResults = getKeywordsSpottingResults();
+		}
+} // End of the composite IBMWatsonSpeechToText
+
+// Following is a sink composite where we are going to process the
+// STT result of a given voice call in specific ways such as
+// storing in files, message queues, databases or make it 
+// accessible from a web application.
+public composite STTResultProcessor(input TranscriptionResult) {
+	graph
+		// In a real-life application, there will be additional operators here with the 
+		// necessary logic to look inside the tuples arriving on the STTResult stream and
+		// analyze different kinds of speech to text result attributes returned from the STT service.
+		// 
+		// But, in this simple example we will only collect the results 
+		// arriving from the WatsonSTT operator and write along with
+		// all the STT related attributes to individual files.
+		// As mentioned in several code blocks above, you can simply reuse all
+		// the code provided in this example file as it is except for this composite/
+		// You can feel free to make any code changes to perform 
+		// specific analytics on the STT results as well as make changes
+		// to store the STT results elsewhere instead of files or 
+		// send the STT results to other downstream systems such as your
+		// web dashboarding applications.
+		() as MySink1 = FileSink(TranscriptionResult as TR) {
+			param
+				// This file will contain a comprehensive set of full STT results.
+				file: TR.vgwSessionId + "-full-result.txt";
+				closeMode: dynamic;
+				quoteStrings: false;
+				append: true;
+				flush: 1u;
+
+			config
+				threadedPort: queue(TR, Sys.Wait);
+		}
+		
+		// In this operator, we will filter only the utterances and send it 
+		// to the downstream operator to be written to the individual files.
+		(stream<rstring vgwSessionId, 
+		 int32 vgwVoiceChannelNumber, 
+		 boolean isCustomerSpeechData,
+		 rstring utteranceText> Utterance as U) 
+			as UtteranceFilter = Custom(TranscriptionResult as TR) {
+			logic
+				state: {
+					mutable Utterance _oTuple = {};
+				}
+					
+				onTuple TR: {
+					if (TR.finalizedUtterance == true) {
+						// There is no need to send partially analyzed utterances.
+						// Send it only if it is a finalized utterance.
+						assignFrom(_oTuple, TR);
+						submit(_oTuple, U);
+					}
+				}
+				
+			config
+				threadedPort: queue(TR, Sys.Wait);
+		}
+
+		// Write only the utterances to a file.
+		() as MySink2 = FileSink(Utterance as U) {
+			param
+				// This file will contain only a small subset of the
+				// STT results (Unique call id, channel number, caller or agent, utterance).
+				file: U.vgwSessionId + "-utterance-result.txt";
+				closeMode: dynamic;
+				quoteStrings: false;
+				append: true;
+				flush: 1u;
+
+			config
+				threadedPort: queue(U, Sys.Wait);
+		}
+} // End of the composite STTResultProcessor
+
+// Following are the common utility functions for 
+// use within the composites declared above.
+//
+// This function creates a new list with all the UDP channel numbers in it. 
+// That means, all such channels are idle at this time. 
+public list<int32> prepareIdleUdpChannelsList(int32 sttEngineCount) {
+	mutable list<int32> myList = [];
+	
+	for(int32 idx in range(sttEngineCount)) {
+		appendM(myList, idx);
+	}
+	
+	return(myList);
+}
+
+// This function takes the idle UDP channels list as an input and
+// returns an idle UDP channel number from the top of the list.
+// If all are busy at this time, it will return -1.
+public int32 getAnIdleUdpChannel(mutable list<int32> myList) {
+	if (size(myList) > 0) {
+		// Get the channel number available at the very top of the list.
+		int32 channelNumber = myList[0];
+		// Remove the topmost channel number.
+		removeM(myList, 0);
+		return(channelNumber);
+	} else {
+		// There is no idle UDP channel number available at this time.
+		return(-1);
+	}
+}

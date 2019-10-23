@@ -11,7 +11,7 @@
       or RAW audio and then transcribe that audio into text via the 
       IBM Watson STT (Speech To Text) cloud service. It does that by sending the audio data 
       to the configured Watson STT service running in the IBM public cloud or in the 
-      IBM Cloud Private (ICP) via the Websocket interface. It then outputs transcriptions of 
+      IBM Cloud Pak for Data (CP4D) via the Websocket interface. It then outputs transcriptions of 
       speech in the form of utterances or in full text as configured. An utterance is a 
       group of transcribed words meant to approximate a sentence. Audio data must be in 16-bit 
       little endian, mono format. For the Telephony model and configurations, the audio must 

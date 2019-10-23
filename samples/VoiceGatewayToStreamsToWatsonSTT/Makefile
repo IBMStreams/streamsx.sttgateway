@@ -24,7 +24,7 @@ else
     TOOLKIT_PATH = $(STREAMS_STTGATEWAY_TOOLKIT):$(STREAMS_JSON_TOOLKIT)
 endif
 
-SPL_MAIN_COMPOSITE = com.ibm.streamsx.sttgateway.sample.watsonstt::AudioRawWatsonSTT
+SPL_MAIN_COMPOSITE = com.ibm.streamsx.sttgateway.sample.watsonstt::VoiceGatewayToStreamsToWatsonSTT
 SPLC_FLAGS = -a --c++std=c++11 -x '-I $(STREAMS_STTGATEWAY_TOOLKIT)/impl/include'
 SPL_CMD_ARGS ?=
 

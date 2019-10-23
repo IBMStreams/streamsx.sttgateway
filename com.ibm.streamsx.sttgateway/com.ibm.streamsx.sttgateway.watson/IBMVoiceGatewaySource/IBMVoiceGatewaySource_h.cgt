@@ -1,0 +1,179 @@
+/*
+==============================================
+# Licensed Materials - Property of IBM
+# Copyright IBM Corp. 2019
+==============================================
+*/
+
+/*
+============================================================
+First created on: Sep/17/2019
+Last modified on: Oct/19/2019
+============================================================
+*/
+
+/* Additional includes go here */
+#include <websocketpp/config/asio.hpp>
+#include <websocketpp/server.hpp>
+#include <iostream>
+#include <fstream>
+#include <iterator>
+#include <algorithm>
+#include <vector>
+// Operator metrics related include files.
+#include <SPL/Runtime/Common/Metric.h>
+#include <SPL/Runtime/Operator/OperatorMetrics.h>
+
+<%SPL::CodeGen::headerPrologue($model);%>
+
+#define VGW_OPENED_A_WS_CONNECTION 1
+#define VGW_STARTED_AN_STT_SESSION 2
+#define VGW_ENDED_AN_STT_SESSION 3
+
+class MY_OPERATOR : public MY_BASE_OPERATOR 
+{
+public:
+	// Websocket related type definitions.
+	// Define types for two different server endpoints, 
+	// one for each config we are using.
+	typedef websocketpp::server<websocketpp::config::asio> server_plain;
+	typedef websocketpp::server<websocketpp::config::asio_tls> server_tls;
+
+	// Alias some of the bind related functions as they are a bit long
+	// Type of the ssl context pointer is long so alias it
+	typedef websocketpp::lib::shared_ptr<boost::asio::ssl::context> context_ptr;
+	
+	// Operator related member variables
+	std::string operatorPhysicalName;
+	SPL::int32 udpChannelNumber;
+	SPL::uint32 tlsPort;
+	std::string certificateFileName;
+	SPL::boolean nonTlsEndpointNeeded;
+	SPL::uint32 nonTlsPort;
+	SPL::float64 initDelay;
+	SPL::boolean vgwLiveMetricsUpdateNeeded;
+	bool websocketLoggingNeeded;
+	bool vgwSessionLoggingNedded;
+	SPL::int64 vgwStaleSessionPurgeInterval;
+	server_plain endpoint_plain;
+	server_tls endpoint_tls;
+	SPL::boolean tlsEndpointStarted;
+	SPL::boolean nonTlsEndpointStarted;
+	SPL::int64 timeOfPreviousStaleSessionRemoval;
+	
+	SPL::uint64 nVoiceCallsProcessed;
+	SPL::uint64 nSpeechDataBytesReceived;
+	SPL::uint64 nOutputTuplesSent;
+	
+	typedef std::set<websocketpp::connection_hdl,
+		std::owner_less<websocketpp::connection_hdl>> tls_con_set;
+	tls_con_set tls_connections_set;
+	
+	struct connection_metadata {
+		// VGW session status will carry the following values:
+		// 1 = VGW client opened a Websocket connection.
+		// 2 = VGW client started the STT transcription along with the call meta data.
+		// 3 = VGW client ended the STT transcription.
+	    int32_t vgwSessionStatus;
+	    int64_t vgwSessionStartTime;
+	    int32_t speechPacketsReceivedCnt;
+	    int32_t speechDataBytesReceived;
+	    // Following are the call metadata details sent by the IBM Voice Gateway. 
+	    std::string vgwSessionId;
+	    std::string vgwSIPCallID;
+	    // This field seems to have the agent phone number.
+	    // e-g: sip:+15712487798@169.61.56.229
+		std::string vgwParticipantURI;
+		std::string vgwTenantID;
+		// According to the VGW team, SBC sends the caller's number
+		// in this field to VGW which simply passes it through.
+		// This could be the caller's number or the Twillio SIP trunk number.
+		// e-g: sip:SIPREC-SRS@184.172.233.76
+		std::string vgwSIPToURI;
+		// This tells if this connection carries caller's or agent's speech data.
+		bool vgwIsCaller;
+		// This indicates the voice channel number i.e. 1 or 2.
+		// Whoever (caller or agent) sends the first round of speech data bytes will
+		// get assigned a voice channel of 1. The next one to follow will get
+		// assigned a voice channel of 2.
+		int32_t vgwVoiceChannelNumber;
+	};
+	
+	// This technique of storing and tracking the client connection specific
+	// details via an associative container is well discussed in this URL:
+	// https://www.zaphoyd.com/websocketpp/manual/common-patterns/storing-connection-specificsession-information
+	typedef std::map<websocketpp::connection_hdl, 
+		connection_metadata, std::owner_less<websocketpp::connection_hdl>> con_map;
+	
+	// This map's key is connection_hdl and value is the connection_metadata structure.
+	con_map client_connections_map;
+	// This map's key is vgwSessionId and value is a 
+	// list of vgwSessionTime values for the 
+	// active speech channels in that vgw session id.
+	// This map is used to detect when all the active speech channels in
+	// a vgwSessionId are fully done in order to send an 
+	// EndOfCall signal.
+	std::map<std::string, SPL::list<int64_t>> vgw_session_id_map; 
+	
+	// Custom metrics for this operator.
+	Metric *nVoiceCallsProcessedMetric;
+	Metric *nSpeechDataBytesReceivedMetric;
+	Metric *nOutputTuplesSentMetric;
+	
+	// Constructor
+	MY_OPERATOR();
+
+	// Destructor
+	virtual ~MY_OPERATOR(); 
+
+	// Notify port readiness
+	void allPortsReady(); 
+
+	// Notify pending shutdown
+	void prepareToShutdown(); 
+
+	// Processing for source and threaded operators   
+	void process(uint32_t idx);
+    
+	// Tuple processing for mutating ports 
+	void process(Tuple & tuple, uint32_t port);
+    
+	// Tuple processing for non-mutating ports
+	void process(Tuple const & tuple, uint32_t port);
+
+	// Punctuation processing
+	void process(Punctuation const & punct, uint32_t port);
+
+	// Websocket client connection open handler.
+	void on_open(websocketpp::connection_hdl hdl);
+		
+	// Websocket message reception event handler
+	template <typename EndpointType>
+	void on_message(EndpointType* s, websocketpp::connection_hdl hdl,
+	    typename EndpointType::message_ptr msg);
+	
+	// Websocket client connection close handler.
+	void on_close(websocketpp::connection_hdl hdl);
+	
+	// Websocket TLS binding event handler
+	context_ptr on_tls_init(websocketpp::connection_hdl hdl);
+	
+	// Callback method needed within the TLS event handler.
+	std::string get_password();
+	
+	// Method that looks up connection metadata for a connection handle in our associate container.
+	MY_OPERATOR::connection_metadata& get_con_metadata_from_hdl(websocketpp::connection_hdl hdl);
+
+private:
+	// These are the output attribute assignment functions for this operator.
+	std::string getIBMVoiceGatewaySessionId(std::string const & vgwSessionId);
+	bool isCustomerSpeechData(bool const & isThisSpeechDataFromCustomer);
+	int32_t getTupleCnt(int32_t const & emittedTupleCnt);
+	int32_t getTotalSpeechDataBytesReceived(int32_t const & totalSpeechDataBytesReceived);
+	int32_t getVoiceChannelNumber(int32_t const & voiceChannelNumber);
+	std::string getAgentPhoneNumber(std::string const & agentPhoneNumber);
+	std::string getCallerPhoneNumber(std::string const & callerPhoneNumber);
+}; 
+
+<%SPL::CodeGen::headerEpilogue($model);%>
+

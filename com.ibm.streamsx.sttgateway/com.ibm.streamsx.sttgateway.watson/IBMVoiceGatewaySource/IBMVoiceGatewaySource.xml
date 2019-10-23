@@ -1,0 +1,300 @@
+<?xml version="1.0" ?>
+<operatorModel
+  xmlns="http://www.ibm.com/xmlns/prod/streams/spl/operator" 
+  xmlns:cmn="http://www.ibm.com/xmlns/prod/streams/spl/common" 
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://www.ibm.com/xmlns/prod/streams/spl/operator operatorModel.xsd">
+  <cppOperatorModel>
+    <context>
+      <description>
+      The IBMVoiceGatewaySource operator is designed to ingest 
+      speech data from the IBM Voice Gateway product version 1.0.3.0 or above. 
+      This speech data is ingested in binary format from the 
+      IBM Voice Gateway into this operator via the Websocket interface. 
+      Such speech data arrives here in multiple fragments directly from 
+      a live voice call. This operator is capable of receiving speech data 
+      from multiple calls that can all happen at the very same time 
+      between different pairs of speakers. For every voice call it handles 
+      in real-time, the IBM Voice Gateway product will open two 
+      Websocket connections into this operator and start sending the 
+      live speech data on both of those connections. One of those connections 
+      will carry the speech data of the agent and the other connection 
+      will carry the speech data of the customer. This operator will 
+      keep sending the audio chunks received on those two Websocket 
+      connections via its output stream for consumption by the 
+      downstream operators. At the end of the any given call, 
+      IBM Voice Gateway will close the two WebSocket connections it 
+      opened into this operator.
+            
+      This operator can be configured with a Websocket port number which is optional. If the user of this
+      operator doesn't specify a Websocket port number, then a default port number of 443 will be used.
+      
+      Requirements: 
+      * Intel RHEL6 or RHEL7 hosts installed with IBM Streams. 
+      
+      See the samples folder inside this toolkit for a working example that show how to use this operator.
+      
+      For a detailed documentation about the operator design, usage patterns and in-depth technical
+      details, please refer to the official STT Gateway toolkit documentation available at this URL:
+      
+      [https://ibmstreams.github.io/streamsx.sttgateway]
+      </description>
+
+      <iconUri size="16">ibmvgwsource_16.gif</iconUri>
+      <iconUri size="32">ibmvgwsource_32.gif</iconUri>
+      
+      <metrics>
+        <metric>
+          <name>nVoiceCallsProcessed</name>
+          <description>Number of voice calls processed by this operator instance.</description>
+          <kind>Gauge</kind>
+        </metric>
+
+        <metric>
+          <name>nSpeechDataBytesReceived</name>
+          <description>Total number of speech data bytes received by this operator instance.</description>
+          <kind>Gauge</kind>
+        </metric>
+        
+        <metric>
+          <name>nOutputTuplesSent</name>
+          <description>Number of output tuples sent by this operator instance.</description>
+          <kind>Gauge</kind>
+        </metric>
+      </metrics>
+
+      <customOutputFunctions>
+        <customOutputFunction>
+          <name>IBMVoiceGatewaySourceFunctions</name>
+          <function>
+            <description>The default function for output attributes. This function assigns the output attribute to the value of the input attribute with the same name.</description>
+            <prototype><![CDATA[<any T> T AsIs(T)]]></prototype> 
+          </function>
+          <function>
+            <description>Returns an rstring value indicating the IBM Voice Gateway session id that corresponds to the current output tuple.</description>
+            <prototype><![CDATA[rstring getIBMVoiceGatewaySessionId()]]></prototype>
+          </function>                    
+          <function>
+            <description>Returns a boolean value to indicate if this is a customer's speech data or not.</description>
+            <prototype><![CDATA[boolean isCustomerSpeechData()]]></prototype>
+          </function>
+          <function>
+            <description>Returns an int32 value indicating the total number of output tuples emitted so far for the given channel in a IBM Voice Gateway session id.</description>
+            <prototype><![CDATA[int32 getTupleCnt()]]></prototype>
+          </function>
+          <function>
+            <description>Returns an int32 value indicating the total number of speech data bytes received so far for the given channel in a IBM Voice Gateway session id.</description>
+            <prototype><![CDATA[int32 getTotalSpeechDataBytesReceived()]]></prototype>
+          </function>
+          <function>
+            <description>Returns an int32 value indicating the voice channel number in which the speech data bytes were received for a IBM Voice Gateway session id.</description>
+            <prototype><![CDATA[int32 getVoiceChannelNumber()]]></prototype>
+          </function>
+          <function>
+            <description>Returns an rstring value with details about the agent's phone number.</description>
+            <prototype><![CDATA[rstring getAgentPhoneNumber()]]></prototype>
+          </function>
+          <function>
+            <description>Returns an rstring value with details about the caller's phone number.</description>
+            <prototype><![CDATA[rstring getCallerPhoneNumber()]]></prototype>
+          </function>
+		</customOutputFunction>
+      </customOutputFunctions>
+      
+      <libraryDependencies>
+        <library>
+          <cmn:description>Boost Library</cmn:description>
+          <cmn:managedLibrary>
+            <cmn:lib>boost_system</cmn:lib>
+            <cmn:libPath>../../impl/lib</cmn:libPath>
+            <!--<cmn:includePath>../../impl/include</cmn:includePath>-->
+          </cmn:managedLibrary>
+        </library>
+         
+        <library>
+          <cmn:description>Boost Library</cmn:description>
+          <cmn:managedLibrary>
+            <cmn:lib>boost_chrono</cmn:lib>
+            <cmn:libPath>../../impl/lib</cmn:libPath>
+            <!--<cmn:includePath>../../impl/include</cmn:includePath>-->
+          </cmn:managedLibrary>
+        </library>
+                
+        <library>
+          <cmn:description>Boost Library</cmn:description>
+          <cmn:managedLibrary>
+            <cmn:lib>boost_random</cmn:lib>
+            <cmn:libPath>../../impl/lib</cmn:libPath>
+            <!--<cmn:includePath>../../impl/include</cmn:includePath>-->
+          </cmn:managedLibrary>
+        </library>       
+
+         <library>
+          <cmn:description>Boost Library</cmn:description>
+          <cmn:managedLibrary>
+            <cmn:lib>boost_thread</cmn:lib>
+            <cmn:libPath>../../impl/lib</cmn:libPath>
+            <!--<cmn:includePath>../../impl/include</cmn:includePath>-->
+          </cmn:managedLibrary>
+        </library> 
+      </libraryDependencies>
+      
+      <providesSingleThreadedContext>Never</providesSingleThreadedContext>
+    </context>  
+    
+    <parameters>
+      <allowAny>false</allowAny>
+      
+      <parameter>
+        <name>tlsPort</name>
+        <description>This parameter specifies the WebSocket TLS port number. Default port number is 443.</description>
+        <optional>true</optional>
+        <rewriteAllowed>true</rewriteAllowed>
+        <expressionMode>AttributeFree</expressionMode>
+        <type>uint32</type>
+        <cardinality>1</cardinality>
+      </parameter> 
+      
+      <parameter>
+        <name>certificateFileName</name>
+        <description>This parameter specifies the full path of the WebSocket server PEM certificate file name. Default is to read ws-server.pem from the etc sub-directory of the application.</description>
+        <optional>true</optional>
+        <rewriteAllowed>true</rewriteAllowed>
+        <expressionMode>AttributeFree</expressionMode>
+        <type>rstring</type>
+        <cardinality>1</cardinality>
+      </parameter>
+
+      <parameter>
+        <name>nonTlsEndpointNeeded</name>
+        <description>This parameter specifies whether a WebSocket (plain) non-TLS endpoint is needed. (Default is false)</description>
+        <optional>true</optional>
+        <rewriteAllowed>true</rewriteAllowed>
+        <expressionMode>AttributeFree</expressionMode>
+        <type>boolean</type>
+        <cardinality>1</cardinality>
+      </parameter>
+
+      <parameter>
+        <name>nonTlsPort</name>
+        <description>This parameter specifies the WebSocket (plain) non-TLS port number. Default port number is 80.</description>
+        <optional>true</optional>
+        <rewriteAllowed>true</rewriteAllowed>
+        <expressionMode>AttributeFree</expressionMode>
+        <type>uint32</type>
+        <cardinality>1</cardinality>
+      </parameter> 
+
+      <parameter>
+        <name>initDelay</name>
+        <description>This parameter specifies a one time delay in seconds for which this source operator should wait before start generating its first tuple. Default delay is 0.0.</description>
+        <optional>true</optional>
+        <rewriteAllowed>true</rewriteAllowed>
+        <expressionMode>AttributeFree</expressionMode>
+        <type>float64</type>
+        <cardinality>1</cardinality>
+      </parameter> 
+
+      <parameter>
+        <name>vgwLiveMetricsUpdateNeeded</name>
+        <description>This parameter specifies whether live update for this operator's custom metrics is needed. (Default is true)</description>
+        <optional>true</optional>
+        <rewriteAllowed>true</rewriteAllowed>
+        <expressionMode>AttributeFree</expressionMode>
+        <type>boolean</type>
+        <cardinality>1</cardinality>
+      </parameter>
+      
+      <parameter>
+        <name>websocketLoggingNeeded</name>
+        <description>This parameter specifies whether logging is needed from the WebSocket library. (Default is false)</description>
+        <optional>true</optional>
+        <rewriteAllowed>true</rewriteAllowed>
+        <expressionMode>AttributeFree</expressionMode>
+        <type>boolean</type>
+        <cardinality>1</cardinality>
+      </parameter>
+      
+      <parameter>
+        <name>vgwSessionLoggingNedded</name>
+        <description>This parameter specifies whether logging is needed when the IBM Voice Gateway session is in progress with this operator. (Default is false)</description>
+        <optional>true</optional>
+        <rewriteAllowed>true</rewriteAllowed>
+        <expressionMode>AttributeFree</expressionMode>
+        <type>boolean</type>
+        <cardinality>1</cardinality>
+      </parameter>
+      
+      <parameter>
+        <name>vgwStaleSessionPurgeInterval</name>
+        <description>This parameter specifies periodic time interval in seconds during which any stale Voice Gateway sessions should be purged to free up memory usage. (Default is 3*60*60 seconds)</description>
+        <optional>true</optional>
+        <rewriteAllowed>true</rewriteAllowed>
+        <expressionMode>AttributeFree</expressionMode>
+        <type>uint32</type>
+        <cardinality>1</cardinality>
+      </parameter>
+    </parameters>
+    
+    <inputPorts>
+    </inputPorts>
+    <outputPorts>
+      <outputPortSet>
+      	<description>
+      	This port produces the output tuples that carry the binary speech data received from 
+      	the IBM Voice Gateway. The schema for this port must have its first attribute named 
+      	as speech with a blob data type to hold the speech data. Remaining attributes can be 
+      	of any type based on the needs of the application. Such speech data being sent in 
+      	these output tuples can represent multiple fragments of a full conversation 
+      	happening in a live voice call. This operator is capable of sending out speech data
+		from multiple calls that can all happen at the very same time between different 
+		pairs of speakers. IBM Voice Gateway will always send the speech data in two voice
+		channels i.e. one channel will carry the speech data of a customer and the other
+		channel will carry the speech data of an agent. Please refer to the custom 
+		output functions provided by this operator to query such voice call meta data
+		information and assign that meta data values to other optional attributes in this
+		output port. 
+      	
+        **There are multiple available output functions**, and output attributes can also be 
+        assigned values with any SPL expression that evaluates to the proper type.      	
+      	</description>
+        <expressionMode>Expression</expressionMode> 
+        <autoAssignment>false</autoAssignment>
+        <completeAssignment>false</completeAssignment>
+        <rewriteAllowed>true</rewriteAllowed>
+        <outputFunctions>
+            <default>AsIs</default>
+            <type>IBMVoiceGatewaySourceFunctions</type>
+        </outputFunctions> 
+        <windowPunctuationOutputMode>Free</windowPunctuationOutputMode>
+        <tupleMutationAllowed>false</tupleMutationAllowed>
+        <cardinality>1</cardinality>
+        <optional>false</optional>
+      </outputPortSet> 
+      
+      <outputPortSet>
+      	<description>
+      	This port produces periodic output tuples to give an indication about the end of a 
+      	specific speaker (i.e. channel) in a voice call that was in progress moments ago for 
+      	the given IBM Voice Gateway session id. The schema for this port must have these 
+      	three attributes with their correct data types as shown here. 
+      	rstring vgwSessionId, boolean isCustomerSpeechData, int32 vgwVoiceChannelNumber
+      	This source operator will set the appropriate values for these attributes to 
+      	indicate which particular speaker (i.e. voice channel number) of a given voice call 
+      	(i.e. session id) just ended the conversation. This tuple also has an attribute 
+      	(i.e. isCustomerSpeechData) to tell whether that recently ended voice channel
+      	carried the speech data of a customer or an agent. Downstream operators can make 
+      	use of this "End Of Voice Call" signal as they see fit.
+      	</description>
+        <expressionMode>Expression</expressionMode> 
+        <autoAssignment>false</autoAssignment>
+        <completeAssignment>false</completeAssignment>
+        <rewriteAllowed>true</rewriteAllowed>
+        <windowPunctuationOutputMode>Free</windowPunctuationOutputMode>
+        <tupleMutationAllowed>false</tupleMutationAllowed>
+        <cardinality>1</cardinality>
+        <optional>false</optional>
+      </outputPortSet>          
+    </outputPorts>
+  </cppOperatorModel>
+</operatorModel>

@@ -1,12 +1,15 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no" ?>
 <toolkitModel xmlns="http://www.ibm.com/xmlns/prod/streams/spl/toolkit" productVersion="4.2.1.6" xmlns:common="http://www.ibm.com/xmlns/prod/streams/spl/common" xmlns:ti="http://www.ibm.com/xmlns/prod/streams/spl/toolkitInfo" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
 
-  <toolkit name="com.ibm.streamsx.sttgateway" requiredProductVersion="4.2.1.6" version="1.0.4">
+  <toolkit name="com.ibm.streamsx.sttgateway" requiredProductVersion="4.2.1.6" version="1.0.5">
     <description/>
     <uriTable>
+      <uri index="8" value="com.ibm.streamsx.sttgateway.watson/IBMVoiceGatewaySource/ibmvgwsource_32.gif"/>
+      <uri index="7" value="com.ibm.streamsx.sttgateway.watson/IBMVoiceGatewaySource/ibmvgwsource_16.gif"/>
       <uri index="1" value="com.ibm.streamsx.sttgateway.watson/IAMAccessTokenGenerator.spl"/>
       <uri index="2" value="com.ibm.streamsx.sttgateway.watson/native.function/function.xml"/>
       <uri index="5" value="com.ibm.streamsx.sttgateway.watson/WatsonSTT/watsonstt_32.gif"/>
+      <uri index="6" value="com.ibm.streamsx.sttgateway.watson/IBMVoiceGatewaySource"/>
       <uri index="3" value="com.ibm.streamsx.sttgateway.watson/WatsonSTT"/>
       <uri index="4" value="com.ibm.streamsx.sttgateway.watson/WatsonSTT/watsonstt_16.gif"/>
     </uriTable>
@@ -17,7 +20,7 @@
       or RAW audio and then transcribe that audio into text via the 
       IBM Watson STT (Speech To Text) cloud service. It does that by sending the audio data 
       to the configured Watson STT service running in the IBM public cloud or in the 
-      IBM Cloud Private (ICP) via the Websocket interface. It then outputs transcriptions of 
+      IBM Cloud Pak for Data (CP4D) via the Websocket interface. It then outputs transcriptions of 
       speech in the form of utterances or in full text as configured. An utterance is a 
       group of transcribed words meant to approximate a sentence. Audio data must be in 16-bit 
       little endian, mono format. For the Telephony model and configurations, the audio must 
@@ -254,7 +257,143 @@
       	</description>
         </outputPort>
       </primitiveOp>
-      <compositeOp column="18" line="36" name="IAMAccessTokenGenerator" potentialMain="false" public="true" uriIndex="1">
+      <primitiveOp language="Cpp" modelUriIndex="6" name="IBMVoiceGatewaySource" public="true">
+        <description>
+      The IBMVoiceGatewaySource operator is designed to ingest 
+      speech data from the IBM Voice Gateway product version 1.0.3.0 or above. 
+      This speech data is ingested in binary format from the 
+      IBM Voice Gateway into this operator via the Websocket interface. 
+      Such speech data arrives here in multiple fragments directly from 
+      a live voice call. This operator is capable of receiving speech data 
+      from multiple calls that can all happen at the very same time 
+      between different pairs of speakers. For every voice call it handles 
+      in real-time, the IBM Voice Gateway product will open two 
+      Websocket connections into this operator and start sending the 
+      live speech data on both of those connections. One of those connections 
+      will carry the speech data of the agent and the other connection 
+      will carry the speech data of the customer. This operator will 
+      keep sending the audio chunks received on those two Websocket 
+      connections via its output stream for consumption by the 
+      downstream operators. At the end of the any given call, 
+      IBM Voice Gateway will close the two WebSocket connections it 
+      opened into this operator.
+            
+      This operator can be configured with a Websocket port number which is optional. If the user of this
+      operator doesn't specify a Websocket port number, then a default port number of 443 will be used.
+      
+      Requirements: 
+      * Intel RHEL6 or RHEL7 hosts installed with IBM Streams. 
+      
+      See the samples folder inside this toolkit for a working example that show how to use this operator.
+      
+      For a detailed documentation about the operator design, usage patterns and in-depth technical
+      details, please refer to the official STT Gateway toolkit documentation available at this URL:
+      
+      [https://ibmstreams.github.io/streamsx.sttgateway]
+      </description>
+        <images>
+          <image size="16" uriIndex="7"/>
+          <image size="32" uriIndex="8"/>
+        </images>
+        <outputFunctions name="IBMVoiceGatewaySourceFunctions">
+          <function name="AsIs" returnType="T">
+            <description>The default function for output attributes. This function assigns the output attribute to the value of the input attribute with the same name.</description>
+            <prototype>&lt;any T&gt; T AsIs(T)</prototype>
+            <parameter name="__p1" type="T"/>
+          </function>
+          <function name="getIBMVoiceGatewaySessionId" returnType="rstring">
+            <description>Returns an rstring value indicating the IBM Voice Gateway session id that corresponds to the current output tuple.</description>
+            <prototype>rstring getIBMVoiceGatewaySessionId()</prototype>
+          </function>
+          <function name="isCustomerSpeechData" returnType="boolean">
+            <description>Returns a boolean value to indicate if this is a customer's speech data or not.</description>
+            <prototype>boolean isCustomerSpeechData()</prototype>
+          </function>
+          <function name="getTupleCnt" returnType="int32">
+            <description>Returns an int32 value indicating the total number of output tuples emitted so far for the given channel in a IBM Voice Gateway session id.</description>
+            <prototype>int32 getTupleCnt()</prototype>
+          </function>
+          <function name="getTotalSpeechDataBytesReceived" returnType="int32">
+            <description>Returns an int32 value indicating the total number of speech data bytes received so far for the given channel in a IBM Voice Gateway session id.</description>
+            <prototype>int32 getTotalSpeechDataBytesReceived()</prototype>
+          </function>
+          <function name="getVoiceChannelNumber" returnType="int32">
+            <description>Returns an int32 value indicating the voice channel number in which the speech data bytes were received for a IBM Voice Gateway session id.</description>
+            <prototype>int32 getVoiceChannelNumber()</prototype>
+          </function>
+          <function name="getAgentPhoneNumber" returnType="rstring">
+            <description>Returns an rstring value with details about the agent's phone number.</description>
+            <prototype>rstring getAgentPhoneNumber()</prototype>
+          </function>
+          <function name="getCallerPhoneNumber" returnType="rstring">
+            <description>Returns an rstring value with details about the caller's phone number.</description>
+            <prototype>rstring getCallerPhoneNumber()</prototype>
+          </function>
+        </outputFunctions>
+        <parameter cardinality="1" expressionMode="AttributeFree" name="tlsPort" optional="true" type="uint32">
+          <description>This parameter specifies the WebSocket TLS port number. Default port number is 443.</description>
+        </parameter>
+        <parameter cardinality="1" expressionMode="AttributeFree" name="certificateFileName" optional="true" type="rstring">
+          <description>This parameter specifies the WebSocket server PEM certificate file name. Default is to read ws-server.pem from the etc sub-directory of the application.</description>
+        </parameter>
+        <parameter cardinality="1" expressionMode="AttributeFree" name="nonTlsEndpointNeeded" optional="true" type="boolean">
+          <description>This parameter specifies whether a WebSocket (plain) non-TLS endpoint is needed. (Default is false)</description>
+        </parameter>
+        <parameter cardinality="1" expressionMode="AttributeFree" name="nonTlsPort" optional="true" type="uint32">
+          <description>This parameter specifies the WebSocket (plain) non-TLS port number. Default port number is 80.</description>
+        </parameter>
+        <parameter cardinality="1" expressionMode="AttributeFree" name="initDelay" optional="true" type="float64">
+          <description>This parameter specifies a one time delay in seconds for which this source operator should wait before start generating its first tuple.</description>
+        </parameter>
+        <parameter cardinality="1" expressionMode="AttributeFree" name="vgwLiveMetricsUpdateNeeded" optional="true" type="boolean">
+          <description>This parameter specifies whether live update for this operator's custom metrics is needed. (Default is true)</description>
+        </parameter>
+        <parameter cardinality="1" expressionMode="AttributeFree" name="websocketLoggingNeeded" optional="true" type="boolean">
+          <description>This parameter specifies whether logging is needed from the WebSocket library. (Default is false)</description>
+        </parameter>
+        <parameter cardinality="1" expressionMode="AttributeFree" name="vgwSessionLoggingNedded" optional="true" type="boolean">
+          <description>This parameter specifies whether logging is needed when the IBM Voice Gateway session is in progress with this operator. (Default is false)</description>
+        </parameter>
+        <parameter cardinality="1" expressionMode="AttributeFree" name="vgwStaleSessionPurgeInterval" optional="true" type="uint32">
+          <description>This parameter specifies time interval in seconds during which any stale Voice Gateway sessions should be purged to free up memory usage. (Default is 3*60*60 seconds)</description>
+        </parameter>
+        <outputPort expressionMode="Expression" maxNumPorts="1" minNumPorts="1" optional="false" windowPunctOutputMode="Free">
+          <description>
+      	This port produces the output tuples that carry the binary speech data received from 
+      	the IBM Voice Gateway. The schema for this port must have its first attribute named 
+      	as speech with a blob data type to hold the speech data. Remaining attributes can be 
+      	of any type based on the needs of the application. Such speech data being sent in 
+      	these output tuples can represent multiple fragments of a full conversation 
+      	happening in a live voice call. This operator is capable of sending out speech data
+		from multiple calls that can all happen at the very same time between different 
+		pairs of speakers. IBM Voice Gateway will always send the speech data in two voice
+		channels i.e. one channel will carry the speech data of a customer and the other
+		channel will carry the speech data of an agent. Please refer to the custom 
+		output functions provided by this operator to query such voice call meta data
+		information and assign that meta data values to other optional attributes in this
+		output port. 
+      	
+        **There are multiple available output functions**, and output attributes can also be 
+        assigned values with any SPL expression that evaluates to the proper type.      	
+      	</description>
+        </outputPort>
+        <outputPort expressionMode="Expression" maxNumPorts="1" minNumPorts="1" optional="false" windowPunctOutputMode="Free">
+          <description>
+      	This port produces periodic output tuples to give an indication about the end of a 
+      	specific speaker (i.e. channel) in a voice call that was in progress moments ago for 
+      	the given IBM Voice Gateway session id. The schema for this port must have these 
+      	three attributes with their correct data types as shown here. 
+      	rstring vgwSessionId, boolean isCustomerSpeechData, int32 vgwVoiceChannelNumber
+      	This source operator will set the appropriate values for these attributes to 
+      	indicate which particular speaker (i.e. voice channel number) of a given voice call 
+      	(i.e. session id) just ended the conversation. This tuple also has an attribute 
+      	(i.e. isCustomerSpeechData) to tell whether that recently ended voice channel
+      	carried the speech data of a customer or an agent. Downstream operators can make 
+      	use of this "End Of Voice Call" signal as they see fit.
+      	</description>
+        </outputPort>
+      </primitiveOp>
+      <compositeOp column="18" line="39" name="IAMAccessTokenGenerator" potentialMain="false" public="true" uriIndex="1">
         <parameter metaType="Expression" name="sttApiKey" optional="false" type="&lt;rstring>"/>
         <parameter metaType="Expression" name="sttIAMTokenURL" optional="false" type="&lt;rstring>"/>
         <parameter metaType="Expression" name="sttAccessTokenRefreshInterval" optional="false" type="&lt;float64>"/>
@@ -267,7 +406,7 @@
         <parameter name="appName" type="rstring"/>
         <parameter mutable="true" name="resultStringOutput" type="rstring"/>
       </function>
-      <type column="6" line="33" name="IamAccessToken_t" static="true" type="rstring access_token, rstring refresh_token, rstring scope, int64 expiration, rstring token_type, int64 expires_in" uriIndex="1"/>
+      <type column="6" line="36" name="IamAccessToken_t" static="true" type="rstring access_token, rstring refresh_token, rstring scope, int64 expiration, rstring token_type, int64 expires_in" uriIndex="1"/>
     </namespace>
     <dependency>
       <common:name>com.ibm.streamsx.json</common:name>
