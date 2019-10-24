@@ -22,7 +22,7 @@
 <div class="body refbody">
 <div class="section">
 <p class="p">
-<a class="xref" href="../toolkits/toolkits.html">Gateway to the IBM Speech To Text (STT) cloud service</a> &gt; <a class="xref" href="tk$com.ibm.streamsx.sttgateway.html">com.ibm.streamsx.sttgateway 1.0.5</a> &gt; <a class="xref" href="ns$com.ibm.streamsx.sttgateway.watson.html">com.ibm.streamsx.sttgateway.watson</a> &gt; WatsonSTT</p>
+<a class="xref" href="../toolkits/toolkits.html">Gateway to the IBM Speech To Text (STT) cloud service</a> &gt; <a class="xref" href="tk$com.ibm.streamsx.sttgateway.html">com.ibm.streamsx.sttgateway 1.0.4</a> &gt; <a class="xref" href="ns$com.ibm.streamsx.sttgateway.watson.html">com.ibm.streamsx.sttgateway.watson</a> &gt; WatsonSTT</p>
 
 </div>
 
@@ -32,7 +32,7 @@
 
 <div class="section">
 
-<p class="p">      The WatsonSTT operator is designed to ingest audio data in the form of a file (.wav, .mp3 etc.)       or RAW audio and then transcribe that audio into text via the        IBM Watson STT (Speech To Text) cloud service. It does that by sending the audio data        to the configured Watson STT service running in the IBM public cloud or in the        IBM Cloud Pak for Data (CP4D) via the Websocket interface. It then outputs transcriptions of        speech in the form of utterances or in full text as configured. An utterance is a        group of transcribed words meant to approximate a sentence. Audio data must be in 16-bit        little endian, mono format. For the Telephony model and configurations, the audio must        have an 8 kHz sampling rate. For the Broadband model and configurations, the audio must        have a 16 kHz sampling rate. The data can be provided as a .wav file or as        RAW uncompressed PCM audio. Here is a sample ffmpeg command to convert a .wav file        to the correct telephony format (use -ar 16000 for broadband): 
+<p class="p">      The WatsonSTT operator is designed to ingest audio data in the form of a file (.wav, .mp3 etc.)       or RAW audio and then transcribe that audio into text via the        IBM Watson STT (Speech To Text) cloud service. It does that by sending the audio data        to the configured Watson STT service running in the IBM public cloud or in the        IBM Cloud Private (ICP) via the Websocket interface. It then outputs transcriptions of        speech in the form of utterances or in full text as configured. An utterance is a        group of transcribed words meant to approximate a sentence. Audio data must be in 16-bit        little endian, mono format. For the Telephony model and configurations, the audio must        have an 8 kHz sampling rate. For the Broadband model and configurations, the audio must        have a 16 kHz sampling rate. The data can be provided as a .wav file or as        RAW uncompressed PCM audio. Here is a sample ffmpeg command to convert a .wav file        to the correct telephony format (use -ar 16000 for broadband): 
 </p>
 
 <p class="p">      $ ffmpeg -i MyFile.wav -ac 1 -ar 8000 MyNewFile.wav

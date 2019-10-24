@@ -81,7 +81,7 @@ IAM access token from [here](https://cloud.ibm.com/docs/services/speech-to-text?
 - d) You should also extract just the certificate portion without your private key from your full TLS/SSL certificate PEM file that you created in the previous step and then create a security credential in the IBM Voice Gateway container as explained in that product's documentation. After that, you should point to that security credential in the deployment configuration of the IBM Voice Gateway's Media Relay.
 
 - e) If you are comfortable with using a self signed TLS/SSL certificate file in your environment, you can follow the instructions given in the following file that is shipped with this toolkit to create your own self signed SSL certificate.
+
 ```
 <YOUR_STTGATEWAY_TOOLKIT_HOME>/samples/VoiceGatewayToStreamsToWatsonSTT/etc/creating-a-self-signed-certificate.txt
 ```
-

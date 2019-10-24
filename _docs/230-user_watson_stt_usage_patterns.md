@@ -78,27 +78,27 @@ In your SPL application, this operator can be invoked with either all operator p
               $certificateFileName : getThisToolkitDir() + "/etc/ws-server.pem";
        }
 				
-       param
-		   tlsPort: $tlsPort;
-		   certificateFileName: _certificateFileName;
-		   nonTlsEndpointNeeded: $nonTlsEndpointNeeded;
-		   nonTlsPort: $nonTlsPort;
-		   // Initial delay before generating the very first tuple.
-		   initDelay: $initDelayBeforeSendingDataToSttEngines;
-		   vgwLiveMetricsUpdateNeeded: $vgwLiveMetricsUpdateNeeded;
-		   websocketLoggingNeeded: $vgwWebsocketLoggingNeeded;
-		   vgwSessionLoggingNedded: $vgwSessionLoggingNedded;
-		   vgwStaleSessionPurgeInterval: $vgwStaleSessionPurgeInterval;
+    param
+       tlsPort: $tlsPort;
+       certificateFileName: _certificateFileName;
+       nonTlsEndpointNeeded: $nonTlsEndpointNeeded;
+       nonTlsPort: $nonTlsPort;
+       // Initial delay before generating the very first tuple.
+       initDelay: $initDelayBeforeSendingDataToSttEngines;
+       vgwLiveMetricsUpdateNeeded: $vgwLiveMetricsUpdateNeeded;
+       websocketLoggingNeeded: $vgwWebsocketLoggingNeeded;
+       vgwSessionLoggingNedded: $vgwSessionLoggingNedded;
+       vgwStaleSessionPurgeInterval: $vgwStaleSessionPurgeInterval;
 			
-       // Get these values via custom output functions	provided by this operator.
-	   output
-			BSD: vgwSessionId = getIBMVoiceGatewaySessionId(),
-					isCustomerSpeechData = isCustomerSpeechData(),
-					vgwVoiceChannelNumber = getVoiceChannelNumber(),
-					callerPhoneNumber = getCallerPhoneNumber(),
-					agentPhoneNumber = getAgentPhoneNumber(),
-					speechDataFragmentCnt = getTupleCnt(),
-					totalSpeechDataBytesReceived = getTotalSpeechDataBytesReceived();
+    // Get these values via custom output functions	provided by this operator.
+    output
+       BSD: vgwSessionId = getIBMVoiceGatewaySessionId(),
+       isCustomerSpeechData = isCustomerSpeechData(),
+       vgwVoiceChannelNumber = getVoiceChannelNumber(),
+       callerPhoneNumber = getCallerPhoneNumber(),
+       agentPhoneNumber = getAgentPhoneNumber(),
+       speechDataFragmentCnt = getTupleCnt(),
+       totalSpeechDataBytesReceived = getTotalSpeechDataBytesReceived();
 }
 ```
 
@@ -337,8 +337,8 @@ The operator invocation code snippet shown above is ideally suited for a batch w
 
 ```
 @parallel(width = $numberOfSTTEngines, 
-partitionBy=[{port=ABC, attributes=[conversationId]}])
-stream<STTResult_t> STTResult = WatsonSTT(AudioBlobContent as ABC) {
+partitionBy=[{port=ABC, attributes=[sttEngineId]}], broadcast=[AT])
+stream<STTResult_t> STTResult = WatsonSTT(AudioBlobContent as ABC; IamAccessToken, AccessTokenForCP4D as AT) {
    // Rest of the code within this block is similar to the 
    // one shown in the previous code snippet above.
 }
