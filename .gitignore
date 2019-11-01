@@ -20,10 +20,13 @@ com.ibm.streamsx.sttgateway/*/.namespace
 # ignore these toolkit specific external dependency files and directories
 com.ibm.streamsx.sttgateway/impl/include/boost
 com.ibm.streamsx.sttgateway/impl/include/websocketpp
-com.ibm.streamsx.sttgateway/impl/lib/libboost_chrono.so*
-com.ibm.streamsx.sttgateway/impl/lib/libboost_random.so*
-com.ibm.streamsx.sttgateway/impl/lib/libboost_system.so*
-com.ibm.streamsx.sttgateway/impl/lib/libboost_thread.so*
+com.ibm.streamsx.sttgateway/impl/lib/libboost_chrono*
+com.ibm.streamsx.sttgateway/impl/lib/libboost_random*
+com.ibm.streamsx.sttgateway/impl/lib/libboost_system*
+com.ibm.streamsx.sttgateway/impl/lib/libboost_thread*
+
+# ignore download dir
+ext/
 
 # ignore the toolkit documentation directory.
 doc/

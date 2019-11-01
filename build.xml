@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+==============================================
+# Licensed Materials - Property of IBM
+# Copyright IBM Corp. 2019
+==============================================
+-->
+<project name="streamsx.sttgateway" default="all">
+
+	<!-- check streams installation -->
+	<property environment="env" />
+	<fail unless="env.STREAMS_INSTALL" message="STREAMS_INSTALL not set."/>
+	<property name="streams.install" value="${env.STREAMS_INSTALL}"/>
+	<property name="spl-mt"          value="${streams.install}/bin/spl-make-toolkit"/>
+
+	<property name="websocket.version"  value="0.8.1"/>
+	<property name="boost.version"      value="1.69.0"/>
+	<property name="boost.version.name" value="1_69_0"/>
+	
+	<property name="websocket.archive" value="https://github.com/zaphoyd/websocketpp/archive"/>
+	<property name="boost.archive"     value="https://dl.bintray.com/boostorg/release"/>
+	
+	<property name="tk.dir"        location="com.ibm.streamsx.sttgateway"/>
+	<property name="impl.dir"      location="${tk.dir}/impl" />
+	<property name="lib.dir"       location="${tk.dir}/impl/lib" />
+	<property name="inc.dir"       location="${tk.dir}/impl/include"/>
+	<property name="ext.dir"       location="ext"/>
+	<property name="boost.str"     value="boost"/>
+	<property name="websocket.str" value="websocketpp"/>
+	<property name="out.dir"       location="${tk.dir}/output"/>                 <!-- streams studio bin dir / used only on clean target -->
+
+	<available property="websocket.dir.exists" file="${ext.dir}/${websocket.str}-${websocket.version}/${websocket.str}" type="dir"/>
+	<!-- <available property="boost.lib.dir.exists" file="${ext.dir}/${boost.str}_${boost.version.name}/lib" type="dir"/>
+	<available property="boost.inc.dir.exists" file="${ext.dir}/${boost.str}_${boost.version.name}/include/boost" type="dir"/> -->
+	<available property="boost.exists" file="${ext.dir}/boost-install-files/${boost.str}_${boost.version.name}" type="dir"/>
+	<!-- <condition property="boost.exists">
+		<and>
+			<istrue value="${boost.lib.dir.exists}"/>
+			<istrue value="${boost.inc.dir.exists}"/>
+		</and>
+	</condition> -->
+
+	<target name="init">
+		<mkdir dir="${lib.dir}"/>
+		<mkdir dir="${ext.dir}"/>
+	</target>
+
+	<target name="all" depends="toolkit" description="Build the toolkit / compatibility target"/>
+	
+	<target name="clean" depends="toolkit-clean" description="Clean up generated toolkit artifacts"/>
+
+	<target name="clean-all" depends="requirements-clean" description="Clean up generated toolkit artifacts and libraries"/>
+
+	<target name="clean-total" depends="requirements-clean" description="Clean up generated toolkit artifacts and libraries and downloaded files">
+		<delete dir="${ext.dir}"/>
+	</target>
+
+	<target name="toolkit" depends="requirements" description="Build the toolkit">
+		<exec executable="${spl-mt}" failonerror="true">
+			<arg value="--directory"/>
+			<arg value="${tk.dir}"/>
+		</exec>
+	</target>
+
+	<target name="toolkit-clean" description="Clean the toolkit">
+		<exec executable="${spl-mt}">
+			<arg value="--directory"/>
+			<arg value="${tk.dir}"/>
+			<arg value="-c"/>
+		</exec>
+	</target>
+
+	<!-- Download websocket library -->
+	<target name="download-websocket" depends="download-websocket-target" description="Download websocket++ library if not existitng"/>
+	
+	<target name="download-websocket-target" depends="init" unless="${websocket.dir.exists}">
+		<echo>Download websocketpp ${websocket.version}</echo>
+		<get src="${websocket.archive}/${websocket.version}.tar.gz" dest="${ext.dir}" verbose="true" usetimestamp="true"/>
+		<untar src="${ext.dir}/${websocket.version}.tar.gz" dest="${ext.dir}" compression="gzip">
+			<patternset>
+				<include name="${websocket.str}-${websocket.version}/${websocket.str}/**"/>
+			</patternset>
+		</untar>
+	</target>
+
+	<!-- Download and build boost -->
+	<target name="download-boost" depends="download-boost-target" description="Download and build boost library if not existitng"/>
+	
+	<target name="download-boost-target" depends="init" unless="${boost.exists}">
+		<echo>Download and build boost ${boost.version}</echo>
+		<mkdir dir="${ext.dir}/boost-install-files"/>
+		<get src="${boost.archive}/${boost.version}/source/boost_${boost.version.name}.tar.gz" dest="${ext.dir}/boost-install-files" verbose="true" usetimestamp="true"/>
+		<!-- use tar command because ant target does not set execute property -->
+		<exec dir="${ext.dir}/boost-install-files" executable="tar">
+			<arg value="xvzf"/>
+			<arg value="boost_${boost.version.name}.tar.gz"/>
+		</exec>
+		<exec executable="./bootstrap.sh" dir="${ext.dir}/boost-install-files/boost_${boost.version.name}" failonerror="true">
+			<!-- <arg value="  prefix=${ext.dir}/boost_${boost.version.name}"/> -->
+			<arg value="--prefix=${impl.dir}"/>
+		</exec>
+	</target>
+
+	<target name="requirements" depends="download-websocket,download-boost" description="Download required libraries">
+		<copy todir="${inc.dir}/${websocket.str}">
+			<fileset dir="${ext.dir}/${websocket.str}-${websocket.version}/${websocket.str}"/>
+		</copy>
+		<exec executable="bash" outputproperty="no.cpus" failonerror="true">
+			<arg value="-c"/>
+			<arg value="cat /proc/cpuinfo | grep processor | wc -l"/>
+		</exec>
+		<exec executable="./b2" dir="${ext.dir}/boost-install-files/boost_${boost.version.name}" failonerror="true">
+			<arg value="install"/>
+			<!-- <arg value="  prefix=${ext.dir}/boost_${boost.version.name}"/> -->
+			<arg value="--prefix=${impl.dir}"/>
+			<arg value="--with-chrono"/>
+			<arg value="--with-random"/>
+			<arg value="--with-system"/>
+			<arg value="--with-thread"/>
+			<arg value="-j${no.cpus}"/>
+		</exec>
+		<!-- <exec executable="cp" dir="${ext.dir}/boost_${boost.version.name}/include" failonerror="true">
+			<arg value="-p"/>
+			<arg value="-r"/>
+			<arg value="-v"/>
+			<arg value="boost"/>
+			<arg value="${inc.dir}"/>
+		</exec>
+		<exec executable="bash" dir="${ext.dir}/boost_${boost.version.name}/lib" failonerror="true">
+			<arg value="-c"/>
+			<arg value="cp -p -d -v *.so* ${lib.dir}"/>
+		</exec> -->
+	</target>
+
+	<target name="requirements-clean" depends="toolkit-clean" description="Cleanup required libraries">
+		<delete dir="${lib.dir}"/>
+		<delete dir="${inc.dir}/${boost.str}"/>
+		<delete dir="${inc.dir}/${websocket.str}"/>
+	</target>
+
+</project>
