@@ -29,16 +29,8 @@
 	<property name="websocket.str" value="websocketpp"/>
 	<property name="out.dir"       location="${tk.dir}/output"/>                 <!-- streams studio bin dir / used only on clean target -->
 
-	<available property="websocket.dir.exists" file="${ext.dir}/${websocket.str}-${websocket.version}/${websocket.str}" type="dir"/>
-	<!-- <available property="boost.lib.dir.exists" file="${ext.dir}/${boost.str}_${boost.version.name}/lib" type="dir"/>
-	<available property="boost.inc.dir.exists" file="${ext.dir}/${boost.str}_${boost.version.name}/include/boost" type="dir"/> -->
+	<available property="websocket.src.dir.exists" file="${ext.dir}/${websocket.str}-${websocket.version}/${websocket.str}" type="dir"/>
 	<available property="boost.exists" file="${ext.dir}/boost-install-files/${boost.str}_${boost.version.name}" type="dir"/>
-	<!-- <condition property="boost.exists">
-		<and>
-			<istrue value="${boost.lib.dir.exists}"/>
-			<istrue value="${boost.inc.dir.exists}"/>
-		</and>
-	</condition> -->
 
 	<target name="init">
 		<mkdir dir="${lib.dir}"/>
@@ -73,10 +65,12 @@
 	<!-- Download websocket library -->
 	<target name="download-websocket" depends="download-websocket-target" description="Download websocket++ library if not existitng"/>
 	
-	<target name="download-websocket-target" depends="init" unless="${websocket.dir.exists}">
+	<!-- must examine websocket.src.dir.exists property otherwise the get task downloads the source archive all the time 
+	     (no valid file date) -->
+	<target name="download-websocket-target" depends="init" unless="${websocket.src.dir.exists}">
 		<echo>Download websocketpp ${websocket.version}</echo>
-		<get src="${websocket.archive}/${websocket.version}.tar.gz" dest="${ext.dir}" verbose="true" usetimestamp="true"/>
-		<untar src="${ext.dir}/${websocket.version}.tar.gz" dest="${ext.dir}" compression="gzip">
+		<get src="${websocket.archive}/${websocket.version}.tar.gz" dest="${ext.dir}/${websocket.str}-${websocket.version}.tar.gz" verbose="true" usetimestamp="true"/>
+		<untar src="${ext.dir}/${websocket.str}-${websocket.version}.tar.gz" dest="${ext.dir}" compression="gzip">
 			<patternset>
 				<include name="${websocket.str}-${websocket.version}/${websocket.str}/**"/>
 			</patternset>
@@ -86,8 +80,9 @@
 	<!-- Download and build boost -->
 	<target name="download-boost" depends="download-boost-target" description="Download and build boost library if not existitng"/>
 	
+	<!-- must examine boost.exists property, otherwise the tar command is always executed -->
 	<target name="download-boost-target" depends="init" unless="${boost.exists}">
-		<echo>Download and build boost ${boost.version}</echo>
+		<echo>Download and bootstrap boost ${boost.version}</echo>
 		<mkdir dir="${ext.dir}/boost-install-files"/>
 		<get src="${boost.archive}/${boost.version}/source/boost_${boost.version.name}.tar.gz" dest="${ext.dir}/boost-install-files" verbose="true" usetimestamp="true"/>
 		<!-- use tar command because ant target does not set execute property -->
@@ -96,22 +91,22 @@
 			<arg value="boost_${boost.version.name}.tar.gz"/>
 		</exec>
 		<exec executable="./bootstrap.sh" dir="${ext.dir}/boost-install-files/boost_${boost.version.name}" failonerror="true">
-			<!-- <arg value="  prefix=${ext.dir}/boost_${boost.version.name}"/> -->
 			<arg value="--prefix=${impl.dir}"/>
 		</exec>
 	</target>
 
-	<target name="requirements" depends="download-websocket,download-boost" description="Download required libraries">
+	<target name="requirements" depends="download-websocket,download-boost" description="Build/Copy required libraries">
+		<echo>Copy websocketcpp to ${inc.dir}/${websocket.str}</echo>
 		<copy todir="${inc.dir}/${websocket.str}">
 			<fileset dir="${ext.dir}/${websocket.str}-${websocket.version}/${websocket.str}"/>
 		</copy>
+		<echo>Build boost ${boost.version}</echo>
 		<exec executable="bash" outputproperty="no.cpus" failonerror="true">
 			<arg value="-c"/>
 			<arg value="cat /proc/cpuinfo | grep processor | wc -l"/>
 		</exec>
 		<exec executable="./b2" dir="${ext.dir}/boost-install-files/boost_${boost.version.name}" failonerror="true">
 			<arg value="install"/>
-			<!-- <arg value="  prefix=${ext.dir}/boost_${boost.version.name}"/> -->
 			<arg value="--prefix=${impl.dir}"/>
 			<arg value="--with-chrono"/>
 			<arg value="--with-random"/>
@@ -119,17 +114,6 @@
 			<arg value="--with-thread"/>
 			<arg value="-j${no.cpus}"/>
 		</exec>
-		<!-- <exec executable="cp" dir="${ext.dir}/boost_${boost.version.name}/include" failonerror="true">
-			<arg value="-p"/>
-			<arg value="-r"/>
-			<arg value="-v"/>
-			<arg value="boost"/>
-			<arg value="${inc.dir}"/>
-		</exec>
-		<exec executable="bash" dir="${ext.dir}/boost_${boost.version.name}/lib" failonerror="true">
-			<arg value="-c"/>
-			<arg value="cp -p -d -v *.so* ${lib.dir}"/>
-		</exec> -->
 	</target>
 
 	<target name="requirements-clean" depends="toolkit-clean" description="Cleanup required libraries">
