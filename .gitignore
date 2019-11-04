@@ -16,6 +16,7 @@ com.ibm.streamsx.sttgateway/.project
 com.ibm.streamsx.sttgateway/.settings
 com.ibm.streamsx.sttgateway/.toolkitList
 com.ibm.streamsx.sttgateway/*/.namespace
+com.ibm.streamsx.sttgateway/toolkit.xml
 
 # ignore these toolkit specific external dependency files and directories
 com.ibm.streamsx.sttgateway/impl/include/boost
