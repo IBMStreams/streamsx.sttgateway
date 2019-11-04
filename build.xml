@@ -15,7 +15,11 @@
 
 	<property name="websocket.version"  value="0.8.1"/>
 	<property name="boost.version"      value="1.69.0"/>
-	<property name="boost.version.name" value="1_69_0"/>
+	<exec executable="bash" outputproperty="boost.version.name" failonerror="true">
+		<arg value="-c"/>
+		<arg value='x="${boost.version}"; echo "${x//./_}"'/>
+	</exec>
+	<echo>${boost.version.name}</echo>
 	
 	<property name="websocket.archive" value="https://github.com/zaphoyd/websocketpp/archive"/>
 	<property name="boost.archive"     value="https://dl.bintray.com/boostorg/release"/>
@@ -84,11 +88,11 @@
 	<target name="download-boost-target" depends="init" unless="${boost.exists}">
 		<echo>Download and bootstrap boost ${boost.version}</echo>
 		<mkdir dir="${ext.dir}/boost-install-files"/>
-		<get src="${boost.archive}/${boost.version}/source/boost_${boost.version.name}.tar.gz" dest="${ext.dir}/boost-install-files" verbose="true" usetimestamp="true"/>
+		<get src="${boost.archive}/${boost.version}/source/boost_${boost.version.name}.tar.gz" dest="${ext.dir}/boost-install-files/boost-${boost.version}.tar.gz" verbose="true" usetimestamp="true"/>
 		<!-- use tar command because ant target does not set execute property -->
 		<exec dir="${ext.dir}/boost-install-files" executable="tar">
 			<arg value="xvzf"/>
-			<arg value="boost_${boost.version.name}.tar.gz"/>
+			<arg value="boost-${boost.version}.tar.gz"/>
 		</exec>
 		<exec executable="./bootstrap.sh" dir="${ext.dir}/boost-install-files/boost_${boost.version.name}" failonerror="true">
 			<arg value="--prefix=${impl.dir}"/>
