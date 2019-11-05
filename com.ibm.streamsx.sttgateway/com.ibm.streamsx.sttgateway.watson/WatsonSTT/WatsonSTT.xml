@@ -52,8 +52,8 @@
           
           NOTE: A few custom metrics are available for the WatsonSTT operator. 
           The Counter kind metrics listed here will be updated when the operator starts. 
-      	  But, the Gauge kind metrics will be updated live during transcription only 
-      	  when the sttLiveMetricsUpdateNeeded operator parameter is set to true.
+          But, the Gauge kind metrics will be updated live during transcription only 
+          when the sttLiveMetricsUpdateNeeded operator parameter is set to true.
           </description>
           <kind>Counter</kind>
         </metric>
@@ -168,45 +168,50 @@
               <description>Returns the STT keywords spotting results as a map of key/value pairs. Read this toolkit's documentation to learn about the map contents.</description>
               <prototype><![CDATA[map<rstring, list<map<rstring, float64>>> getKeywordsSpottingResults()]]></prototype>
           </function> 
-		</customOutputFunction>
+        </customOutputFunction>
       </customOutputFunctions>
       
       <libraryDependencies>
+      
         <library>
-          <cmn:description>Boost Library</cmn:description>
+          <cmn:description>Websocketpp library</cmn:description>
+          <cmn:managedLibrary>
+            <cmn:includePath>../../impl/include</cmn:includePath>
+          </cmn:managedLibrary>
+        </library>
+        
+        <library>
+          <cmn:description>Boost Library common and system</cmn:description>
           <cmn:managedLibrary>
             <cmn:lib>boost_system</cmn:lib>
             <cmn:libPath>../../impl/lib</cmn:libPath>
-            <!--<cmn:includePath>../../impl/include</cmn:includePath>-->
+            <cmn:includePath>../../impl/include</cmn:includePath>
           </cmn:managedLibrary>
         </library>
          
         <library>
-          <cmn:description>Boost Library</cmn:description>
+          <cmn:description>Boost Library chrono</cmn:description>
           <cmn:managedLibrary>
             <cmn:lib>boost_chrono</cmn:lib>
             <cmn:libPath>../../impl/lib</cmn:libPath>
-            <!--<cmn:includePath>../../impl/include</cmn:includePath>-->
           </cmn:managedLibrary>
         </library>
                 
         <library>
-          <cmn:description>Boost Library</cmn:description>
+          <cmn:description>Boost Library random</cmn:description>
           <cmn:managedLibrary>
             <cmn:lib>boost_random</cmn:lib>
             <cmn:libPath>../../impl/lib</cmn:libPath>
-            <!--<cmn:includePath>../../impl/include</cmn:includePath>-->
           </cmn:managedLibrary>
-        </library>       
+        </library>
 
          <library>
-          <cmn:description>Boost Library</cmn:description>
+          <cmn:description>Boost Library thread</cmn:description>
           <cmn:managedLibrary>
             <cmn:lib>boost_thread</cmn:lib>
             <cmn:libPath>../../impl/lib</cmn:libPath>
-            <!--<cmn:includePath>../../impl/include</cmn:includePath>-->
           </cmn:managedLibrary>
-        </library> 
+        </library>
 
       </libraryDependencies>
       
