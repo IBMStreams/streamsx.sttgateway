@@ -78,7 +78,7 @@ type STTResult_t = rstring vgwSessionId, boolean isCustomerSpeechData,
 	map<rstring, list<map<rstring, float64>>> keywordsSpottingResults;
 
 // This is the main composite for this application.
-composite VoiceGatewayToStreamsToWatsonSTT {
+public composite VoiceGatewayToStreamsToWatsonSTT {
 	param
 		// IBM Voice Gateway related submission time values are defined below.
 		// TLS port on which this application will listen for

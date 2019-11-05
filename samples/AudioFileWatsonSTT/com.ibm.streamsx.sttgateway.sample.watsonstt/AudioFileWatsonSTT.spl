@@ -42,7 +42,7 @@ namespace com.ibm.streamsx.sttgateway.sample.watsonstt;
 
 use com.ibm.streamsx.sttgateway.watson::*;
 
-composite AudioFileWatsonSTT {
+public composite AudioFileWatsonSTT {
 	param
 		// IMPORTANT: The WatsonSTT operator uses Websocket to communicate with the 
 		// Watson STT cloud service. For the STT service on IBM Public Cloud, 
