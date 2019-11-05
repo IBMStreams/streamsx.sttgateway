@@ -32,6 +32,7 @@ com.ibm.streamsx.sttgateway/impl/lib/libboost_thread*
 
 # ignore the toolkit documentation directory.
 /doc/spldoc/
+/samples/doc/spldoc/
 
 # ignore release archives
 /releases/
