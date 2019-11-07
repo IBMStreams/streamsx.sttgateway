@@ -12,7 +12,8 @@
 com.ibm.streamsx.sttgateway/.apt_generated
 com.ibm.streamsx.sttgateway/.classpath
 com.ibm.streamsx.sttgateway/output
-com.ibm.streamsx.sttgateway/.project
+com.ibm.streamsx.sttgateway/doc
+com.ibm.streamsx.sttgateway/bin
 com.ibm.streamsx.sttgateway/.settings
 com.ibm.streamsx.sttgateway/.toolkitList
 com.ibm.streamsx.sttgateway/*/.namespace
