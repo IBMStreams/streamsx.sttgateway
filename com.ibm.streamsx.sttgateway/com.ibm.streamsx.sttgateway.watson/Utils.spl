@@ -1,0 +1,28 @@
+namespace com.ibm.streamsx.sttgateway.watson;
+
+/**
+ * Function hourMinuteSecondMillisec
+ * 
+ * build a string from a timestamp with format <hour>:<minute>:<second>.<millisecond>
+ * 
+ * @param t input time
+ * 
+ * @return the formatted time string
+ */
+public rstring hourMinuteSecondMillisec(timestamp t) {
+	mutable Sys.tm mytime = {};
+	time(t, mytime);
+	rstring res = strftime(mytime, "%H:%M:%S");
+	uint32 milliseconds = getNanoseconds(t) / 1000000u;
+	return res + "." + addLeadingZero3((rstring)milliseconds);
+}
+
+rstring addLeadingZero3(rstring number) {
+	if (length(number) == 1)
+		return "00" + number;
+	else if (length(number) == 2)
+		return "0" + number;
+	else
+		return number;
+}
+
