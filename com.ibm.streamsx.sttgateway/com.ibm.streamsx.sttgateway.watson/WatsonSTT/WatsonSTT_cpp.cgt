@@ -8,7 +8,7 @@
 /*
 ============================================================
 First created on: Jul/01/2018
-Last modified on: Oct/07/2019
+Last modified on: Nov/06/2019
 
 Please refer to the sttgateway-tech-brief.txt file in the 
 top-level directory of this toolkit to read about 
@@ -2139,7 +2139,7 @@ void MY_OPERATOR::on_message(MY_OPERATOR::client* c, websocketpp::connection_hdl
 					  
 					  // In the alternatives JSON array, only one element will have the
 					  // best result combined with confidence. We will store that as the
-					  // finalized utterance in the h-best alternative hypothesis scenario.
+					  // finalized utterance in the n-best alternative hypothesis scenario.
 					  if (sttResultMode == 2 && 
 						  confidenceFound == true) {
 						  utteranceText = tempUtteranceText;

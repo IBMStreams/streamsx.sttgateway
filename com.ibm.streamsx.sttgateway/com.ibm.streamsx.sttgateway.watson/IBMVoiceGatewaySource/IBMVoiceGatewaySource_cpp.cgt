@@ -8,7 +8,7 @@
 /*
 ============================================================
 First created on: Sep/20/2019
-Last modified on: Oct/22/2019
+Last modified on: Nov/06/2019
 
 Please refer to the sttgateway-tech-brief.txt file in the 
 top-level directory of this toolkit to read about 
@@ -196,15 +196,19 @@ using websocketpp::lib::bind;
 	# Default: 0
     $websocketLoggingNeeded = $websocketLoggingNeeded ? $websocketLoggingNeeded->getValueAt(0)->getCppExpression() : 0;    
 
-    my $vgwSessionLoggingNedded = $model->getParameterByName("vgwSessionLoggingNedded");
+    my $vgwSessionLoggingNeeded = $model->getParameterByName("vgwSessionLoggingNeeded");
 	# Default: 0
-    $vgwSessionLoggingNedded = $vgwSessionLoggingNedded ? $vgwSessionLoggingNedded->getValueAt(0)->getCppExpression() : 0;
+    $vgwSessionLoggingNeeded = $vgwSessionLoggingNeeded ? $vgwSessionLoggingNeeded->getValueAt(0)->getCppExpression() : 0;
  
     my $vgwStaleSessionPurgeInterval = $model->getParameterByName("vgwStaleSessionPurgeInterval");
 	# Default: 3*60*60 seconds
     $vgwStaleSessionPurgeInterval = $vgwStaleSessionPurgeInterval ? $vgwStaleSessionPurgeInterval->getValueAt(0)->getCppExpression() : 3*60*60;
-    %>
 
+    my $ipv6Available = $model->getParameterByName("ipv6Available");
+	# Default: 1
+    $ipv6Available = $ipv6Available ? $ipv6Available->getValueAt(0)->getCppExpression() : 1;    
+    %>
+        
 <%SPL::CodeGen::implementationPrologue($model);%>
 
 // Constructor
@@ -228,8 +232,9 @@ MY_OPERATOR::MY_OPERATOR()
 	initDelay = <%=$initDelay%>;
 	vgwLiveMetricsUpdateNeeded = <%=$vgwLiveMetricsUpdateNeeded%>;
 	websocketLoggingNeeded = <%=$websocketLoggingNeeded%>;
-	vgwSessionLoggingNedded = <%=$vgwSessionLoggingNedded%>;
+	vgwSessionLoggingNeeded = <%=$vgwSessionLoggingNeeded%>;
 	vgwStaleSessionPurgeInterval = <%=$vgwStaleSessionPurgeInterval%>;
+	ipv6Available = <%=$ipv6Available%>;
 	certificateFileName = <%=$certificateFileName%>;
 	
 	if (certificateFileName == "") {
@@ -391,7 +396,23 @@ void MY_OPERATOR::process(uint32_t idx)
 			}
 			
 			// Plain (non-TLS) endpoint listens on its own port.
-			endpoint_plain.listen(nonTlsPort);
+			// Most of the modern day Linux machines will have an ipv6 protocol stack. 
+			// By default, WebSocket++ listens in a dual stack ipv4/ipv6 mode. 
+			// It will fail with the following error if an ipv6 stack is not available. 
+			// "asio listen error: system:97 (Address family not supported by protocol)"
+			// If it is an issue to enable ipv6 on a Linux macchine, a quick fix is to 
+			// use one of the endpoint::listen overloads that lets us specify 
+			// an address family to listen on and manually select to listen only via ipv4.
+			// This solution is suggested in these URLs:
+			// https://groups.google.com/forum/#!topic/websocketpp/-BB_Kr_rFPg
+			// https://github.com/zaphoyd/websocketpp/issues/674
+			if (ipv6Available == true) {
+				endpoint_plain.listen(nonTlsPort);
+			} else {
+				// We must use only the ipv4 protocol stack in this case.
+				endpoint_plain.listen(boost::asio::ip::tcp::v4(), nonTlsPort);
+			}
+			
 			endpoint_plain.start_accept();
 			nonTlsEndpointStarted = true;
 		}
@@ -416,8 +437,16 @@ void MY_OPERATOR::process(uint32_t idx)
 			endpoint_tls.clear_error_channels(websocketpp::log::elevel::all);
 		}		
 		
-		// TLS endpoint listens on a different port
-		endpoint_tls.listen(tlsPort);
+		// TLS endpoint listens on a different port.
+		// Please refer to the detailed comments in the endpoint_plain.listen 
+		// code block above about this ipv6 availability check.
+		if (ipv6Available == true) {
+			endpoint_tls.listen(tlsPort);
+		} else {
+			// We must use only the ipv4 protocol stack in this case.
+			endpoint_tls.listen(boost::asio::ip::tcp::v4(), tlsPort);
+		}
+		
 		endpoint_tls.start_accept();
 		tlsEndpointStarted = true;
 
@@ -433,7 +462,7 @@ void MY_OPERATOR::process(uint32_t idx)
 MY_OPERATOR::context_ptr MY_OPERATOR::on_tls_init(websocketpp::connection_hdl hdl) {
 	bool vgwSessionLoggingDone = false;
 	
-	if (vgwSessionLoggingNedded == true) {
+	if (vgwSessionLoggingNeeded == true) {
 		SPLAPPTRC(L_ERROR, "on_tls_init called with hdl: " << hdl.lock().get(), "on_tls_init");
 		vgwSessionLoggingDone = true;
 	}
@@ -470,7 +499,7 @@ MY_OPERATOR::context_ptr MY_OPERATOR::on_tls_init(websocketpp::connection_hdl hd
 void MY_OPERATOR::on_open(websocketpp::connection_hdl hdl) {
 	bool vgwSessionLoggingDone = false;
 	
-	if (vgwSessionLoggingNedded == true) {
+	if (vgwSessionLoggingNeeded == true) {
 		SPLAPPTRC(L_ERROR, "on_open called for hdl: " << 
 			hdl.lock().get(), "on_open");
 		vgwSessionLoggingDone = true;
@@ -537,7 +566,7 @@ void MY_OPERATOR::on_message(EndpointType* s, websocketpp::connection_hdl hdl,
     typename EndpointType::message_ptr msg) {
 	bool vgwSessionLoggingDone = false;
 	
-	if (vgwSessionLoggingNedded == true) {
+	if (vgwSessionLoggingNeeded == true) {
 		SPLAPPTRC(L_ERROR, "on_message called with hdl: " << hdl.lock().get()
 			<< " with a message size of: " << msg->get_payload().size() << " bytes.", "on_message");
 		vgwSessionLoggingDone = true;
@@ -568,7 +597,7 @@ void MY_OPERATOR::on_message(EndpointType* s, websocketpp::connection_hdl hdl,
 			// Load the json data in the boost ptree
 			pt::read_json(ss, root);
 		} catch (std::exception const& e) {
-			if (vgwSessionLoggingNedded == true) {
+			if (vgwSessionLoggingNeeded == true) {
 				SPLAPPTRC(L_ERROR, "Operator " << operatorPhysicalName <<
 					"-->Channel " << boost::to_string(udpChannelNumber) <<
 					"-->X1 Received text content is in an unexpected format: " <<
@@ -585,7 +614,7 @@ void MY_OPERATOR::on_message(EndpointType* s, websocketpp::connection_hdl hdl,
 		try {
 			action = query(root, "action").get_value<std::string>();
 		} catch (std::exception const& e) {
-			if (vgwSessionLoggingNedded == true) {
+			if (vgwSessionLoggingNeeded == true) {
 				SPLAPPTRC(L_ERROR, "Operator " << operatorPhysicalName <<
 					"-->Channel " << boost::to_string(udpChannelNumber) <<
 					"-->X1 JSON parsing error when reading the field : " << e.what() <<
@@ -627,7 +656,7 @@ void MY_OPERATOR::on_message(EndpointType* s, websocketpp::connection_hdl hdl,
 					con_metadata.vgwSessionId = query(root, 
 						"siprecMetadata.vgwSessionID").get_value<std::string>();
 				}  catch (std::exception const& e) {
-					if (vgwSessionLoggingNedded == true) {
+					if (vgwSessionLoggingNeeded == true) {
 						SPLAPPTRC(L_ERROR, "Operator " << operatorPhysicalName <<
 							"-->Channel " << boost::to_string(udpChannelNumber) <<
 							"-->X1 JSON parsing error when reading the field : " << e.what() <<
@@ -669,7 +698,7 @@ void MY_OPERATOR::on_message(EndpointType* s, websocketpp::connection_hdl hdl,
 					con_metadata.vgwSIPCallID = query(root, 
 						"siprecMetadata.vgwSIPCallID").get_value<std::string>();
 				}  catch (std::exception const& e) {
-					if (vgwSessionLoggingNedded == true) {
+					if (vgwSessionLoggingNeeded == true) {
 						SPLAPPTRC(L_ERROR, "Operator " << operatorPhysicalName <<
 							"-->Channel " << boost::to_string(udpChannelNumber) <<
 							"-->X1 JSON parsing error when reading the field : " << e.what() <<
@@ -683,7 +712,7 @@ void MY_OPERATOR::on_message(EndpointType* s, websocketpp::connection_hdl hdl,
 					con_metadata.vgwParticipantURI = query(root, 
 						"siprecMetadata.vgwParticipantURI").get_value<std::string>();
 				}  catch (std::exception const& e) {
-					if (vgwSessionLoggingNedded == true) {
+					if (vgwSessionLoggingNeeded == true) {
 						SPLAPPTRC(L_ERROR, "Operator " << operatorPhysicalName <<
 							"-->Channel " << boost::to_string(udpChannelNumber) <<
 							"-->X1 JSON parsing error when reading the field : " << e.what() <<
@@ -697,7 +726,7 @@ void MY_OPERATOR::on_message(EndpointType* s, websocketpp::connection_hdl hdl,
 					con_metadata.vgwTenantID = query(root, 
 						"siprecMetadata.vgwTenantID").get_value<std::string>();
 				}  catch (std::exception const& e) {
-					if (vgwSessionLoggingNedded == true) {
+					if (vgwSessionLoggingNeeded == true) {
 						SPLAPPTRC(L_ERROR, "Operator " << operatorPhysicalName <<
 							"-->Channel " << boost::to_string(udpChannelNumber) <<
 							"-->X1 JSON parsing error when reading the field : " << e.what() <<
@@ -711,7 +740,7 @@ void MY_OPERATOR::on_message(EndpointType* s, websocketpp::connection_hdl hdl,
 					con_metadata.vgwSIPToURI = query(root, 
 						"siprecMetadata.vgwSIPToURI").get_value<std::string>();
 				}  catch (std::exception const& e) {
-					if (vgwSessionLoggingNedded == true) {
+					if (vgwSessionLoggingNeeded == true) {
 						SPLAPPTRC(L_ERROR, "Operator " << operatorPhysicalName <<
 							"-->Channel " << boost::to_string(udpChannelNumber) <<
 							"-->X1 JSON parsing error when reading the field : " << e.what() <<
@@ -740,7 +769,7 @@ void MY_OPERATOR::on_message(EndpointType* s, websocketpp::connection_hdl hdl,
 				// Update it in the client connections map.
 				client_connections_map[hdl] = con_metadata;
 				
-				if (vgwSessionLoggingNedded == true) {
+				if (vgwSessionLoggingNeeded == true) {
 					SPLAPPTRC(L_ERROR, "Operator " << operatorPhysicalName <<
 						"-->Channel " << boost::to_string(udpChannelNumber) <<
 						"-->X1 Received and processed a start session message for the vgwSessionId " <<
@@ -755,7 +784,7 @@ void MY_OPERATOR::on_message(EndpointType* s, websocketpp::connection_hdl hdl,
 
 				return;
 			} else {
-				if (vgwSessionLoggingNedded == true) {
+				if (vgwSessionLoggingNeeded == true) {
 					SPLAPPTRC(L_ERROR, "Operator " << operatorPhysicalName <<
 						"-->Channel " << boost::to_string(udpChannelNumber) <<
 						"-->X1 Received an invalid action: " <<
@@ -791,7 +820,7 @@ void MY_OPERATOR::on_message(EndpointType* s, websocketpp::connection_hdl hdl,
 				// It is a stop session message sent by the IBM Voice Gateway.
 				// We can delete this connection's meta data cached in our
 				// client connection map.
-				if (vgwSessionLoggingNedded == true) {
+				if (vgwSessionLoggingNeeded == true) {
 					SPLAPPTRC(L_ERROR, "Operator " << operatorPhysicalName <<
 						"-->Channel " << boost::to_string(udpChannelNumber) <<
 						"-->X3 Received and processed a stop session message for the vgwSessionId " << 
@@ -823,7 +852,7 @@ void MY_OPERATOR::on_message(EndpointType* s, websocketpp::connection_hdl hdl,
 					oTuple.set_vgwVoiceChannelNumber(con_metadata.vgwVoiceChannelNumber);
 					submit(oTuple, 1);
 					
-					if (vgwSessionLoggingNedded == true) {
+					if (vgwSessionLoggingNeeded == true) {
 						SPLAPPTRC(L_ERROR, "Operator " << operatorPhysicalName <<
 							"-->Channel " << boost::to_string(udpChannelNumber) <<
 							"-->X3 Sent an 'End of Voice Call' signal for vgwSessionId=" << 
@@ -897,7 +926,7 @@ void MY_OPERATOR::on_message(EndpointType* s, websocketpp::connection_hdl hdl,
 							it != staleList.end(); it++) {
 							vgw_session_id_map.erase(*it);
 							
-							if (vgwSessionLoggingNedded == true) {
+							if (vgwSessionLoggingNeeded == true) {
 								SPLAPPTRC(L_ERROR, "Operator " << operatorPhysicalName <<
 									"-->Channel " << boost::to_string(udpChannelNumber) <<
 									"-->X4 Removed a stale VGW session id. " <<
@@ -931,7 +960,7 @@ void MY_OPERATOR::on_message(EndpointType* s, websocketpp::connection_hdl hdl,
 							stale2RemovedCnt++;
 						}
 	
-						if (vgwSessionLoggingNedded == true && stale2RemovedCnt > 0) {
+						if (vgwSessionLoggingNeeded == true && stale2RemovedCnt > 0) {
 							SPLAPPTRC(L_ERROR, "Operator " << operatorPhysicalName <<
 								"-->Channel " << boost::to_string(udpChannelNumber) <<
 								"-->X4 Removed a few stale client connection handles. Removed count=" <<
@@ -946,7 +975,7 @@ void MY_OPERATOR::on_message(EndpointType* s, websocketpp::connection_hdl hdl,
 
 				return;
 			} else {
-				if (vgwSessionLoggingNedded == true) {
+				if (vgwSessionLoggingNeeded == true) {
 					SPLAPPTRC(L_ERROR, "Operator " << operatorPhysicalName <<
 						"-->Channel " << boost::to_string(udpChannelNumber) <<
 						"-->X3 Received an invalid action: " <<
@@ -1078,17 +1107,19 @@ void MY_OPERATOR::on_message(EndpointType* s, websocketpp::connection_hdl hdl,
 		  	  	  <%} elsif ($operation eq "getAgentPhoneNumber") { 
 		    %> 
 			   	   oTuple.set_<%=$name%>( 
-			   	        <%=$operation%>(con_metadata.vgwParticipantURI));
+			   	        <%=$operation%>(con_metadata.vgwParticipantURI,
+							con_metadata.vgwIsCaller, con_metadata.vgwVoiceChannelNumber));
 	  	  	  	  <%} elsif ($operation eq "getCallerPhoneNumber") { 
 	  	  	%> 
 		   	   	   oTuple.set_<%=$name%>( 
-		   	            <%=$operation%>(con_metadata.vgwSIPToURI));
+		   	            <%=$operation%>(con_metadata.vgwParticipantURI,
+							con_metadata.vgwIsCaller, con_metadata.vgwVoiceChannelNumber));
 		  	  	  <%}	
 			}%>
 			
 			submit(oTuple, 0);
 
-			if (vgwSessionLoggingNedded == true) {
+			if (vgwSessionLoggingNeeded == true) {
 				SPLAPPTRC(L_ERROR, "Operator " << operatorPhysicalName <<
 					"-->Channel " << boost::to_string(udpChannelNumber) <<
 					"-->X2 Received speech data from the vgwSessionId " << 
@@ -1105,7 +1136,7 @@ void MY_OPERATOR::on_message(EndpointType* s, websocketpp::connection_hdl hdl,
 			
 			return;
 		} else {
-			if (vgwSessionLoggingNedded == true) {
+			if (vgwSessionLoggingNeeded == true) {
 				SPLAPPTRC(L_ERROR, "Operator " << operatorPhysicalName <<
 					"-->Channel " << boost::to_string(udpChannelNumber) <<
 					"-->X2 Received binary content via connection handle " <<
@@ -1130,7 +1161,7 @@ void MY_OPERATOR::on_close(websocketpp::connection_hdl hdl) {
 	
 	bool vgwSessionLoggingDone = false;
 	
-	if (vgwSessionLoggingNedded == true) {
+	if (vgwSessionLoggingNeeded == true) {
 		SPLAPPTRC(L_ERROR, "on_close called for hdl: " << 
 			hdl.lock().get() << 
 			", vgwSessionId: " << con_metadata.vgwSessionId <<
@@ -1225,12 +1256,30 @@ int32_t MY_OPERATOR::getVoiceChannelNumber(int32_t const & voiceChannelNumber) {
 	return(voiceChannelNumber);
 }
 
-std::string MY_OPERATOR::getAgentPhoneNumber(std::string const & agentPhoneNumber) {
-	return(agentPhoneNumber);
+std::string MY_OPERATOR::getAgentPhoneNumber(std::string const & phoneNumber,
+	bool const & isCaller, int32_t const & voiceChannelNumber) {
+	// We will use the isCaller argument to determine whether it is an 
+	// agent number or a caller number.
+	// Read the commentary in the .h file for the connection_metadata structure to
+	// gain more background about what is going on with the vgwIsCaller and the
+	// vgwVoiceChannelNumber.
+	if (isCaller == false) {
+		return(phoneNumber);
+	} else {
+		// This is not an agent's voice channel.
+		return("");
+	}
 }
 
-std::string MY_OPERATOR::getCallerPhoneNumber(std::string const & callerPhoneNumber) {
-	return(callerPhoneNumber);
+std::string MY_OPERATOR::getCallerPhoneNumber(std::string const & phoneNumber,
+	bool const & isCaller, int32_t const & voiceChannelNumber) {
+	// The same commenary given in the previous method applies here as well.
+	if (isCaller == true) {
+		return(phoneNumber);
+	} else {
+		// This is not a caller's voice channel.
+		return("");
+	}
 }
 
 <%SPL::CodeGen::implementationEpilogue($model);%>

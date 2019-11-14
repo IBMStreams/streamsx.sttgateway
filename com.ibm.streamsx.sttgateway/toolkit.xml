@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no" ?>
 <toolkitModel xmlns="http://www.ibm.com/xmlns/prod/streams/spl/toolkit" productVersion="4.2.1.6" xmlns:common="http://www.ibm.com/xmlns/prod/streams/spl/common" xmlns:ti="http://www.ibm.com/xmlns/prod/streams/spl/toolkitInfo" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
 
-  <toolkit name="com.ibm.streamsx.sttgateway" requiredProductVersion="4.2.1.6" version="1.0.5">
+  <toolkit name="com.ibm.streamsx.sttgateway" requiredProductVersion="4.2.1.6" version="1.0.6">
     <description/>
     <uriTable>
       <uri index="8" value="com.ibm.streamsx.sttgateway.watson/IBMVoiceGatewaySource/ibmvgwsource_32.gif"/>
@@ -278,8 +278,8 @@
       IBM Voice Gateway will close the two WebSocket connections it 
       opened into this operator.
             
-      This operator can be configured with a Websocket port number which is optional. If the user of this
-      operator doesn't specify a Websocket port number, then a default port number of 443 will be used.
+      This operator can be configured with a Websocket server port number which is optional. If the user of this
+      operator doesn't specify a Websocket server port number, then a default port number of 443 will be used.
       
       Requirements: 
       * Intel RHEL6 or RHEL7 hosts installed with IBM Streams. 
@@ -334,7 +334,7 @@
           <description>This parameter specifies the WebSocket TLS port number. Default port number is 443.</description>
         </parameter>
         <parameter cardinality="1" expressionMode="AttributeFree" name="certificateFileName" optional="true" type="rstring">
-          <description>This parameter specifies the WebSocket server PEM certificate file name. Default is to read ws-server.pem from the etc sub-directory of the application.</description>
+          <description>This parameter specifies the full path of the WebSocket server PEM certificate file name. Default is to read ws-server.pem from the etc sub-directory of the application.</description>
         </parameter>
         <parameter cardinality="1" expressionMode="AttributeFree" name="nonTlsEndpointNeeded" optional="true" type="boolean">
           <description>This parameter specifies whether a WebSocket (plain) non-TLS endpoint is needed. (Default is false)</description>
@@ -343,7 +343,7 @@
           <description>This parameter specifies the WebSocket (plain) non-TLS port number. Default port number is 80.</description>
         </parameter>
         <parameter cardinality="1" expressionMode="AttributeFree" name="initDelay" optional="true" type="float64">
-          <description>This parameter specifies a one time delay in seconds for which this source operator should wait before start generating its first tuple.</description>
+          <description>This parameter specifies a one time delay in seconds for which this source operator should wait before start generating its first tuple. Default delay is 0.0.</description>
         </parameter>
         <parameter cardinality="1" expressionMode="AttributeFree" name="vgwLiveMetricsUpdateNeeded" optional="true" type="boolean">
           <description>This parameter specifies whether live update for this operator's custom metrics is needed. (Default is true)</description>
@@ -351,11 +351,14 @@
         <parameter cardinality="1" expressionMode="AttributeFree" name="websocketLoggingNeeded" optional="true" type="boolean">
           <description>This parameter specifies whether logging is needed from the WebSocket library. (Default is false)</description>
         </parameter>
-        <parameter cardinality="1" expressionMode="AttributeFree" name="vgwSessionLoggingNedded" optional="true" type="boolean">
+        <parameter cardinality="1" expressionMode="AttributeFree" name="vgwSessionLoggingNeeded" optional="true" type="boolean">
           <description>This parameter specifies whether logging is needed when the IBM Voice Gateway session is in progress with this operator. (Default is false)</description>
         </parameter>
         <parameter cardinality="1" expressionMode="AttributeFree" name="vgwStaleSessionPurgeInterval" optional="true" type="uint32">
-          <description>This parameter specifies time interval in seconds during which any stale Voice Gateway sessions should be purged to free up memory usage. (Default is 3*60*60 seconds)</description>
+          <description>This parameter specifies periodic time interval in seconds during which any stale Voice Gateway sessions should be purged to free up memory usage. (Default is 3*60*60 seconds)</description>
+        </parameter>
+        <parameter cardinality="1" expressionMode="AttributeFree" name="ipv6Available" optional="true" type="boolean">
+          <description>This parameter indicates whether the ipv6 protocol stack is available in the Linux machine where the IBMVoiceGatewaySource operator is running. (Default is true)</description>
         </parameter>
         <outputPort expressionMode="Expression" maxNumPorts="1" minNumPorts="1" optional="false" windowPunctOutputMode="Free">
           <description>

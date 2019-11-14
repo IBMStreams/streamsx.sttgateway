@@ -8,7 +8,7 @@
 /*
 ==============================================
 First created on: Jul/01/2018
-Last modified on: Sep/04/2019
+Last modified on: Nov/13/2019
 
 This example demonstrates transcription of audio files into text using the WatsonSTT operator. 
 This example code is suitable for processing audio data that is already saved into 
@@ -42,7 +42,7 @@ namespace com.ibm.streamsx.sttgateway.sample.watsonstt;
 
 use com.ibm.streamsx.sttgateway.watson::*;
 
-composite AudioFileWatsonSTT {
+public composite AudioFileWatsonSTT {
 	param
 		// IMPORTANT: The WatsonSTT operator uses Websocket to communicate with the 
 		// Watson STT cloud service. For the STT service on IBM Public Cloud, 
@@ -380,4 +380,4 @@ composite AudioFileWatsonSTT {
 			config
 				threadedPort: queue(SR, Sys.Wait);
 		}
-}
+} // End of composite AudioFileWatsonSTT (Main composite)
