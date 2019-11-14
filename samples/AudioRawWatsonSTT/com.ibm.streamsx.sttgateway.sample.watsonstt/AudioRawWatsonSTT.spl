@@ -8,7 +8,7 @@
 /*
 ==============================================
 First created on: Jul/01/2018
-Last modified on: Sep/04/2019
+Last modified on: Nov/13/2019
 
 This example demonstrates transcription of raw audio data to text using the WatsonSTT operator. 
 This example code is suitable for processing the raw audio binary data that is either 
@@ -45,7 +45,7 @@ namespace com.ibm.streamsx.sttgateway.sample.watsonstt;
 use spl.file::*;
 use com.ibm.streamsx.sttgateway.watson::*;
 
-composite AudioRawWatsonSTT {
+public composite AudioRawWatsonSTT {
 	param
 		// IMPORTANT: The WatsonSTT operator uses Websocket to communicate with the 
 		// Watson STT cloud service. For the STT service on IBM Public Cloud, 
@@ -82,8 +82,18 @@ composite AudioRawWatsonSTT {
 		// given audio conversation.
 		expression<int64> $audioBlobFragmentSize : (int64)
 			getSubmissionTimeValue("audioBlobFragmentSize", "512");
+		// NOTE: This particular application always crashes when multiple 
+		// STT engines (i.e. > 1) are configured to run in distributed mode. 
+		// It works fine sometimes with multiple STT engines in the 
+		// standalone mode where everything is fused. The problem seems to 
+		// appear in the Custom operator code below that reads blob fragments 
+		// from the audio files and feeds it to the STT engines.  
+		// We have to fix it at a later time by testing it both in the
+		// standalone and distributed modes. 
+		// Hence, we are setting the default STT engine count to 1 for now 
+		// so that it can work without crashing in standalone and distributed modes.
 		expression<int32> $numberOfSTTEngines :(int32)
-			getSubmissionTimeValue("numberOfSTTEngines", "5") ;
+			getSubmissionTimeValue("numberOfSTTEngines", "1") ;
 		expression<rstring> $sttUri : getSubmissionTimeValue("sttUri",
 			"wss://stream.watsonplatform.net/speech-to-text/api/v1/recognize");
 		// IMPORTANT: The WatsonSTT operator uses Websocket to communicate with the 
@@ -574,4 +584,4 @@ composite AudioRawWatsonSTT {
 			config
 				threadedPort: queue(SR, Sys.Wait);
 		}
-}
+} // End of composite AudioRawWatsonSTT (Main composite)

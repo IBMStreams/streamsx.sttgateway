@@ -1,6 +1,19 @@
 Changes
 =======
-## v1.0.4:
+## v1.0.6:
+* Nov/14/2019
+* Added a new ipv6Available parameter to support both the dual stack (ipv4/ipv6) and the single stack (ipv4 only) environments.
+* Added new logic to assign the caller and agent telephone number attributes based on the vgwIsCaller metadata field.
+* Fixed a typo in an operator parameter name.
+* Added new logic in the examples to send the STT results to a file as well as to an HTTP endpoint.
+* Added a new example VoiceGatewayToStreamsToWatsonS2T to showcase an architectural design pattern where all the three IBM products (IBM Voice Gateway, IBM Streams and Watson S2T engine embedded in a Streams operator) can come together to work seamlessly.
+
+## v1.0.5:
+* Oct/23/2019
+* Added code for the new IBMVoiceGatewaySource operator.
+* Added a new example VoiceGatewayToStreamsToWatsonSTT to showcase an architectural design pattern where all the three IBM products (IBM Voice Gateway, IBM Streams and IBM Watson Speech To Text) can come together to work seamlessly.
+
+## V1.0.4:
 * Sep/05/2019
 * Made changes for the user to provide either the API key for public cloud or the access token for IBM Cloud Pak for Data.
 * Made the necessary changes to use either the STT service on public cloud or the STT service on the IBM Cloud Pak for Data (CP4D).

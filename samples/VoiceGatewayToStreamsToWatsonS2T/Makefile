@@ -2,10 +2,18 @@
 # others. All Rights Reserved.                        
 .PHONY: build all distributed clean
 
+# You must ensure that the following line points to your 
+# correct STT Gateway toolkit directory that is of v1.0.5 or above.
 STREAMS_STTGATEWAY_TOOLKIT ?= $(PWD)/../../com.ibm.streamsx.sttgateway
 # You must ensure that the following line points to your
 # correct JSON toolkit directory that is of v1.4.6 or above.
 STREAMS_JSON_TOOLKIT ?= $(STREAMS_INSTALL)/toolkits/com.ibm.streamsx.json
+# You must ensure that the following line points to your 
+# correct Network toolkit directory that is of v3.0.5.
+STREAMS_NETWORK_TOOLKIT ?= $(HOME)/streamsx.network-rtp-dev
+# You must ensure that the following line points to your 
+# correct Speech2Text toolkit directory that is of any version from v2.9.1 to v2.12.0.
+STREAMS_S2T_TOOLKIT ?= $(HOME)/toolkit.speech2text-v2.12.0
 # You must ensure that the following line points to your 
 # correct inet toolkit directory that is of v3.0.0 or above.
 STREAMS_INET_TOOLKIT ?= $(STREAMS_INSTALL)/toolkits/com.ibm.streamsx.inet
@@ -24,10 +32,10 @@ else
     SPLC = $(STREAMS_INSTALL)/bin/sc
     DATA_DIR = data
     OUTPUT_DIR = output
-    TOOLKIT_PATH = $(STREAMS_STTGATEWAY_TOOLKIT):$(STREAMS_JSON_TOOLKIT):$(STREAMS_INET_TOOLKIT)
+    TOOLKIT_PATH = $(STREAMS_STTGATEWAY_TOOLKIT):$(STREAMS_JSON_TOOLKIT):$(STREAMS_NETWORK_TOOLKIT):$(STREAMS_S2T_TOOLKIT):$(STREAMS_INET_TOOLKIT)
 endif
 
-SPL_MAIN_COMPOSITE = com.ibm.streamsx.sttgateway.sample.watsonstt::VoiceGatewayToStreamsToWatsonSTT
+SPL_MAIN_COMPOSITE = com.ibm.streamsx.sttgateway.sample.watsons2t::VoiceGatewayToStreamsToWatsonS2T
 SPLC_FLAGS = -a --c++std=c++11 -x '-I $(STREAMS_STTGATEWAY_TOOLKIT)/impl/include'
 SPL_CMD_ARGS ?=
 

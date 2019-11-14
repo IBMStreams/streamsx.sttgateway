@@ -26,8 +26,8 @@
       IBM Voice Gateway will close the two WebSocket connections it 
       opened into this operator.
             
-      This operator can be configured with a Websocket port number which is optional. If the user of this
-      operator doesn't specify a Websocket port number, then a default port number of 443 will be used.
+      This operator can be configured with a Websocket server port number which is optional. If the user of this
+      operator doesn't specify a Websocket server port number, then a default port number of 443 will be used.
       
       Requirements: 
       * Intel RHEL6 or RHEL7 hosts installed with IBM Streams. 
@@ -216,7 +216,7 @@
       </parameter>
       
       <parameter>
-        <name>vgwSessionLoggingNedded</name>
+        <name>vgwSessionLoggingNeeded</name>
         <description>This parameter specifies whether logging is needed when the IBM Voice Gateway session is in progress with this operator. (Default is false)</description>
         <optional>true</optional>
         <rewriteAllowed>true</rewriteAllowed>
@@ -234,8 +234,18 @@
         <type>uint32</type>
         <cardinality>1</cardinality>
       </parameter>
+      
+      <parameter>
+        <name>ipv6Available</name>
+        <description>This parameter indicates whether the ipv6 protocol stack is available in the Linux machine where the IBMVoiceGatewaySource operator is running. (Default is true)</description>
+        <optional>true</optional>
+        <rewriteAllowed>true</rewriteAllowed>
+        <expressionMode>AttributeFree</expressionMode>
+        <type>boolean</type>
+        <cardinality>1</cardinality>
+      </parameter>
     </parameters>
-    
+        
     <inputPorts>
     </inputPorts>
     <outputPorts>

@@ -8,7 +8,7 @@
 /*
 ============================================================
 First created on: Sep/17/2019
-Last modified on: Oct/19/2019
+Last modified on: Nov/06/2019
 ============================================================
 */
 
@@ -53,8 +53,9 @@ public:
 	SPL::float64 initDelay;
 	SPL::boolean vgwLiveMetricsUpdateNeeded;
 	bool websocketLoggingNeeded;
-	bool vgwSessionLoggingNedded;
+	bool vgwSessionLoggingNeeded;
 	SPL::int64 vgwStaleSessionPurgeInterval;
+	bool ipv6Available;
 	server_plain endpoint_plain;
 	server_tls endpoint_tls;
 	SPL::boolean tlsEndpointStarted;
@@ -81,14 +82,24 @@ public:
 	    // Following are the call metadata details sent by the IBM Voice Gateway. 
 	    std::string vgwSessionId;
 	    std::string vgwSIPCallID;
-	    // This field seems to have the agent phone number.
+	    // This field seems to carry either the agent phone number or the
+	    // caller phone number depending on who is on a given voice channel.
 	    // e-g: sip:+15712487798@169.61.56.229
+	    // (OR) sip:+19149453000@4.55.11.163:5060
+	    // Read more details in the commentary provided for the other fields below.
 		std::string vgwParticipantURI;
 		std::string vgwTenantID;
 		// According to the VGW team, SBC sends the caller's number
 		// in this field to VGW which simply passes it through.
-		// This could be the caller's number or the Twillio SIP trunk number.
+		// VGW team says this could be the caller's number or the Twillio SIP trunk number.
+		// But, in my tests I only noticed a string that looks like the following which
+		// has no phone number at all.
 		// e-g: sip:SIPREC-SRS@184.172.233.76
+		// By doing more tests, I observed something (as of Nov/02/2019) that 
+		// I documented in the vgwParticipantURI field above. For now, I'm going to use 
+		// the vgwParticipantURI field's value in combintation with the vgwIsCaller 
+		// and/or the vgwVoiceChannelNumber fields that appear below to assign the 
+		// phone number as that of the agent or the caller.
 		std::string vgwSIPToURI;
 		// This tells if this connection carries caller's or agent's speech data.
 		bool vgwIsCaller;
@@ -96,6 +107,11 @@ public:
 		// Whoever (caller or agent) sends the first round of speech data bytes will
 		// get assigned a voice channel of 1. The next one to follow will get
 		// assigned a voice channel of 2.
+		// In my tests of calling into a call center i.e. a virtual agent's number,
+		// I noticed that voice channel 1 always goes to the agent and 
+		// voice channel 2 always goes to the caller/customer. We can also use this
+		// clue to decide whether the phone number appearing in the vgwParticipantURI
+		// field belongs to an agent or a caller/customer.
 		int32_t vgwVoiceChannelNumber;
 	};
 	
@@ -171,8 +187,10 @@ private:
 	int32_t getTupleCnt(int32_t const & emittedTupleCnt);
 	int32_t getTotalSpeechDataBytesReceived(int32_t const & totalSpeechDataBytesReceived);
 	int32_t getVoiceChannelNumber(int32_t const & voiceChannelNumber);
-	std::string getAgentPhoneNumber(std::string const & agentPhoneNumber);
-	std::string getCallerPhoneNumber(std::string const & callerPhoneNumber);
+	std::string getAgentPhoneNumber(std::string const & phoneNumber,
+		bool const & isCaller, int32_t const & voiceChannelNumber);
+	std::string getCallerPhoneNumber(std::string const & phoneNumber,
+		bool const & isCaller, int32_t const & voiceChannelNumber);
 }; 
 
 <%SPL::CodeGen::headerEpilogue($model);%>
