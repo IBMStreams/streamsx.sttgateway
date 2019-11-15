@@ -2,7 +2,7 @@
 title: "Toolkit Overview [Technical]"
 permalink: /docs/knowledge/overview/
 excerpt: "Basic knowledge of the toolkit's technical domain."
-last_modified_at: 2019-10-22T06:15:48+01:00
+last_modified_at: 2019-11-14T08:15:48+01:00
 redirect_from:
    - /theme-setup/
 sidebar:
@@ -25,6 +25,23 @@ The streamsx.sttgateway toolkit provides the following two operators that can he
 In a Streams application, these two operators can either be used together or independent of each other. In a real-time speech analytics scenario for transcribing live voice calls into text, both of these operators can be used as part of a Streams application graph. In a batch mode operation to convert a set of prerecorded audio files stored in a file system directory into text, WatsonSTT operator can be used on its own in a Streams application graph. So, your application requirements will determine whether you will need only one or both of those operators.
 
 This toolkit excels at ingesting speech data from an enterprise telephony infrastructure and from audio files (wav, mp3 etc.) as well as in sending the speech data to the Watson STT service and get back the transcription results. Based on the user preference, this toolkit is designed to work with the IBM Watson STT service available on the IBM public cloud or on the hybrid cloud ready IBM Cloud Pak for Data (CP4D). It uses the Websocket communication API interface to interact with both the IBM Voice Gateway and the Watson STT service. So, processing of the audio data either from the real-time speech conversations or from the prerecorded speech conversations that are stored in files can be accomplished by this toolkit.
+
+## Architectural patterns enabled by this toolkit
+1. For the **real-time** speech to text transcription, following are the possible architectural patterns.
+
+- <span style="color:green">Your Telephony SIPREC-->IBM Voice Gateway-->IBM Streams<-->Watson Speech To Text on IBM Public Cloud</span>
+ 
+- <span style="color:blue">Your Telephony SIPREC-->IBM Voice Gateway-->IBM Streams<-->Watson Speech To Text on IBM Cloud Pak for Data (CP4D)</span>
+ 
+- <span style="color:purple">Your Telephony SIPREC-->IBM Voice Gateway-->IBM Streams<-->Watson Speech To Text engine embedded inside an IBM Streams operator</span>
+
+2. For the **batch (post call)** speech to text transcription, following are the possible architectural patterns.
+ 
+- <span style="color:green">Speech data files in a directory-->IBM Streams<-->Watson Speech To Text on IBM Public Cloud</span>
+ 
+- <span style="color:blue">Speech data files in a directory-->IBM Streams<-->Watson Speech To Text on IBM Cloud Pak for Data (CP4D)</span>
+ 
+- <span style="color:purple">Speech data files in a directory-->IBM Streams<-->Watson Speech To Text engine embedded inside an IBM Streams operator</span>
 
 ## Technical positioning of this toolkit
 At a very high level, this toolkit shares the same design goal as the other IBM Streams toolkit named com.ibm.streams.speech2text to convert speech data into text. But, they both work very differently to realize that design goal. IBM Streams users can select either of these two toolkits depending on their application and hardware infrastructure needs. So, it is important to know the following major differences between these two toolkits before choosing the suitable one for a given situation.

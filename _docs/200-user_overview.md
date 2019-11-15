@@ -2,7 +2,7 @@
 title: "Toolkit Usage Overview"
 permalink: /docs/user/overview/
 excerpt: "How to use this toolkit."
-last_modified_at: 2019-10-22T15:10:48+01:00
+last_modified_at: 2019-11-14T08:28:48+01:00
 redirect_from:
    - /theme-setup/
 sidebar:
@@ -190,12 +190,23 @@ make
 st  submitjob  -d  <YOUR_STREAMS_DOMAIN>  -i  <YOUR_STREAMS_INSTANCE>  output/com.ibm.streamsx.sttgateway.sample.watsonstt.VoiceGatewayToStreamsToWatsonSTT.sab -P tlsPort=9443  -P numberOfSTTEngines=14  -P sttApiKey=<YOUR_WATSON_STT_SERVICE_API_KEY>  -P sttResultMode=2   -P contentType="audio/mulaw;rate=8000"
 ```
 
+**Special Note**
+For those customers who are using the speech to text engine embedded in the com.ibm.streams.speech2text.watson::WatsonS2T operator, the following example is available as a reference application to exploit that operator in a real-time voice call analytics scenario. It can be compiled and executed as shown below. You have to replace the hardcoded paths and IP addresses to suit your environment.
+
+```
+cd   streamsx.sttgateway/samples/VoiceGatewayToStreamsToWatsonS2T
+make
+st submitjob -P tlsPort=9443 -P vgwSessionLoggingNeeded=false -P numberOfS2TEngines=4 -P WatsonS2TConfigFile=/home/streamsadmin/toolkit.speech2text-v2.12.0/model/en_US.8kHz.general.diarization.low_latency.pset -P WatsonS2TModelFile=/home/streamsadmin/toolkit.speech2text-v2.12.0/model/en_US.8kHz.general.pkg -P ipv6Available=false -P writeTranscriptionResultsToFiles=true -P sendTranscriptionResultsToHttpEndpoint=true -P httpEndpointForSendingTranscriptionResults=http://172.30.105.11:9080/sttresults/Receiver/ports/output/0/inject output/com.ibm.streamsx.sttgateway.sample.watsons2t.VoiceGatewayToStreamsToWatsonS2T.sab
+```
+
 ### Working examples shipped with this toolkit
-As explained in the previous section, there are three examples available within this toolkit directory that can be compiled and tested by using a valid IAM access token (generated via your STT service instance's API key) required to connect to the Watson STT service on the IBM public cloud or by using the regular access token to connect to the Watson STT service on your CP4D cluster. The streamsx.sttgateway toolkit provides a utility composite operator named IAMAccessTokenGenerator that can be used within any Streams application to generate and refresh an IAM access token that stays current and valid at all times. Without a valid IAM access token, this toolkit will not be able to function correctly. So, it is necessary to understand the importance of the IAM access token. The three examples provided in this toolkit will show you how to use the utility composite operator to generate/refresh the IAM access token and send it to the WatsonSTT operator. For using the Watson STT service on your CP4D cluster, you will not require the IAM access token and you will need the regular access token displayed in the CP4D web console. The first two examples show different variations of reading and processing the batch workload from a collection of prerecorded audio files. The third example shows how to get the real-time speech data of  the live voice calls from the IBM Voice Gateway product into IBM Streams and then invoke the Watson Speech To Text service either on the public cloud or on a private cloud running CP4D. Within the same streamsx.sttgateway/samples directory where these three examples are present, there is also a directory named audio-files that contains a few test audio files useful for testing these three examples. 
+As explained in the previous section, there are four examples available within this toolkit directory that can be compiled and tested by using a valid IAM access token (generated via your STT service instance's API key) required to connect to the Watson STT service on the IBM public cloud or by using the regular access token to connect to the Watson STT service on your CP4D cluster. The streamsx.sttgateway toolkit provides a utility composite operator named IAMAccessTokenGenerator that can be used within any Streams application to generate and refresh an IAM access token that stays current and valid at all times. Without a valid IAM access token, this toolkit will not be able to function correctly. So, it is necessary to understand the importance of the IAM access token. The four examples provided in this toolkit will show you how to use the utility composite operator to generate/refresh the IAM access token and send it to the WatsonSTT operator. For using the Watson STT service on your CP4D cluster, you will not require the IAM access token and you will need the regular access token displayed in the CP4D web console. The first two examples show different variations of reading and processing the batch workload from a collection of prerecorded audio files. The third example shows how to get the real-time speech data of  the live voice calls from the IBM Voice Gateway product into IBM Streams and then invoke the Watson Speech To Text service either on the public cloud or on a private cloud running CP4D. The fourth example shows how to do real-time speech to text transcription using the embedded STT engine available inside a Streams operator named com.ibm.streams.speech2text.watson::WatsonS2T. Within the same streamsx.sttgateway/samples directory where these four examples are present, there is a directory named audio-files that contains a few test audio files useful for testing the batch speech to text examples. There is also a helper application named stt_results_http_receiver which can be used to see how the real-time STT results can be streamed to an external HTTP server.
 
 * [AudioFileWatsonSTT](https://github.com/IBMStreams/streamsx.sttgateway/tree/master/samples/AudioFileWatsonSTT)
 * [AudioRawWatsonSTT](https://github.com/IBMStreams/streamsx.sttgateway/tree/master/samples/AudioRawWatsonSTT)
 * [VoiceGatewayToStreamsToWatsonSTT](https://github.com/IBMStreams/streamsx.sttgateway/tree/master/samples/VoiceGatewayToStreamsToWatsonSTT)
+* [VoiceGatewayToStreamsToWatsonS2T](https://github.com/IBMStreams/streamsx.sttgateway/tree/master/samples/VoiceGatewayToStreamsToWatsonS2T)
+* [stt_results_http_receiver](https://github.com/IBMStreams/streamsx.sttgateway/tree/master/samples/stt_results_http_receiver)
 * [audio_files](https://github.com/IBMStreams/streamsx.sttgateway/tree/master/samples/audio-files)
 
 ## Common log messages generated by the Websocket library

@@ -2,7 +2,7 @@
 title: "Operator Usage Patterns"
 permalink: /docs/user/WatsonSTTUsagePatterns/
 excerpt: "Describes the WatsonSTT operator usage patterns."
-last_modified_at: 2019-10-22T18:22:48+01:00
+last_modified_at: 2019-11-14T08:53:48+01:00
 redirect_from:
    - /theme-setup/
 sidebar:
@@ -87,8 +87,9 @@ In your SPL application, this operator can be invoked with either all operator p
        initDelay: $initDelayBeforeSendingDataToSttEngines;
        vgwLiveMetricsUpdateNeeded: $vgwLiveMetricsUpdateNeeded;
        websocketLoggingNeeded: $vgwWebsocketLoggingNeeded;
-       vgwSessionLoggingNedded: $vgwSessionLoggingNedded;
+       vgwSessionLoggingNeeded: $vgwSessionLoggingNeeded;
        vgwStaleSessionPurgeInterval: $vgwStaleSessionPurgeInterval;
+	   ipv6Available: $ipv6Available;
 			
     // Get these values via custom output functions	provided by this operator.
     output
@@ -137,6 +138,15 @@ There is a working example included within this toolkit. You can use it as a ref
 cd   streamsx.sttgateway/samples/VoiceGatewayToStreamsToWatsonSTT
 make
 st  submitjob  -d  <YOUR_STREAMS_DOMAIN>  -i  <YOUR_STREAMS_INSTANCE>  output/com.ibm.streamsx.sttgateway.sample.watsonstt.VoiceGatewayToStreamsToWatsonSTT.sab -P tlsPort=9443  -P numberOfSTTEngines=14  -P sttApiKey=<YOUR_WATSON_STT_SERVICE_API_KEY>  -P sttResultMode=2   -P contentType="audio/mulaw;rate=8000"
+```
+
+**Special Note**
+For those customers who are using the speech to text engine embedded in the com.ibm.streams.speech2text.watson::WatsonS2T operator, the following example is available as a reference application to exploit that operator in a real-time voice call analytics scenario. It can be compiled and executed as shown below. You have to replace the hardcoded paths and IP addresses to suit your environment.
+
+```
+cd   streamsx.sttgateway/samples/VoiceGatewayToStreamsToWatsonS2T
+make
+st submitjob -P tlsPort=9443 -P vgwSessionLoggingNeeded=false -P numberOfS2TEngines=4 -P WatsonS2TConfigFile=/home/streamsadmin/toolkit.speech2text-v2.12.0/model/en_US.8kHz.general.diarization.low_latency.pset -P WatsonS2TModelFile=/home/streamsadmin/toolkit.speech2text-v2.12.0/model/en_US.8kHz.general.pkg -P ipv6Available=false -P writeTranscriptionResultsToFiles=true -P sendTranscriptionResultsToHttpEndpoint=true -P httpEndpointForSendingTranscriptionResults=http://172.30.105.11:9080/sttresults/Receiver/ports/output/0/inject output/com.ibm.streamsx.sttgateway.sample.watsons2t.VoiceGatewayToStreamsToWatsonS2T.sab
 ```
 
 *******************************

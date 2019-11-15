@@ -22,7 +22,7 @@
 <div class="body refbody">
 <div class="section">
 <p class="p">
-<a class="xref" href="../toolkits/toolkits.html">Gateway to the IBM Speech To Text (STT) cloud service</a> &gt; <a class="xref" href="tk$com.ibm.streamsx.sttgateway.html">com.ibm.streamsx.sttgateway 1.0.6</a> &gt; <a class="xref" href="ns$com.ibm.streamsx.sttgateway.watson.html">com.ibm.streamsx.sttgateway.watson</a> &gt; IBMVoiceGatewaySource</p>
+<a class="xref" href="../toolkits/toolkits.html">Gateway to the IBM Speech To Text (STT) cloud service</a> &gt; <a class="xref" href="tk$com.ibm.streamsx.sttgateway.html">com.ibm.streamsx.sttgateway 1.0.5</a> &gt; <a class="xref" href="ns$com.ibm.streamsx.sttgateway.watson.html">com.ibm.streamsx.sttgateway.watson</a> &gt; IBMVoiceGatewaySource</p>
 
 </div>
 
@@ -35,7 +35,7 @@
 <p class="p">      The IBMVoiceGatewaySource operator is designed to ingest        speech data from the IBM Voice Gateway product version 1.0.3.0 or above.        This speech data is ingested in binary format from the        IBM Voice Gateway into this operator via the Websocket interface.        Such speech data arrives here in multiple fragments directly from        a live voice call. This operator is capable of receiving speech data        from multiple calls that can all happen at the very same time        between different pairs of speakers. For every voice call it handles        in real-time, the IBM Voice Gateway product will open two        Websocket connections into this operator and start sending the        live speech data on both of those connections. One of those connections        will carry the speech data of the agent and the other connection        will carry the speech data of the customer. This operator will        keep sending the audio chunks received on those two Websocket        connections via its output stream for consumption by the        downstream operators. At the end of the any given call,        IBM Voice Gateway will close the two WebSocket connections it        opened into this operator.
 </p>
 
-<p class="p">      This operator can be configured with a Websocket server port number which is optional. If the user of this       operator doesn't specify a Websocket server port number, then a default port number of 443 will be used.
+<p class="p">      This operator can be configured with a Websocket port number which is optional. If the user of this       operator doesn't specify a Websocket port number, then a default port number of 443 will be used.
 </p>
 
 <div class="p">      Requirements: 
@@ -75,9 +75,9 @@
  
   <dt class="dt dlterm">Parameters</dt>
 
-  <dd class="dd">This operator supports 10 parameters.
+  <dd class="dd">This operator supports 9 parameters.
 <p class="p"> Optional: 
-<a class="xref" href="#spldoc_operator__parameter__certificateFileName">certificateFileName</a>, <a class="xref" href="#spldoc_operator__parameter__initDelay">initDelay</a>, <a class="xref" href="#spldoc_operator__parameter__ipv6Available">ipv6Available</a>, <a class="xref" href="#spldoc_operator__parameter__nonTlsEndpointNeeded">nonTlsEndpointNeeded</a>, <a class="xref" href="#spldoc_operator__parameter__nonTlsPort">nonTlsPort</a>, <a class="xref" href="#spldoc_operator__parameter__tlsPort">tlsPort</a>, <a class="xref" href="#spldoc_operator__parameter__vgwLiveMetricsUpdateNeeded">vgwLiveMetricsUpdateNeeded</a>, <a class="xref" href="#spldoc_operator__parameter__vgwSessionLoggingNeeded">vgwSessionLoggingNeeded</a>, <a class="xref" href="#spldoc_operator__parameter__vgwStaleSessionPurgeInterval">vgwStaleSessionPurgeInterval</a>, <a class="xref" href="#spldoc_operator__parameter__websocketLoggingNeeded">websocketLoggingNeeded</a>
+<a class="xref" href="#spldoc_operator__parameter__certificateFileName">certificateFileName</a>, <a class="xref" href="#spldoc_operator__parameter__initDelay">initDelay</a>, <a class="xref" href="#spldoc_operator__parameter__nonTlsEndpointNeeded">nonTlsEndpointNeeded</a>, <a class="xref" href="#spldoc_operator__parameter__nonTlsPort">nonTlsPort</a>, <a class="xref" href="#spldoc_operator__parameter__tlsPort">tlsPort</a>, <a class="xref" href="#spldoc_operator__parameter__vgwLiveMetricsUpdateNeeded">vgwLiveMetricsUpdateNeeded</a>, <a class="xref" href="#spldoc_operator__parameter__vgwSessionLoggingNedded">vgwSessionLoggingNedded</a>, <a class="xref" href="#spldoc_operator__parameter__vgwStaleSessionPurgeInterval">vgwStaleSessionPurgeInterval</a>, <a class="xref" href="#spldoc_operator__parameter__websocketLoggingNeeded">websocketLoggingNeeded</a>
 
 </p>
 </dd>
@@ -327,9 +327,9 @@
 
 <div class="section">
 <p class="p splhead-1"><strong class="ph b"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters">Parameters</a></strong></p>
-This operator supports 10 parameters.
+This operator supports 9 parameters.
 <p class="p"> Optional: 
-<a class="xref" href="#spldoc_operator__parameter__certificateFileName">certificateFileName</a>, <a class="xref" href="#spldoc_operator__parameter__initDelay">initDelay</a>, <a class="xref" href="#spldoc_operator__parameter__ipv6Available">ipv6Available</a>, <a class="xref" href="#spldoc_operator__parameter__nonTlsEndpointNeeded">nonTlsEndpointNeeded</a>, <a class="xref" href="#spldoc_operator__parameter__nonTlsPort">nonTlsPort</a>, <a class="xref" href="#spldoc_operator__parameter__tlsPort">tlsPort</a>, <a class="xref" href="#spldoc_operator__parameter__vgwLiveMetricsUpdateNeeded">vgwLiveMetricsUpdateNeeded</a>, <a class="xref" href="#spldoc_operator__parameter__vgwSessionLoggingNeeded">vgwSessionLoggingNeeded</a>, <a class="xref" href="#spldoc_operator__parameter__vgwStaleSessionPurgeInterval">vgwStaleSessionPurgeInterval</a>, <a class="xref" href="#spldoc_operator__parameter__websocketLoggingNeeded">websocketLoggingNeeded</a>
+<a class="xref" href="#spldoc_operator__parameter__certificateFileName">certificateFileName</a>, <a class="xref" href="#spldoc_operator__parameter__initDelay">initDelay</a>, <a class="xref" href="#spldoc_operator__parameter__nonTlsEndpointNeeded">nonTlsEndpointNeeded</a>, <a class="xref" href="#spldoc_operator__parameter__nonTlsPort">nonTlsPort</a>, <a class="xref" href="#spldoc_operator__parameter__tlsPort">tlsPort</a>, <a class="xref" href="#spldoc_operator__parameter__vgwLiveMetricsUpdateNeeded">vgwLiveMetricsUpdateNeeded</a>, <a class="xref" href="#spldoc_operator__parameter__vgwSessionLoggingNedded">vgwSessionLoggingNedded</a>, <a class="xref" href="#spldoc_operator__parameter__vgwStaleSessionPurgeInterval">vgwStaleSessionPurgeInterval</a>, <a class="xref" href="#spldoc_operator__parameter__websocketLoggingNeeded">websocketLoggingNeeded</a>
 
 </p>
 <dl class="dl">
@@ -381,41 +381,6 @@ This operator supports 10 parameters.
 
      <dd class="dd">   <ul class="sl simple">
      <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__type">Type</a>: float64
-     </li>
-
-     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__cardinality">Cardinality</a>: 1
-     </li>
-
-     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__optional">Optional</a>: true
-     </li>
-
-     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__expressionmode">ExpressionMode</a>: AttributeFree
-     </li>
-
-   </ul>
-
-     <p class="p"/>
-     </dd>
-
-    
-  </dl>
-
-     </dd>
-
-  
-  
-     <dt class="dt dlterm"><a name="spldoc_operator__parameter__ipv6Available"><!-- --></a><tt class="ph tt">ipv6Available</tt></dt>
-
-     <dd class="dd">
-<p class="p">This parameter indicates whether the ipv6 protocol stack is available in the Linux machine where the IBMVoiceGatewaySource operator is running. (Default is true)
-</p>
-
-  <dl class="dl">
-    
-     <dt class="dt dlterm">Properties</dt>
-
-     <dd class="dd">   <ul class="sl simple">
-     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__type">Type</a>: boolean
      </li>
 
      <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__cardinality">Cardinality</a>: 1
@@ -579,7 +544,7 @@ This operator supports 10 parameters.
 
   
   
-     <dt class="dt dlterm"><a name="spldoc_operator__parameter__vgwSessionLoggingNeeded"><!-- --></a><tt class="ph tt">vgwSessionLoggingNeeded</tt></dt>
+     <dt class="dt dlterm"><a name="spldoc_operator__parameter__vgwSessionLoggingNedded"><!-- --></a><tt class="ph tt">vgwSessionLoggingNedded</tt></dt>
 
      <dd class="dd">
 <p class="p">This parameter specifies whether logging is needed when the IBM Voice Gateway session is in progress with this operator. (Default is false)

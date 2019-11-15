@@ -2,7 +2,7 @@
 title: "Operator Design"
 permalink: /docs/user/OperatorDesign/
 excerpt: "Describes the design of the Message Hub toolkit operators."
-last_modified_at: 2019-10-22T15:52:48+01:00
+last_modified_at: 2019-11-14T08:47:48+01:00
 redirect_from:
    - /theme-setup/
 sidebar:
@@ -38,8 +38,9 @@ Following are the parameters accepted by the IBMVoiceGatewaySource operator. Som
 | initDelay | `float64` | `0.0` | This parameter specifies a one time delay in seconds for which this source operator should wait before start generating its first tuple. |
 | vgwLiveMetricsUpdateNeeded | `boolean` | `true` | This parameter specifies whether live update for this operator's custom metrics is needed. |
 | websocketLoggingNeeded | `boolean` | `false` | This parameter specifies whether logging is needed from the WebSocket library. |
-| vgwSessionLoggingNedded | `boolean` | `false` | This parameter specifies whether logging is needed when the IBM Voice Gateway session is in progress with this operator. |
+| vgwSessionLoggingNeeded | `boolean` | `false` | This parameter specifies whether logging is needed when the IBM Voice Gateway session is in progress with this operator. |
 | vgwStaleSessionPurgeInterval | `uint32` | `10800` | This parameter specifies periodic time interval in seconds during which any stale Voice Gateway sessions should be purged to free up memory usage. |
+| ipv6Available | `boolean` | `true` | This parameter indicates whether the ipv6 protocol stack is available in the Linux machine where the IBMVoiceGatewaySource operator is running. |
 
 ### IBMVoiceGatewaySource operator's custom output functions
 Following are the custom output functions supported by the IBMVoiceGatewaySource operator. These functions can be called as needed within the output clause of this operator's SPL invocation code.
