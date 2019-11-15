@@ -28,19 +28,12 @@ This toolkit excels at ingesting speech data from an enterprise telephony infras
 
 ## Architectural patterns enabled by this toolkit
 1. For the **real-time** speech to text transcription, following are the possible architectural patterns.
-
 - <span style="color:green">Your Telephony SIPREC-->IBM Voice Gateway-->IBM Streams<-->Watson Speech To Text on IBM Public Cloud</span>
- 
 - <span style="color:blue">Your Telephony SIPREC-->IBM Voice Gateway-->IBM Streams<-->Watson Speech To Text on IBM Cloud Pak for Data (CP4D)</span>
- 
 - <span style="color:purple">Your Telephony SIPREC-->IBM Voice Gateway-->IBM Streams<-->Watson Speech To Text engine embedded inside an IBM Streams operator</span>
-
 2. For the **batch (post call)** speech to text transcription, following are the possible architectural patterns.
- 
 - <span style="color:green">Speech data files in a directory-->IBM Streams<-->Watson Speech To Text on IBM Public Cloud</span>
- 
 - <span style="color:blue">Speech data files in a directory-->IBM Streams<-->Watson Speech To Text on IBM Cloud Pak for Data (CP4D)</span>
- 
 - <span style="color:purple">Speech data files in a directory-->IBM Streams<-->Watson Speech To Text engine embedded inside an IBM Streams operator</span>
 
 ## Technical positioning of this toolkit
