@@ -219,6 +219,7 @@ public composite AudioFileWatsonSTT {
 				// previous operator can complete generating the
 				// IAM access token and send it to the WatsonSTT operator.
 				initDelay : 30.0;
+				sortBy: name;
 				
 			config
 				placement: partitionIsolation;
@@ -362,17 +363,17 @@ public composite AudioFileWatsonSTT {
 						++_conversationCnt;
 						
 						if (_conversationCnt == 1) {
-							appTrc(Trace.error, "STT result for conversation " + (rstring) _conversationCnt
+							printStringLn(hourMinuteSecondMillisec(getTimestamp()) + " STT result for conversation " + (rstring) _conversationCnt
 								+ " " + conversationId + " arrived.");
 						} else if (_conversationCnt == $sttBatchSize) {
-							appTrc(Trace.error, "STT result for conversation " + (rstring) _conversationCnt
+							printStringLn(hourMinuteSecondMillisec(getTimestamp()) + " STT result for conversation " + (rstring) _conversationCnt
 								+ " " + conversationId + " arrived.");
 						}
 					} else {
 						// User didn't give a non-zero batch size. In that case,
 						// we will print every transcription result, which will make the
 						// file system busy in the Distributed Mode execution.
-						appTrc(Trace.error, (rstring)++_conversationCnt + 
+						printStringLn(hourMinuteSecondMillisec(getTimestamp()) + " " + (rstring)++_conversationCnt + 
 							") STT result: " + (rstring)SR);
 					}
 				}
