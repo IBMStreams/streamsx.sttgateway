@@ -28,7 +28,7 @@ else
 endif
 
 SPL_MAIN_COMPOSITE = com.ibm.streamsx.sttgateway.sample.watsonstt::VoiceGatewayToStreamsToWatsonSTT
-SPLC_FLAGS = -a --c++std=c++11 -x '-I $(STREAMS_STTGATEWAY_TOOLKIT)/impl/include'
+SPLC_FLAGS = -a --c++std=c++11
 SPL_CMD_ARGS ?=
 
 build: distributed
