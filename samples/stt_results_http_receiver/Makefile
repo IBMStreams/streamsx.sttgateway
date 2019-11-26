@@ -4,7 +4,7 @@
 
 # You must ensure that the following line points to your 
 # correct inet server toolkit directory that is of v4.3.1 or above.
-STREAMS_INET_SERVER_TOOLKIT ?= $(HOME)/com.ibm.streamsx.inetserver
+STREAMS_INET_SERVER_TOOLKIT ?= $(HOME)/toolkits/com.ibm.streamsx.inetserver
 
 ifeq ($(STREAMS_STUDIO_BUILDING), 1)
     $(info Building from Streams Studio, use env vars set by studio)

@@ -37,6 +37,7 @@
 
 	<property name="doc.string"         value="doc"/>
 	<property name="doc.dir"            value="${doc.string}/spldoc"/>
+	<property name="doc.dir.old"        value="${toolkit.dir}/${doc.string}"/>
 	<property name="tktitle"            value="Gateway to the IBM Speech To Text (STT) cloud service" />
 	<property name="tkauthor"           value="Senthil Nathan" />
 
@@ -60,26 +61,33 @@
 		<mkdir dir="${ext.dir}"/>
 	</target>
 
-	<target name="all" depends="toolkit" description="Build the toolkit / compatibility target"/>
+	<target name="all" depends="toolkit"
+		description="Build the toolkit index. This is compatibility target for production">
+	</target>
 	
-	<target name="clean" depends="spldoc-clean,samples-clean,toolkit-clean,releaseinfo-clean" description="Clean up generated toolkit artifacts and spldoc">
+	<target name="clean" depends="spldoc-clean,samples-clean,toolkit-clean,releaseinfo-clean"
+		description="Clean up generated toolkit artifacts, spldoc and samples">
 		<delete dir="${out.dir}"/>
 	</target>
 
-	<target name="clean-all" depends="clean,requirements-clean" description="Clean up generated toolkit artifacts and libraries"/>
-
-	<target name="clean-downloads" depends="clean-all" description="Clean up generated toolkit artifacts and libraries and downloaded library files">
-		<delete dir="${ext.dir}"/>
+	<target name="clean-all" depends="clean,requirements-clean"
+		description="Clean up generated toolkit artifacts, spldoc, samples and remove libraries from toolkit directory">
 	</target>
 
-	<target name="toolkit" depends="requirements" description="Build the toolkit index">
+	<target name="clean-total" depends="clean-all,download-clean"
+		description="Clean up generated toolkit artifacts, spldoc, samples, remove libraries from toolkit directory and remove all library files from ext directory">
+	</target>
+
+	<target name="toolkit" depends="requirements"
+		description="Build the toolkit index and all dependencies">
 		<exec executable="${spl-mt}" failonerror="true">
 			<arg value="--directory"/>
 			<arg value="${toolkit.dir}"/>
 		</exec>
 	</target>
 
-	<target name="toolkit-clean" description="Clean the toolkit index">
+	<target name="toolkit-clean"
+		description="Clean the toolkit index">
 		<exec executable="${spl-mt}">
 			<arg value="--directory"/>
 			<arg value="${toolkit.dir}"/>
@@ -88,7 +96,9 @@
 	</target>
 
 	<!-- Download websocket library -->
-	<target name="download-websocket" depends="download-websocket-target" description="Download websocket++ library if not existitng"/>
+	<target name="download-websocket" depends="download-websocket-target"
+		description="Download websocket++ library if not existitng. (all files into ext directory)">
+	</target>
 	
 	<!-- must examine websocket.src.dir.exists property otherwise the get task downloads the source archive all the time 
 	     (no valid file date) -->
@@ -103,14 +113,17 @@
 	</target>
 
 	<!-- Download and build boost -->
-	<target name="download-boost" depends="download-boost-target" description="Download and bootstrap boost library if not existitng"/>
+	<target name="download-boost" depends="download-boost-target"
+		description="Download, untar and bootstrap boost library if not existing. (all files into ext directory)">
+	</target>
 	
 	<!-- must examine boost.exists property, otherwise the tar command is always executed -->
+	<!-- download, untar and bootstrap boost lib -->
 	<target name="download-boost-target" depends="init" unless="${boost.exists}">
 		<echo>Download and bootstrap boost ${boost.version}</echo>
 		<mkdir dir="${ext.dir}/boost-install-files"/>
 		<get src="${boost.archive}/${boost.version}/source/boost_${boost.version.name}.tar.gz" dest="${ext.dir}/boost-install-files/boost-${boost.version}.tar.gz" verbose="true" usetimestamp="true"/>
-		<!-- use tar command because ant target does not set execute property -->
+		<!-- use tar command because ant untar target does not set execute permission -->
 		<exec dir="${ext.dir}/boost-install-files" executable="tar">
 			<arg value="xzf"/>
 			<arg value="boost-${boost.version}.tar.gz"/>
@@ -120,7 +133,13 @@
 		</exec>
 	</target>
 
-	<target name="requirements" depends="download-websocket,download-boost" description="Build/Copy required libraries into toolkit directory">
+	<target name="download-clean"
+		description="Clean up downloaded library sources and the libraries build artifacts from ext directory">
+		<delete dir="${ext.dir}"/>
+	</target>
+
+	<target name="requirements" depends="download-websocket,download-boost"
+		description="Build required libraries and copy results into toolkit directory">
 		<echo>Copy websocketcpp to ${inc.dir}/${websocket.str}</echo>
 		<copy todir="${inc.dir}/${websocket.str}">
 			<fileset dir="${ext.dir}/${websocket.str}-${websocket.version}/${websocket.str}"/>
@@ -141,13 +160,15 @@
 		</exec>
 	</target>
 
-	<target name="requirements-clean" description="Cleanup required libraries">
+	<target name="requirements-clean"
+		description="Remove the required libraries from toolkit directory">
 		<delete dir="${lib.dir}"/>
 		<delete dir="${inc.dir}/${boost.str}"/>
 		<delete dir="${inc.dir}/${websocket.str}"/>
 	</target>
 
-	<target name="spldoc" depends="toolkit" description="Generate the toolkit documentation">
+	<target name="spldoc" depends="toolkit"
+		description="Generate the toolkit documentation">
 		<echo message="Tookit spldoc to: ${doc.dir}"/>
 		<exec executable="${spl-md}" failonerror="true">
 			<arg value="--include-composite-operator-diagram" />
@@ -168,6 +189,7 @@
 		description="Clean the toolkit documentation and samples documentation">
 		<delete dir="${doc.dir}"/>
 		<delete dir="${samples.doc.dir}"/>
+		<delete dir="${doc.dir.old}"/>
 	</target>
 
 	<!-- Targets on samples -->
@@ -175,12 +197,12 @@
 		description="Build all samples">
 		<subant genericantfile="${basedir}/build.xml">
 			<target name="build-sample-target"/>
-			<dirset dir="samples" includes="*" excludes="${doc.string},audio-files"/>
+			<dirset dir="samples" includes="*" excludes="${doc.string},audio-files,VoiceGatewayToStreamsToWatsonS2T"/>
 		</subant>
 	</target>
 	
 	<target name="samples-clean"
-		description="Clean up samples index and samples code">
+		description="Clean up all samples index and samples code">
 		<subant genericantfile="${basedir}/build.xml">
 			<target name="clean-sample-target"/>
 			<dirset dir="samples" includes="*" excludes="${doc.string},audio-files"/>
@@ -188,7 +210,7 @@
 	</target>
 
 	<target name="spldoc-samples" depends="samples"
-		description="Generate the doc for all samples">
+		description="Generate the spldoc for all samples">
 		<echo message="All samples spldoc to: ${samples.doc.dir}"/>
 		<exec executable="bash" outputproperty="samples.list" failonerror="true">
 			<arg value="-c"/>
@@ -227,13 +249,15 @@
 	</target>
 
 	<!-- Targets to build releases -->
-	<target name="release" depends="clean"
-		description="Make a toolkit release archive - purge workspace and build toolkit from scratch">
+	<target name="release" depends="clean-all"
+		description="Make a toolkit release archive - purge workspace except downloaded libs and build toolkit from scratch">
 		<antcall target="release-target" inheritAll="true"/>
 	</target>
 	
 	<target name="release-target" depends="releaseinfo">
 		<antcall target="spldoc"/>
+		<antcall target="spldoc-samples"/>
+		<antcall target="samples-clean"/>
 		<mkdir dir="${release.dir}"/>
 		<!-- Extract the short git commit hash -->
 		<exec executable="git" outputproperty="commithash">
@@ -247,7 +271,7 @@
 			destfile="${releasefilename}"
 			basedir="${basedir}"
 			includes="${toolkit.dir}/** ${samples.dir}/** ${doc.string}/** README.md LICENSE"
-			excludes="**/.toolkitList **/.git* ${toolkit.dir}/.settings/ ${toolkit.dir}/.project ${toolkit.dir}/.classpath ${toolkit.dir}/build.xml ${toolkit.dir}/pom.xml ${toolkit.dir}/icons/ ${toolkit.dir}/impl/java/"
+			excludes="**/.toolkitList **/.git* ${toolkit.dir}/.settings/ ${toolkit.dir}/.externalToolBuilders/ ${toolkit.dir}/.project ${toolkit.dir}/.classpath ${toolkit.dir}/build.xml ${toolkit.dir}/pom.xml ${toolkit.dir}/icons/ ${toolkit.dir}/impl/java/"
 		/>
 		<checksum file="${releasefilename}"/>
 		<checksum algorithm="sha1" file="${releasefilename}"/>

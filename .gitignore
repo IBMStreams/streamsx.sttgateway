@@ -14,7 +14,6 @@ com.ibm.streamsx.sttgateway/.classpath
 com.ibm.streamsx.sttgateway/output
 com.ibm.streamsx.sttgateway/doc
 com.ibm.streamsx.sttgateway/bin
-com.ibm.streamsx.sttgateway/.settings
 com.ibm.streamsx.sttgateway/.toolkitList
 com.ibm.streamsx.sttgateway/toolkit.xml
 com.ibm.streamsx.sttgateway/build.info
