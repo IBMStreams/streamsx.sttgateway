@@ -176,8 +176,7 @@ type S2TResult_t = rstring vgwSessionId, boolean isCustomerSpeechData,
 	list<float64> utteranceWordConfidences, list<rstring> nBestHypotheses, 
 	list<rstring> wordAlternatives, 
 	list<list<float64>> wordAlternativesConfidences,
-	list<list<float64>> wordAlternativesStartTimes, 
-	boolean transcriptionCompleted;
+	list<float64> wordAlternativesStartTimes;
 
 // This is a very minimal set of STT Results you can have.
 /*
@@ -669,6 +668,7 @@ public composite VoiceGatewayToStreamsToWatsonS2T {
 		}
 		*/
 		// =================================================================
+	config restartable : false;
 } // End of the main composite.
 
 // Following is a composite where we are going to perform the
@@ -676,18 +676,19 @@ public composite VoiceGatewayToStreamsToWatsonS2T {
 // Speech 2 Text transcription.
 public composite IBMWatsonSpeech2Text(input AudioBlobContent; output S2TResult, S2TDiagnostics) {
 	param
+		expression<float64> $samplingRate : (float64)getSubmissionTimeValue("samplingRate", "8000.0");
 		expression<rstring> $watsonS2TConfigFile :
 			getSubmissionTimeValue("WatsonS2TConfigFile",
 			"/homes/hny5/sen/s2t_standalone/toolkit.speech2text-v2.12.0/model/en_US.8kHz.general.diarization.low_latency.pset") ;
 		expression<rstring> $watsonS2TModelFile :
 			getSubmissionTimeValue("WatsonS2TModelFile",
 			"/homes/hny5/sen/s2t_standalone/toolkit.speech2text-v2.12.0/model/en_US.8kHz.general.pkg") ;
-		expression<rstring> $watsonS2TLMPatchFile1 :
-			getSubmissionTimeValue("WatsonS2TLMPatchFile1", "") ;
-		expression<float32> $watsonS2TLMPatchWeight1 :(float32)
-			getSubmissionTimeValue("WatsonS2TLMPatchWeight1", "0.7") ;
-		expression<rstring> $watsonS2TAMPatchFile1 :
-			getSubmissionTimeValue("WatsonS2TAMPatchFile1", "");
+		expression<rstring> $watsonGrammarPatchFile1 :
+			getSubmissionTimeValue("watsonGrammarPatchFile1", "") ;
+		expression<float32> $watsonGrammarPatchWeights1 :(float32)
+			getSubmissionTimeValue("watsonGrammarPatchWeights1", "0.7") ;
+		expression<rstring> $watsonAMPatchFile :
+			getSubmissionTimeValue("watsonAMPatchFile", "");
 		expression<boolean> $outputNBestUtterances :(boolean)
 			getSubmissionTimeValue("OutputNBestUtterances", "false") ;
 
@@ -773,13 +774,14 @@ public composite IBMWatsonSpeech2Text(input AudioBlobContent; output S2TResult, 
 				}
 
 			param
+				samplingRate : $samplingRate;
 				watsonConfigFile : $watsonS2TConfigFile ;
 				watsonModelFile : $watsonS2TModelFile ;
 				// If you have no LM and/or AM patch files. it is okay to 
 				// set the following patch file parameters to an empty string.
-				watsonLMPatchFiles : $watsonS2TLMPatchFile1 ;
-				watsonLMPatchWeights: $watsonS2TLMPatchWeight1;
-				watsonAMPatchFiles: $watsonS2TAMPatchFile1;
+				watsonGrammarPatchFiles : $watsonGrammarPatchFile1;
+				watsonGrammarPatchWeights: $watsonGrammarPatchWeights1;
+				watsonAMPatchFile: $watsonAMPatchFile;
 				
 				//
 				// If we set this to false, then it will process every incoming 
@@ -800,7 +802,6 @@ public composite IBMWatsonSpeech2Text(input AudioBlobContent; output S2TResult, 
 				
 			output
 				S2TResult : utteranceText = getUtteranceText(),
-					transcriptionCompleted = transcriptionComplete(),
 					utteranceStartTime = getUtteranceStartTime(),
 					utteranceEndTime = getUtteranceEndTime(),
 					utteranceNumber = getUtteranceNumber(),
@@ -880,6 +881,11 @@ public composite S2TResultProcessor(input MyTranscriptionResult) {
 						submit(MTR, TRFSTH);
 					}
 				}
+				onPunct MTR: {
+					if ($writeTranscriptionResultsToFiles == true) {
+						submit(currentPunct(), TRFWTF);
+					}
+				}
 		}
 		
 		() as MySink1 = FileSink(TranscriptionResultForWritingToFile as TRFWTF) {
@@ -890,6 +896,7 @@ public composite S2TResultProcessor(input MyTranscriptionResult) {
 				quoteStrings: false;
 				append: true;
 				flush: 1u;
+				writePunctuations: true;
 
 			config
 				threadedPort: queue(TRFWTF, Sys.Wait);

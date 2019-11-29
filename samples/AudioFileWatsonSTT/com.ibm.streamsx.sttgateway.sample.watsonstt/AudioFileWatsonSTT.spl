@@ -381,4 +381,6 @@ public composite AudioFileWatsonSTT {
 			config
 				threadedPort: queue(SR, Sys.Wait);
 		}
+
+	config restartable: false;
 } // End of composite AudioFileWatsonSTT (Main composite)

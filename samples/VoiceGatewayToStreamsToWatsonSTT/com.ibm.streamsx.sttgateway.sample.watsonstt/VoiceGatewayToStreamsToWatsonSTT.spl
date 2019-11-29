@@ -147,7 +147,7 @@ public composite VoiceGatewayToStreamsToWatsonSTT {
 			(float64)getSubmissionTimeValue("sttAccessTokenRefreshInterval", "55.00");
 		// Specify the IBM STT on Cloud Pak for Data (CP4D i.e. private cloud) access token.
 		// You should leave this submission time value empty when not using STT on CP4D.
-		expression<rstring> $sttOnCP4DAccessToken : getSubmissionTimeValue("sttOnCP4DAccessToken", "");		
+		expression<rstring> $sttOnCP4DAccessToken : getSubmissionTimeValue("sttOnCP4DAccessToken", "");
 		expression<int32> $numberOfSTTEngines :(int32)
 			getSubmissionTimeValue("numberOfSTTEngines", "10") ;
 		// Time in seconds to wait before sending data to the STT engines.
@@ -428,7 +428,7 @@ public composite VoiceGatewayToStreamsToWatsonSTT {
 									" two speakers in every given concurrent voice call.");
 							}
 
-							return;	
+							return;
 						} else {
 							// We got an idle STT engine.
 							BSD.sttEngineId = mySttEngineId;
@@ -677,6 +677,8 @@ public composite VoiceGatewayToStreamsToWatsonSTT {
 		}
 		*/
 		// =================================================================
+
+	config restartable: false;
 } // End of the main composite.
 
 // Following is a composite where we are going to perform the
@@ -865,7 +867,7 @@ public composite STTResultProcessor(input MyTranscriptionResult) {
 			getSubmissionTimeValue("httpEndpointForSendingTranscriptionResults", 
 				"http://www.MyTranscriptionResults.com");
 		
-		// This submission time value indicates a file name where the HTTP responses will be logged.	
+		// This submission time value indicates a file name where the HTTP responses will be logged.
 		expression<rstring> $httpResponseFile : 
 			getSubmissionTimeValue("httpResponseFile", "/dev/null");
 			
