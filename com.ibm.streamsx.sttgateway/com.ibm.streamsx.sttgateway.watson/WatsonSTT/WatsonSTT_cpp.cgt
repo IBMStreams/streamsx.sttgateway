@@ -200,10 +200,8 @@ MY_OPERATOR::MY_OPERATOR()
 {
 	// Custom metrics for this operator are already defined in the operator model XML file. 
 	// Hence, there is no need to explicitly create them here.
-	// Simply get the custom metrics already defined for this operator. 
-	// We will update the Counter kind custom metrics when the operator starts.
-	// We will update the Gauge kind custom metrics during transcription only when the 
-	// sttLiveMetricsUpdateNeeded optional operator parameter is set to true.
+	// Simply get the custom metrics already defined for this operator.
+	// The update of metrics nFullAudioConversationsReceived and nFullAudioConversationsTranscribed depends on parameter sttLiveMetricsUpdateNeeded
 	OperatorMetrics  & opm = getContext().getMetrics();
 	nSTTResultModeMetric = & opm.getCustomMetricByName("nSTTResultMode");
 	nWebsocketConnectionAttemptsMetric = & opm.getCustomMetricByName("nWebsocketConnectionAttempts");

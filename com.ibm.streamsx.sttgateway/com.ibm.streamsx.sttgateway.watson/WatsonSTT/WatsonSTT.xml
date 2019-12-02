@@ -47,14 +47,7 @@
       <metrics>
         <metric>
           <name>nSTTResultMode</name>
-          <description>
-          STT result mode currently in effect for a given operator instance.
-          
-          NOTE: A few custom metrics are available for the WatsonSTT operator. 
-          The Counter kind metrics listed here will be updated when the operator starts. 
-          But, the Gauge kind metrics will be updated live during transcription only 
-          when the sttLiveMetricsUpdateNeeded operator parameter is set to true.
-          </description>
+          <description>STT result mode currently in effect for a given operator instance.</description>
           <kind>Counter</kind>
         </metric>
         
@@ -66,14 +59,22 @@
         
         <metric>
           <name>nFullAudioConversationsReceived</name>
-          <description>Number of full audio conversations received for transcription by this operator instance.</description>
-          <kind>Gauge</kind>
+          <description>
+          Number of full audio conversations received for transcription by this operator instance.
+          
+          *NOTE:* This metric is only updated if parameter `sttLiveMetricsUpdateNeeded` is true.
+          </description>
+          <kind>Counter</kind>
         </metric>
         
         <metric>
           <name>nFullAudioConversationsTranscribed</name>
-          <description>Number of full audio conversations transcribed by this operator instance.</description>
-          <kind>Gauge</kind>
+          <description>
+          Number of full audio conversations transcribed by this operator instance.
+          
+          *NOTE:* This metric is only updated if parameter `sttLiveMetricsUpdateNeeded` is true.
+          </description>
+          <kind>Counter</kind>
         </metric>
       </metrics>
       
@@ -451,7 +452,7 @@
 
       <parameter>
         <name>sttLiveMetricsUpdateNeeded</name>
-        <description>This parameter specifies whether live update for this operator's custom metrics is needed. (Default is true)</description>
+        <description>This parameter specifies whether live update for this operator's metrics `nFullAudioConversationsReceived` and `nFullAudioConversationsTranscribed` is needed. (Default is true)</description>
         <optional>true</optional>
         <rewriteAllowed>true</rewriteAllowed>
         <expressionMode>AttributeFree</expressionMode>

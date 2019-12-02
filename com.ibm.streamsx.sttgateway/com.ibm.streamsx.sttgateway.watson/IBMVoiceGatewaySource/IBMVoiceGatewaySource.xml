@@ -46,19 +46,31 @@
       <metrics>
         <metric>
           <name>nVoiceCallsProcessed</name>
-          <description>Number of voice calls processed by this operator instance.</description>
-          <kind>Gauge</kind>
+          <description>
+          Number of voice calls processed by this operator instance.
+          
+          *NOTE:* This metric is only updated if parameter `vgwLiveMetricsUpdateNeeded` is true.
+          </description>
+          <kind>Counter</kind>
         </metric>
 
         <metric>
           <name>nSpeechDataBytesReceived</name>
-          <description>Total number of speech data bytes received by this operator instance.</description>
-          <kind>Gauge</kind>
+          <description>
+          Total number of speech data bytes received by this operator instance.
+          
+          *NOTE:* This metric is only updated if parameter `vgwLiveMetricsUpdateNeeded` is true.
+          </description>
+          <kind>Counter</kind>
         </metric>
         
         <metric>
           <name>nOutputTuplesSent</name>
-          <description>Number of output tuples sent by this operator instance.</description>
+          <description>
+          Number of output tuples sent by this operator instance.
+          
+          *NOTE:* This metric is only updated if parameter `vgwLiveMetricsUpdateNeeded` is true.
+          </description>
           <kind>Gauge</kind>
         </metric>
       </metrics>
