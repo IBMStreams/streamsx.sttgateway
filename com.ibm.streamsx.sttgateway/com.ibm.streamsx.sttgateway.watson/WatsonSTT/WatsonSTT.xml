@@ -252,7 +252,12 @@
 
       <parameter>
         <name>sttResultMode</name>
-        <description>This parameter specifies what type of STT result is needed: 1 to get partial utterances, 2 to get completed utterance, 3 (default) to get the full text after transcribing the entire audio.</description>
+        <description>
+        This parameter specifies what type of STT result is needed: 1 to get partial utterances, 2 to get completed utterance, 
+        3 (default) to get the full text after transcribing the entire audio. If this parameter is set to value 3, the features 
+        `utteranceAlternatives`, `wordAlternatives`, `wordConfidenceNeeded`, `wordTimestampNeeded`, `identifySpeakers` and `keywordsSpotting` 
+        are forced disabled.
+        </description>
         <optional>true</optional>
         <rewriteAllowed>true</rewriteAllowed>
         <expressionMode>AttributeFree</expressionMode>
@@ -262,7 +267,7 @@
       
       <parameter>
         <name>sttRequestLogging</name>
-        <description>This parameter specifies whether request logging should be done for every STT audio transcription request. (Default is false)</description>
+        <description>Indicates whether IBM can use data that is sent over the connection to improve the service for future users. Specify false to prevent IBM from accessing the logged data. (Default is false)</description>
         <optional>true</optional>
         <rewriteAllowed>true</rewriteAllowed>
         <expressionMode>AttributeFree</expressionMode>
@@ -322,7 +327,14 @@
 
       <parameter>
         <name>sttJsonResponseDebugging</name>
-        <description>This parameter is used for debugging the STT JSON response message. Mostly for IBM internal use. (Default is false)</description>
+        <description>
+        This parameter is used for debugging the STT JSON response message. Mostly for IBM internal use. 
+        When enabled, it will simply display the full JSON message and a few important fields resulting from parsing that JSON message. 
+        After the display is done, it will return without doing any further tuple submission. This debugging mode is useful during 
+        toolkit development to verify any new fields in the STT result JSON. It is like a sandbox to do experiments with the STT JSON result. 
+        
+        (Default is false)
+        </description>
         <optional>true</optional>
         <rewriteAllowed>true</rewriteAllowed>
         <expressionMode>AttributeFree</expressionMode>
@@ -332,7 +344,11 @@
       
       <parameter>
         <name>maxUtteranceAlternatives</name>
-        <description>This parameter indicates the required number of n-best alternative hypotheses for the transcription results. (Default is 1)</description>
+        <description>
+        This parameter indicates the required number of n-best alternative hypotheses for the transcription results. (Default is 1)
+        
+        **Note:** This parameter is forced to 1 if `sttResultMode` equals 3.
+        </description>
         <optional>true</optional>
         <rewriteAllowed>true</rewriteAllowed>
         <expressionMode>AttributeFree</expressionMode>
@@ -342,7 +358,12 @@
 
       <parameter>
         <name>wordAlternativesThreshold</name>
-        <description>This parameter controls the density of the word alternatives results (a.k.a. Confusion Networks). A value of 0.0 disables this feature. Valid value must be less than 1.0 (Default is 0.0)</description>
+        <description>
+        This parameter controls the density of the word alternatives results (a.k.a. Confusion Networks). A value of 0.0 
+        disables this feature. Valid value must be less than 1.0 (Default is 0.0)
+        
+        **Note:** This parameter is forced to 0.0 if `sttResultMode` equals 3.
+        </description>
         <optional>true</optional>
         <rewriteAllowed>true</rewriteAllowed>
         <expressionMode>AttributeFree</expressionMode>
@@ -352,7 +373,12 @@
 
       <parameter>
         <name>wordConfidenceNeeded</name>
-        <description>This parameter indicates whether the transcription result should include individual words and their confidences or not. (Default is false)</description>
+        <description>
+        This parameter indicates whether the transcription result should include individual words and their confidences 
+        or not. (Default is false)
+        
+        **Note:** This parameter is forced to false if `sttResultMode` equals 3.
+        </description>
         <optional>true</optional>
         <rewriteAllowed>true</rewriteAllowed>
         <expressionMode>AttributeFree</expressionMode>
@@ -362,7 +388,12 @@
 
       <parameter>
         <name>wordTimestampNeeded</name>
-        <description>This parameter indicates whether the transcription result should include individual words and their timestamps or not. (Default is false)</description>
+        <description>
+        This parameter indicates whether the transcription result should include individual words and their timestamps 
+        or not. (Default is false)
+        
+        **Note:** This parameter is forced to false if `sttResultMode` equals 3.
+        </description>
         <optional>true</optional>
         <rewriteAllowed>true</rewriteAllowed>
         <expressionMode>AttributeFree</expressionMode>
@@ -372,7 +403,12 @@
 
       <parameter>
         <name>identifySpeakers</name>
-        <description>This parameter indicates whether the speakers of the individual words in an utterance result should be identified. (Default is false)</description>
+        <description>
+        This parameter indicates whether the speakers of the individual words in an utterance result should be identified. 
+        (Default is false)
+        
+        **Note:** This parameter is forced to false if `sttResultMode` equals 3.
+        </description>
         <optional>true</optional>
         <rewriteAllowed>true</rewriteAllowed>
         <expressionMode>AttributeFree</expressionMode>
@@ -392,7 +428,12 @@
 
       <parameter>
         <name>keywordsSpottingThreshold</name>
-        <description>This parameter specifies the minimum confidence level that the STT service must have for an utterance word to match a given keyword. A value of 0.0 disables this feature. Valid value must be less than 1.0. (Default is 0.0)</description>
+        <description>
+        This parameter specifies the minimum confidence level that the STT service must have for an utterance word to 
+        match a given keyword. A value of 0.0 disables this feature. Valid value must be less than 1.0. (Default is 0.0)
+        
+        **Note:** This parameter is forced to 0.0 if `sttResultMode` equals 3.
+        </description>
         <optional>true</optional>
         <rewriteAllowed>true</rewriteAllowed>
         <expressionMode>AttributeFree</expressionMode>
@@ -432,7 +473,7 @@
       
       <parameter>
         <name>waitTimeBeforeSTTServiceConnectionRetry</name>
-        <description>This parameter specifies the time (in seconds) to wait before retrying a connection attempt to the Watson STT service. It should be >= 1.0 (Default is 3.0)</description>
+        <description>This parameter specifies the time (in seconds) to wait before retrying a connection attempt to the Watson STT service. It must be >= 1.0 (Default is 3.0)</description>
         <optional>true</optional>
         <rewriteAllowed>true</rewriteAllowed>
         <expressionMode>AttributeFree</expressionMode>
@@ -442,7 +483,7 @@
 
       <parameter>
         <name>maxAllowedConnectionAttempts</name>
-        <description>This parameter specifies the maximum number of attempts to make a Websocket connection to the STT service. It should be >= 1 (Default is 10)</description>
+        <description>This parameter specifies the maximum number of attempts to make a Websocket connection to the STT service. It must be >= 1 (Default is 10)</description>
         <optional>true</optional>
         <rewriteAllowed>true</rewriteAllowed>
         <expressionMode>AttributeFree</expressionMode>
