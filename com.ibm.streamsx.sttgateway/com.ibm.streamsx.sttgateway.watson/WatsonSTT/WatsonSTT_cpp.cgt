@@ -363,6 +363,36 @@ MY_OPERATOR::MY_OPERATOR()
 	
 	// Update the operator metric.
 	nSTTResultModeMetric->setValueNoLock(sttResultMode);
+
+	//print the configuration
+	std::cout << "WatsonSTT configuration:"
+	<< "\nOperatorName                            = " << getContext().getName()
+	<< "\ncpuYieldTimeInAudioSenderThread         = " << cpuYieldTimeInAudioSenderThread
+	<< "\nwaitTimeBeforeSTTServiceConnectionRetry = " << waitTimeBeforeSTTServiceConnectionRetry
+	<< "\nmaxAllowedConnectionAttempts            = " << maxAllowedConnectionAttempts
+	<< "\nsttLiveMetricsUpdateNeeded              = " << sttLiveMetricsUpdateNeeded
+	<< "\nuri                                     = " << uri
+	<< "\nbaseLanguageModel                       = " << baseLanguageModel
+	<< "\ncontentType                             = " << contentType
+	<< "\nsttResultMode                           = " << sttResultMode
+	<< "\nsttRequestLogging                       = " << sttRequestLogging
+	<< "\nbaseModelVersion                        = " << baseModelVersion
+	<< "\ncustomizationId                         = " << customizationId
+	<< "\ncustomizationWeight                     = " << customizationWeight
+	<< "\nacousticCustomizationId                 = " << acousticCustomizationId
+	<< "\nfilterProfanity                         = " << filterProfanity
+	<< "\nsttJsonResponseDebugging                = " << sttJsonResponseDebugging
+	<< "\nmaxUtteranceAlternatives                = " << maxUtteranceAlternatives
+	<< "\nwordAlternativesThreshold               = " << wordAlternativesThreshold
+	<< "\nwordConfidenceNeeded                    = " << wordConfidenceNeeded
+	<< "\nwordTimestampNeeded                     = " << wordTimestampNeeded
+	<< "\nidentifySpeakers                        = " << identifySpeakers
+	<< "\nsmartFormattingNeeded                   = " << smartFormattingNeeded
+	<< "\nkeywordsSpottingThreshold               = " << keywordsSpottingThreshold
+	<< "\nkeywordsToBeSpotted                     = " << keywordsToBeSpotted
+	<< "\naudioInputAsBlob                        = " << audioInputAsBlob
+	<< "\n----------------------------------------------------------------" << std::endl;
+
 }
 
 // Destructor
@@ -529,7 +559,7 @@ void MY_OPERATOR::process(Tuple & tuple, uint32_t port)
 		ValueHandle handle1 = tuple.getAttributeValue("access_token");
 		rstring & accessToken_rstring = handle1;
 		accessToken = accessToken_rstring.string();
-		SPLAPPTRC(L_ERROR, "Operator " << operatorPhysicalName <<
+		SPLAPPTRC(L_INFO, "Operator " << operatorPhysicalName <<
 			"-->Channel " << boost::to_string(udpChannelNumber) <<
 			"-->Received new/refreshed access token.", "process");
 		return;
@@ -593,6 +623,11 @@ void MY_OPERATOR::process(Tuple & tuple, uint32_t port)
 		if (sizeOfBlob == 0 && 
 			numberOfAudioBlobFragmentsReceivedInCurrentConversation == 0) {
 			// This is not allowed. Ignore this empty blob.
+			SPLAPPTRC(L_ERROR, "Operator " << operatorPhysicalName <<
+				"-->Channel " << boost::to_string(udpChannelNumber) <<
+				"-->Received audio data is an empty blob in an empty conversation. "
+				"This tuple is ignored!",
+				"process");
 			return;
 		}
 		
@@ -727,33 +762,40 @@ void MY_OPERATOR::ws_audio_blob_sender() {
 			//
 			// In that case, we will try to reestablish the connection.
 			// There is audio data waiting in the vector. Reestablish the connection.
-			SPLAPPTRC(L_DEBUG, "Operator " << operatorPhysicalName <<
-				"-->Channel " << boost::to_string(udpChannelNumber) <<
-				"-->Audio data is waiting to be processed." << 
-				" Establishing the Websocket connection to the Watson STT service now.",
-				"establish_ws_connection");
 
 			// If we have already done enough connection retry attempts, we will stop
 			// making any more connection attempts. In this case, this operator will
 			// simply go idle without doing any transcription work. (Alternatively,
 			// we can throw an exception. That is something to do later if really needed.)
 			if (numberOfWebsocketConnectionAttempts >= maxAllowedConnectionAttempts) {
+				SPLAPPTRC(L_ERROR, "Operator " << operatorPhysicalName <<
+					"-->Channel " << boost::to_string(udpChannelNumber) <<
+					"-->Audio data is waiting to be processed."
+					" Must establish the Websocket connection to the Watson STT service now, "
+					"but maxAllowedConnectionAttempts is reached. Block for 60 sec.!",
+					"establish_ws_connection");
 				// Block for a minute or until the operator shutdown is requested.
 				SPL::Functions::Utility::block(60.00);
 				// In this situation, there is no work to do. Simply loop around.
 				continue;
 			}
 
+			//update numberOfWebsocketConnectionAttempts
+			++numberOfWebsocketConnectionAttempts;
+			
+			nWebsocketConnectionAttemptsMetric->setValueNoLock(numberOfWebsocketConnectionAttempts);
 			std::string msg = "Operator " + operatorPhysicalName +
 				"-->Channel " + boost::to_string(udpChannelNumber) + 
-				"-->Websocket connection attempt " +
-				boost::to_string(++numberOfWebsocketConnectionAttempts) + 
-				" to the Watson STT service.";
-			SPLAPPTRC(L_ERROR,  msg, "ws_connection_attempt");
+				"-->Audio data is waiting to be processed."
+				" Establishing the Websocket connection to the Watson STT service now. "
+				"Attempt " +
+				boost::to_string(numberOfWebsocketConnectionAttempts);
+			if (numberOfWebsocketConnectionAttempts > 1)
+				SPLAPPTRC(L_WARN,  msg, "ws_connection_attempt");
+			else
+				SPLAPPTRC(L_INFO,  msg, "ws_connection_attempt");
 			websocketConnectionErrorOccurred = false;
 			makeNewWebsocketConnection = true;
-			// Update the operator metric.
-			nWebsocketConnectionAttemptsMetric->setValueNoLock(numberOfWebsocketConnectionAttempts);
 			
 			// After a successful connection, makeNewWebsocketConnection will be
 			// set to false in the ws_init method below.
@@ -773,12 +815,12 @@ void MY_OPERATOR::ws_audio_blob_sender() {
 						// We can't proceed further at this point.
 						msg = "Operator " + operatorPhysicalName +
 							"-->Channel " + boost::to_string(udpChannelNumber) + 
-							std::string("-->WatsonSTT_cpp.cgt: Unable to establish a Websocket connection to ") +
-							std::string("the STT service. It could be either due to network issues or ") +
-							std::string("invalid service URL or invalid access token or ") +
-							std::string("invalid configuration done for the STT service parameters.") +
-							std::string(" Giving up after 10 attempts. This operator instance will ") + 
-							std::string(" be idle from this point onwards without doing any transcription work.");
+							"-->WatsonSTT_cpp.cgt: Unable to establish a Websocket connection to "
+							"the STT service. It could be either due to network issues or "
+							"invalid service URL or invalid access token or "
+							"invalid configuration done for the STT service parameters. "
+							"Giving up after 10 attempts. This operator instance will "
+							"be idle from this point onwards without doing any transcription work.";
 						SPLAPPTRC(L_ERROR, msg, "ws_connection_attempt_failure");
 					} else {
 						// Back off for a few seconds and then try to connect again.
@@ -809,6 +851,10 @@ void MY_OPERATOR::ws_audio_blob_sender() {
 		// happening as a result of an abnormal transcription error.
 		// Read more commentary about it in the next if segment.
 		if (transcriptionErrorOccurred == true) {
+			SPLAPPTRC(L_WARN, "Operator " + operatorPhysicalName +
+					"-->Channel " + boost::to_string(udpChannelNumber) +
+					" -->WatsonSTT_cpp.cgt: transcriptionErrorOccurred 1",
+					"ws_connection_attempt_failure");
 			// Wait for 600 milliseconds.
 			SPL::Functions::Utility::block(0.600);
 			transcriptionErrorOccurred = false;
@@ -832,6 +878,10 @@ void MY_OPERATOR::ws_audio_blob_sender() {
 			// short delay and then reestablish the Websocket connection.
 			// This is simply defensive coding to avoid that "invalid state" exception.
 			if (transcriptionErrorOccurred == true) {
+				SPLAPPTRC(L_WARN, "Operator " + operatorPhysicalName +
+						"-->Channel " + boost::to_string(udpChannelNumber) +
+						" -->WatsonSTT_cpp.cgt: transcriptionErrorOccurred 2",
+						"ws_connection_attempt_failure");
 				continue;
 			}
 
@@ -933,6 +983,9 @@ void MY_OPERATOR::ws_audio_blob_sender() {
 				unsigned char * buffer = audioBytes.at(0);
 				uint64_t sizeOfBlob = audioSize.at(0);
 				
+				SPLAPPTRC(L_DEBUG, "Operator " << operatorPhysicalName <<
+					"-->Channel " << boost::to_string(udpChannelNumber) <<
+					"-->Sending blob of size " << sizeOfBlob , "ws_audio_blob_sender");
 				if (buffer == NULL) {
 					// We reached the end of the blob data as sent/streamed from the SPL application.
 					// Signal end of the audio data.
@@ -1012,9 +1065,9 @@ void MY_OPERATOR::ws_init() {
 			// previously created Websocket client object.
 			delete wsClient;
 		}
-  
+
 		try {
-			SPLAPPTRC(L_ERROR, "Operator " << operatorPhysicalName <<
+			SPLAPPTRC(L_INFO, "Operator " << operatorPhysicalName <<
 				"-->Channel " << boost::to_string(udpChannelNumber) <<
 				"-->Going to connect to " << uri, "ws_init");
 			wsClient = new client();
@@ -1071,23 +1124,23 @@ void MY_OPERATOR::ws_init() {
 	
 			// Start the ASIO io_service run loop
 			wsClient->run();
-			SPLAPPTRC(L_DEBUG, "Operator " << operatorPhysicalName <<
+			SPLAPPTRC(L_INFO, "Operator " << operatorPhysicalName <<
 				"-->Channel " << boost::to_string(udpChannelNumber) <<
 				"-->Reached 4", "ws_init");
 		} catch (const std::exception & e) {
-			std::cout << "Operator " << operatorPhysicalName <<
+			SPLAPPTRC(L_ERROR, "Operator " << operatorPhysicalName <<
 				"-->Channel " << boost::to_string(udpChannelNumber) << 
-				"-->" << e.what() << std::endl;
+				"-->" << e.what(), "ws_init");
 			SPL::Functions::Utility::abort(__FILE__, __LINE__);
-		} catch (websocketpp::lib::error_code e) {
-			std::cout << "Operator " << operatorPhysicalName <<
+		} catch (const websocketpp::lib::error_code & e) {
+			SPLAPPTRC(L_ERROR, "Operator " << operatorPhysicalName <<
 				"-->Channel " << boost::to_string(udpChannelNumber) << 
-				"-->" << e.message() << std::endl;
+				"-->" << e.message(), "ws_init");
 			SPL::Functions::Utility::abort(__FILE__, __LINE__);
 		} catch (...) {
-			std::cout << "Operator " << operatorPhysicalName <<
+			SPLAPPTRC(L_ERROR, "Operator " << operatorPhysicalName <<
 				"-->Channel " << boost::to_string(udpChannelNumber) <<
-				"-->Other exception in WatsonSTT operator's Websocket initializtion." << std::endl;
+				"-->Other exception in WatsonSTT operator's Websocket initializtion.", "ws_init");
 			SPL::Functions::Utility::abort(__FILE__, __LINE__);
 		}	
 	} // End of while loop.
@@ -1204,7 +1257,7 @@ void MY_OPERATOR::on_open(MY_OPERATOR::client* c, websocketpp::connection_hdl hd
 	  // Store this handle to be used from process and shutdown methods of this operator.
 	  wsHandle = hdl;
 	  // c->get_alog().write(websocketpp::log::alevel::app, "Sent Message: "+msg);
-	  SPLAPPTRC(L_ERROR, "Operator " << operatorPhysicalName <<
+	  SPLAPPTRC(L_INFO, "Operator " << operatorPhysicalName <<
 		  "-->Channel " << boost::to_string(udpChannelNumber) <<
 		  "-->A recognition request start message was sent to the Watson STT service: " <<
 		  msg, "on_open");
@@ -1216,8 +1269,9 @@ void MY_OPERATOR::on_open(MY_OPERATOR::client* c, websocketpp::connection_hdl hd
 // It helps us to directly index an element in a JSON array returned by the Watson STT service.
 // To use c++11 syntax in a Streams C++ operator, it is required to add this
 // sc (Streams Compiler) option: --c++std=c++11
+// function requires no object reference -> make it satic
 template <typename Tree>
-Tree query(Tree& pt, typename Tree::path_type path) {
+static Tree query(Tree& pt, typename Tree::path_type path) {
     if (path.empty())
         return pt;
 
@@ -1269,7 +1323,7 @@ void MY_OPERATOR::on_message(MY_OPERATOR::client* c, websocketpp::connection_hdl
   bool transcriptionResultAvailableForParsing = false;
   std::string sttErrorString = "";
   std::string payload = msg->get_payload();
-  std::size_t found = payload.find("\"state\": \"listening\"");
+  std::size_t stateListeningFound = payload.find("\"state\": \"listening\"");
   // STT error will have the following message format.
   // {"error": "unable to transcode data stream audio/wav -> audio/x-float-array "}
   std::size_t sttError = payload.find("\"error\": \"");
@@ -1285,7 +1339,11 @@ void MY_OPERATOR::on_message(MY_OPERATOR::client* c, websocketpp::connection_hdl
 			  "-->Channel " << boost::to_string(udpChannelNumber) << 
 			  "-->X3 STT error message=" << payload << std::endl;
 	  }
-  } else if (found != std::string::npos && wsConnectionEstablished == false) {
+	  SPLAPPTRC(L_ERROR, "Operator " << operatorPhysicalName <<
+		  "-->Channel " << boost::to_string(udpChannelNumber) <<
+		  "-->X3 STT error message=" << payload, "on_message");
+
+  } else if (stateListeningFound != std::string::npos && wsConnectionEstablished == false) {
 	  // This is the "listening" response from the STT service for the 
 	  // new recognition request that was initiated in the on_open method above.
 	  // This response is sent only once for every new Websocket connection request made and
@@ -1293,14 +1351,18 @@ void MY_OPERATOR::on_message(MY_OPERATOR::client* c, websocketpp::connection_hdl
 	  wsConnectionEstablished = true;
 	  websocketConnectionErrorOccurred = false;
 	  numberOfWebsocketConnectionAttempts = 0;
-	  SPLAPPTRC(L_ERROR,  "Operator " << operatorPhysicalName <<
-		  "-->Channel " << boost::to_string(udpChannelNumber) <<
-		  "-->Websocket connection established with the Watson STT service.", "on_message");
+
+	  if (sttJsonResponseDebugging == true) {
+		  std::cout << "Operator " << operatorPhysicalName <<
+			  "-->Channel " << boost::to_string(udpChannelNumber) << 
+			  "-->X0 STT response payload=" << payload << std::endl;
+	  }
+	  
 	  SPLAPPTRC(L_DEBUG, "Operator " << operatorPhysicalName <<
 		  "-->Channel " << boost::to_string(udpChannelNumber) <<
-		  "-->Reached 8", "on_message");
+		  "-->Reached 8 Websocket connection established with the Watson STT service.", "on_message");
 	  return;
-  } else if (found == std::string::npos && wsConnectionEstablished == true) {
+  } else if (stateListeningFound == std::string::npos && wsConnectionEstablished == true) {
 	  // This must be the response for our audio transcription request.
 	  // Keep accumulating the transcription result.
 	  transcriptionResult += payload;
@@ -1311,6 +1373,10 @@ void MY_OPERATOR::on_message(MY_OPERATOR::client* c, websocketpp::connection_hdl
 			  "-->X1 STT response payload=" << payload << std::endl;
 	  }
 	  
+	  SPLAPPTRC(L_DEBUG, "Operator " << operatorPhysicalName <<
+		  "-->Channel " << boost::to_string(udpChannelNumber) <<
+		  "-->Reached 10 Websocket connection established - no listening state.", "on_message");
+
 	  if (sttResultMode == 1 || sttResultMode == 2) {
 		  // We can parse this partial or completed 
 		  // utterance result now since the user has asked for it.
@@ -1320,7 +1386,7 @@ void MY_OPERATOR::on_message(MY_OPERATOR::client* c, websocketpp::connection_hdl
 		  // We will parse the full transcription result later when it is fully completed.
 		  return;
 	  }
-  } else if (found != std::string::npos && wsConnectionEstablished == true) {
+  } else if (stateListeningFound != std::string::npos && wsConnectionEstablished == true) {
 	  // This is the "listening" response from the STT service for the 
 	  // transcription completion for the audio data that was sent earlier.
 	  // This response also indicates that the STT service is ready to do a new transcription.
@@ -1330,15 +1396,19 @@ void MY_OPERATOR::on_message(MY_OPERATOR::client* c, websocketpp::connection_hdl
 		  std::cout << "Operator " << operatorPhysicalName <<
 			  "-->Channel " << boost::to_string(udpChannelNumber) << 
 			  "-->X2 STT task completion message=" << payload << std::endl;
-	  }	  
-	  
+	  }
+
+	  SPLAPPTRC(L_DEBUG, "Operator " << operatorPhysicalName <<
+		  "-->Channel " << boost::to_string(udpChannelNumber) <<
+		  "-->Reached 11 Websocket connection established - transcription completion.", "on_message");
+
 	  if (sttResultMode == 3) {
 		  // Neither partial nor completed utterance results were parsed earlier.
 		  // So, parse the full transcription result now.
 		  transcriptionResultAvailableForParsing = true;
 	  }
   }
-  
+
   std::string audioFileName = "";
   int32_t utteranceNumber = 0;
   std::string utteranceText = "";
@@ -1546,6 +1616,9 @@ void MY_OPERATOR::on_message(MY_OPERATOR::client* c, websocketpp::connection_hdl
 						  "-->Channel " << boost::to_string(udpChannelNumber) <<
 						  "-->X9 JSON parsing error when reading the speaker field : " << e.what(), "STT_Result_Processing");
 				  }
+				  SPLAPPTRC(L_ERROR, "Operator " << operatorPhysicalName <<
+					  "-->Channel " << boost::to_string(udpChannelNumber) <<
+					  "-->X9 JSON parsing error when reading the speaker field : " << e.what(), "STT_Result_Processing");
 				  
 				  break;
 			  }
@@ -1560,6 +1633,9 @@ void MY_OPERATOR::on_message(MY_OPERATOR::client* c, websocketpp::connection_hdl
 						  "-->Channel " << boost::to_string(udpChannelNumber) <<
 						  "-->X10 JSON parsing error when reading the confidence field : " << e.what(), "STT_Result_Processing");
 				  }
+				  SPLAPPTRC(L_ERROR, "Operator " << operatorPhysicalName <<
+					  "-->Channel " << boost::to_string(udpChannelNumber) <<
+					  "-->X10 JSON parsing error when reading the confidence field : " << e.what(), "STT_Result_Processing");
 				  
 				  break;
 			  }
@@ -1620,6 +1696,9 @@ void MY_OPERATOR::on_message(MY_OPERATOR::client* c, websocketpp::connection_hdl
 					  "-->Channel " << boost::to_string(udpChannelNumber) <<
 					  "-->X12 JSON parsing error when reading the result_index field : " << e.what(), "STT_Result_Processing");
 			  }
+			  SPLAPPTRC(L_WARN, "Operator " << operatorPhysicalName <<
+				  "-->Channel " << boost::to_string(udpChannelNumber) <<
+				  "-->X12 JSON parsing error when reading the result_index field : " << e.what(), "STT_Result_Processing");
 			  
 			  // If speaker_labels is enabled, it is possible not to receive the 
 			  // result_index field and the results array field in certain situations with 
@@ -1678,6 +1757,10 @@ void MY_OPERATOR::on_message(MY_OPERATOR::client* c, websocketpp::connection_hdl
 						  "-->Channel " << boost::to_string(udpChannelNumber) << 
 						  "-->X15 Forcing final = true after receiving the speaker_labels message." << std::endl;
 				  }
+				  SPLAPPTRC(L_ERROR, "Operator " << operatorPhysicalName <<
+					  "-->Channel " << boost::to_string(udpChannelNumber) << 
+					  "-->X15 Forcing final = true after receiving the speaker_labels message.", "STT_Result_Processing");
+
 			  }
 			  
 			  // At this time, we can prepare the output tuple for the 
@@ -2638,9 +2721,10 @@ MY_OPERATOR::context_ptr MY_OPERATOR::on_tls_init(MY_OPERATOR::client* c, websoc
 			boost::asio::ssl::context::no_sslv3 |
 			boost::asio::ssl::context::single_dh_use);
 	} catch (std::exception& e) {
-		std::cout << "Operator " << operatorPhysicalName <<
-			"-->Channel " << boost::to_string(udpChannelNumber) << 
-			"-->" << e.what() << std::endl;
+		std::string msg = "Operator " + operatorPhysicalName +
+			"-->Channel " + boost::to_string(udpChannelNumber) +
+			"-->" + e.what();
+		SPLAPPTRC(L_ERROR, msg, "on_tls_init");
 	}
   
 	return ctx;
