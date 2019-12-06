@@ -51,7 +51,7 @@ using websocketpp::lib::bind;
 	# Check the input port 0 i.e. the first input port. 
 	my $inputPort = $model->getInputPortAt(0);
 	my $inputTupleName = $inputPort->getCppTupleName();
-	my $audioInputAsBlob = undef;	
+	my $audioInputAsBlob = undef;
 	my $inputAttrs = $inputPort->getAttributes();
 	my $speechAttributeFound = 0;
 	
@@ -80,6 +80,8 @@ using websocketpp::lib::bind;
 	
 	if (!(defined($audioInputAsBlob))) {
 		SPL::CodeGen::exitln("WatsonSTT_cpp.cgt: The required input tuple attribute 'speech' is not of type 'rstring' or 'blob' in the first input port.");
+	} else {
+		print "//code generated for case \$audioInputAsBlob = $audioInputAsBlob\n";
 	}
 	
 	# Check the input port number 1 i.e. the second input port.
@@ -306,7 +308,6 @@ MY_OPERATOR::MY_OPERATOR() : wsClient{nullptr}
 		keywordsSpottingThreshold = 0.0;
 	}
 	
-	audioInputAsBlob = <%=$audioInputAsBlob%>;
 	websocketLoggingNeeded = <%=$websocketLoggingNeeded%>;
 	cpuYieldTimeInAudioSenderThread = <%=$cpuYieldTimeInAudioSenderThread%>;
 
@@ -390,7 +391,7 @@ MY_OPERATOR::MY_OPERATOR() : wsClient{nullptr}
 	<< "\nsmartFormattingNeeded                   = " << smartFormattingNeeded
 	<< "\nkeywordsSpottingThreshold               = " << keywordsSpottingThreshold
 	<< "\nkeywordsToBeSpotted                     = " << keywordsToBeSpotted
-	<< "\naudioInputAsBlob                        = " << audioInputAsBlob
+	<< "\naudioInputAsBlob                        = " << "<%=$audioInputAsBlob%>"
 	<< "\n----------------------------------------------------------------" << std::endl;
 
 }
@@ -516,24 +517,46 @@ void MY_OPERATOR::prepareToShutdown()
 	}
 }
 
-// Processing for source and threaded operators   
-void MY_OPERATOR::process(uint32_t idx)
-{
-    // A typical implementation will loop until shutdown
-    /*
-      while(!getPE().getShutdownRequested()) {
-          // do work ...
-      }
-    */
-}
 
-// Tuple processing for mutating ports 
 // This operator has two input ports.
-// Port 0: Audio data (a file name or a blob) arrives on this port.
+// Port 0: Audio data (a file name or a blob) arrives on this port. (mutating)
 // Port 1: It is a control port where the IAM access token is
 //         sent into this operator for connecting to the
-//         STT service in a secure manner.
-//
+//         STT service in a secure manner. (non mutating)
+
+//Non mutating port 1
+void MY_OPERATOR::process(Tuple const & tuple, uint32_t port) {
+	// There are multiple methods (process, audio_blob_sender and on_message) that
+	// regularly access (read, write and delete) the vector member variables.
+	// All those methods work in parallel inside their own threads.
+	// To make that vector access thread safe, we will use this mutex.
+	SPL::AutoMutex autoMutex(sttMutex1);
+	
+	// Let is first process if the IAM access token is sent via port 1 i.e. second input port.
+	if (port != 1)
+		throw std::invalid_argument("Port number is not 1");
+
+	IPort1Type const & inputTuple = static_cast<IPort1Type const &>(tuple);
+	// Save the access token for subsequent use within this operator.
+	accessToken = inputTuple.get_access_token();
+	SPLAPPTRC(L_INFO, "Operator " << operatorPhysicalName <<
+		"-->Channel " << boost::to_string(udpChannelNumber) <<
+		"-->Received new/refreshed access token.", "process");
+	// This must be the audio data arriving here via port 0 i.e. first input port.
+	// If we have a non-empty IAM access token, process the audio data.
+	// Otherwise, skip it.
+	if (accessToken == "") {
+		SPLAPPTRC(L_ERROR, "Operator " << operatorPhysicalName <<
+			"-->Channel " << boost::to_string(udpChannelNumber) <<
+			"-->Ignoring the received audio data at this time due " <<
+			"to an empty IAM access token. User must first provide "
+			" the IAM access token before sending any audio data to this operator.",
+			"process");
+	}
+
+	return;
+}
+
 // With the WebSocket interface, audio data is always streamed to the 
 // STT service over the connection. You can pass the blob data through the 
 // Websocket all at once, or you can pass data for the live-use case 
@@ -550,6 +573,8 @@ void MY_OPERATOR::process(uint32_t idx)
 // output port. It is somewhat different from the usual stuff and 
 // very involved in terms of the logic. So, read the code completely to 
 // understand what is going on inside all these threads.
+
+//Mutating port 0
 void MY_OPERATOR::process(Tuple & tuple, uint32_t port)
 {
 	// There are multiple methods (process, audio_blob_sender and on_message) that
@@ -558,35 +583,10 @@ void MY_OPERATOR::process(Tuple & tuple, uint32_t port)
 	// To make that vector access thread safe, we will use this mutex.
 	SPL::AutoMutex autoMutex(sttMutex1);
 
-	// Let is first process if the IAM access token is sent via port 1 i.e. second input port.
-	if (port == 1) {
-		// Use this variable if needed in the future.
-		IPort1Type const & <%=$inputTupleName2%> = static_cast<IPort1Type const&>(tuple);
-		// Save the access token for subsequent use within this operator.
-		ValueHandle handle1 = tuple.getAttributeValue("access_token");
-		rstring & accessToken_rstring = handle1;
-		accessToken = accessToken_rstring.string();
-		SPLAPPTRC(L_INFO, "Operator " << operatorPhysicalName <<
-			"-->Channel " << boost::to_string(udpChannelNumber) <<
-			"-->Received new/refreshed access token.", "process");
-		return;
-	}
-	
-	// This must be the audio data arriving here via port 0 i.e. first input port.
-	// If we have a non-empty IAM access token, process the audio data.
-	// Otherwise, skip it.
-	if (accessToken == "") {
-		SPLAPPTRC(L_ERROR, "Operator " << operatorPhysicalName <<
-			"-->Channel " << boost::to_string(udpChannelNumber) <<
-			"-->Ignoring the received audio data at this time due " <<
-			"to an empty IAM access token. User must first provide "
-			" the IAM access token before sending any audio data to this operator.",
-			"process");
-		return;
-	}
+	if (port != 0)
+		throw std::invalid_argument("Port number is not 0");
 
-	// Use this variable if needed in the future.
-	IPort0Type const & <%=$inputTupleName%> = static_cast<IPort0Type const&>(tuple);
+	IPort0Type & <%=$inputTupleName%> = static_cast<IPort0Type &>(tuple);
 	
 	// If this operator is configured to receive audio blob data instead of 
 	// an audio filename, then the caller could send the blob in different
@@ -595,7 +595,7 @@ void MY_OPERATOR::process(Tuple & tuple, uint32_t port)
 	// In addition, save the blob data related information in a
 	// vector member variable to be used later in the audio blob sender and
 	// in the on_message methods.
-	if (audioInputAsBlob == true) {
+	<%if ( $audioInputAsBlob == 1 ) {%>
 		// Speech data is sent into this operator via a blob buffer rather than via a file.
 		// Release the blob data so that we can own the memory management of that data.
 		// Get the blob's data pointer and store it in a vector for later use in the
@@ -617,8 +617,7 @@ void MY_OPERATOR::process(Tuple & tuple, uint32_t port)
 		// given audio either in full or in partial fragments.
 		//
 		unsigned char * ptr = NULL;
-		ValueHandle handle0 = tuple.getAttributeValue("speech");
-		SPL::blob & speechBlob = handle0;
+		SPL::blob & speechBlob = <%=$inputTupleName%>.get_speech();
 		uint64_t sizeOfBlob = SPL::Functions::Collections::blobSize(speechBlob);
 
 		// We can allow an end of audio indicator (i.e. an empty blob) only 
@@ -650,7 +649,7 @@ void MY_OPERATOR::process(Tuple & tuple, uint32_t port)
 		}
 		
 		audioSize.push_back(sizeOfBlob);
-	} else {
+	<%} else {%>
 		// Speech data is sent into this operator via a file rather than via a blob buffer.
 		ConstValueHandle handle0 = tuple.getAttributeValue("speech");
 		rstring const & fileName_rstring = handle0;
@@ -662,7 +661,7 @@ void MY_OPERATOR::process(Tuple & tuple, uint32_t port)
 		// ws_audio_blob_sender (thread) method.
 		audioFiles.push_back(audioFileName);
 		numberOfFullAudioConversationsReceived++;
-	} // End of if (audioInputAsBlob == true)
+	<%}%> // End of if (audioInputAsBlob == true)
 
 	// Update the operator metric only if the user asked for a live update.
 	if (sttLiveMetricsUpdateNeeded == true) {
@@ -676,15 +675,19 @@ void MY_OPERATOR::process(Tuple & tuple, uint32_t port)
 	// the object pointer can be stored in the oTupleList below.
 	// For every new audio (either a new audio filename or the very first 
 	// audio blob fragment sent here, we will create a new oTuple object.
-	if (audioInputAsBlob == false ||
-		(audioInputAsBlob == true &&
-		 numberOfAudioBlobFragmentsReceivedInCurrentConversation == 1)) {	
+	<%if ( $audioInputAsBlob == 1 ) {%>
+	const bool newAudioSegment = numberOfAudioBlobFragmentsReceivedInCurrentConversation == 1;
+	<%} else {%>
+	const bool newAudioSegment = true;
+	<%}%>
+	if (newAudioSegment) {
 		OPort0Type *oTuple = new OPort0Type;
 		
 		if (oTuple == NULL) {
 			// Object instantiation (memory allocation) error.
-			throw std::runtime_error(
-				"WatsonSTT_cpp.cgt: Unable to create a new oTuple object in the process method.");
+			throw std::bad_alloc();
+				//Don't try to allocate further strings
+				//"WatsonSTT_cpp.cgt: Unable to create a new oTuple object in the process method.");
 		}
 		
 		<% 
@@ -707,23 +710,18 @@ void MY_OPERATOR::process(Tuple & tuple, uint32_t port)
 		// Push this partially filled oTuple object's pointer to the 
 		// vector so that we can get it back when the transcription result arrives.
 		oTupleList.push_back(oTuple);
-	} // End of if (audioInputAsBlob == false ||
-}
-
-// Tuple processing for non-mutating ports
-void MY_OPERATOR::process(Tuple const & tuple, uint32_t port)
-{
+	} // End of if (newAudioSegment)
 }
 
 // Punctuation processing
-void MY_OPERATOR::process(Punctuation const & punct, uint32_t port)
-{
-	  // Forward the punctuation markers on our first output port.
-      if(punct==Punctuation::WindowMarker) {
-        submit(punct, 0);
-      } else if(punct==Punctuation::FinalMarker) {
-        submit(punct, 0);
-      }
+void MY_OPERATOR::process(Punctuation const & punct, uint32_t port) {
+	// Forward the punctuation markers on our first output port.
+	// Final markers are handled from streams runtime -> see Operator model finalPunctuationPortScope
+	if (port == 0) {
+		if(punct==Punctuation::WindowMarker) {
+			submit(punct, 0);
+		}
+	}
 }
 
 // This method provides a thread for the Websocket audio blob sender
@@ -898,8 +896,8 @@ void MY_OPERATOR::ws_audio_blob_sender() {
 			// To make that vector access thread safe, we will use this mutex.
 			SPL::AutoMutex autoMutex(sttMutex1);
 			
-			if (audioInputAsBlob == false) {
-				// Speech data is sent into this operator via a file rather than via a blob buffer.			
+			<%if ( $audioInputAsBlob == 0 ) {%>
+				// Speech data is sent into this operator via a file rather than via a blob buffer.
 				std::string audioFileName = audioFiles.at(0);
 				SPLAPPTRC(L_DEBUG, "Operator " << operatorPhysicalName <<
 					"-->Channel " << boost::to_string(udpChannelNumber) <<
@@ -972,7 +970,7 @@ void MY_OPERATOR::ws_audio_blob_sender() {
 				audioFiles.erase(audioFiles.begin() + 0);
 				// Continue from the top of the while loop.
 				continue;
-			} else {
+			<%} else {%>
 				//
 				// We can keep streaming the blob based speech data to the STT service.
 				// So the signal for the end of the audio data will be sent to the
@@ -1020,7 +1018,7 @@ void MY_OPERATOR::ws_audio_blob_sender() {
 				audioSize.erase(audioSize.begin() + 0);
 				// Continue from the top of the while loop.
 				continue;
-			} // End of if (audioInputAsBlob == false)
+			<%}%> // End of if (audioInputAsBlob == false)
 		} // End of if ((audioBytesVectorSize > 0 ||
 	} // End of the while loop	
 }
@@ -1082,7 +1080,7 @@ void MY_OPERATOR::ws_init() {
 				"-->Going to connect to " << uri, "ws_init");
 			wsClient = new client();
 			if ( ! wsClient)
-				throw std::runtime_error("WatsonSTT_cpp.cgt: Unable to create a new websocket client opject.");
+				throw std::bad_alloc();
 
 			// https://docs.websocketpp.org/reference_8logging.html
 			// Set the logging policy as needed
@@ -2645,7 +2643,7 @@ void MY_OPERATOR::on_message(MY_OPERATOR::client* c, websocketpp::connection_hdl
 		  // audio transcription that we just stopped due to an STT error, it is important for
 		  // us to clean up the remaining audio blob fragments from that audio converstion that are
 		  // still waiting in the vector to be sent to the STT service.
-		  if (sttErrorString != "" && audioInputAsBlob == true &&
+		  if (sttErrorString != "" && <%=$audioInputAsBlob%> &&
 			  statusOfAudioDataTransmissionToSTT == AUDIO_BLOB_FRAGMENTS_BEING_SENT_TO_STT) {
 			  // We got an STT error in the middle of a transcription of the
 			  // partial audio blob fragments. If all the blob fragments

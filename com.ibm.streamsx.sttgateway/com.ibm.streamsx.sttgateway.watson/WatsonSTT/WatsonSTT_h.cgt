@@ -91,7 +91,6 @@ public:
 	bool smartFormattingNeeded;
 	SPL::float64 keywordsSpottingThreshold;
 	SPL::list<SPL::rstring> keywordsToBeSpotted;
-	bool audioInputAsBlob;
 	
 	// Custom metrics for this operator.
 	Metric *nWebsocketConnectionAttemptsMetric;
@@ -112,13 +111,10 @@ public:
 	// Notify pending shutdown
 	void prepareToShutdown(); 
 	
-	// Processing for source and threaded operators   
-	void process(uint32_t idx);
-	
-	// Tuple processing for mutating ports 
+	// Tuple processing for mutating port 0
 	void process(Tuple & tuple, uint32_t port);
 	
-	// Tuple processing for non-mutating ports
+	// Tuple processing for non-mutating port 1
 	void process(Tuple const & tuple, uint32_t port);
 	
 	// Punctuation processing
@@ -149,9 +145,6 @@ public:
 	// Websocket audio blob sender thread method
 	void ws_audio_blob_sender();
 	
-	// Utility to method to retrieve the operator's self (this) pointer
-	MY_OPERATOR* myOp(MY_OPERATOR*);
-		
 private:
 	// These are the output attribute assignment functions
 	SPL::int32 getUtteranceNumber(int32_t const & utteranceNumber);
