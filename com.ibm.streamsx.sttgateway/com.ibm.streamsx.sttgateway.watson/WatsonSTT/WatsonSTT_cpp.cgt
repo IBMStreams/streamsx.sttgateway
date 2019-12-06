@@ -196,7 +196,7 @@ using websocketpp::lib::bind;
 <%SPL::CodeGen::implementationPrologue($model);%>
 
 // Constructor
-MY_OPERATOR::MY_OPERATOR() 
+MY_OPERATOR::MY_OPERATOR() : wsClient{nullptr}
 {
 	// Custom metrics for this operator are already defined in the operator model XML file. 
 	// Hence, there is no need to explicitly create them here.
@@ -502,11 +502,18 @@ void MY_OPERATOR::prepareToShutdown()
 {
 	// Close the Websocket connection to the Watson STT service.
 	// wsClient->get_alog().write(websocketpp::log::alevel::app, "Client is closing the Websocket connection to the Watson STT service.");
-	SPLAPPTRC(L_ERROR, "Operator " << operatorPhysicalName <<
-		"-->Channel " << boost::to_string(udpChannelNumber) <<
-		"-->Client is closing the Websocket connection to the Watson STT service.",
-		"prepareToShutdown");
-	wsClient->close(wsHandle,websocketpp::close::status::normal,"");
+	if (wsClient) {
+		SPLAPPTRC(L_INFO, "Operator " << operatorPhysicalName <<
+			"-->Channel " << boost::to_string(udpChannelNumber) <<
+			"-->Client is closing the Websocket connection to the Watson STT service.",
+			"prepareToShutdown");
+		wsClient->close(wsHandle,websocketpp::close::status::normal,"");
+	} else {
+		SPLAPPTRC(L_INFO, "Operator " << operatorPhysicalName <<
+			"-->Channel " << boost::to_string(udpChannelNumber) <<
+			"-->client is null.",
+			"prepareToShutdown");
+	}
 }
 
 // Processing for source and threaded operators   
@@ -1023,7 +1030,6 @@ void MY_OPERATOR::ws_audio_blob_sender() {
 // See the commentary in the allPortsReady method above to
 // understand our need to run it in a separate thread.
 void MY_OPERATOR::ws_init() {
-	bool wsClientExists = false;
 
 	while (!getPE().getShutdownRequested()) { 
 		if (makeNewWebsocketConnection == false) {
@@ -1060,10 +1066,14 @@ void MY_OPERATOR::ws_init() {
 		uri += "&access_token=" + accessToken;
 		wsConnectionEstablished = false;
 
-		if (wsClientExists == true) {
+		if (wsClient) {
 			// If we are going to do a reconnection, then free the
 			// previously created Websocket client object.
+			SPLAPPTRC(L_DEBUG, "Operator " << operatorPhysicalName <<
+				"-->Channel " << boost::to_string(udpChannelNumber) <<
+				"-->Delete client " << uri, "ws_init");
 			delete wsClient;
+			wsClient = nullptr;
 		}
 
 		try {
@@ -1071,7 +1081,8 @@ void MY_OPERATOR::ws_init() {
 				"-->Channel " << boost::to_string(udpChannelNumber) <<
 				"-->Going to connect to " << uri, "ws_init");
 			wsClient = new client();
-			wsClientExists = true;
+			if ( ! wsClient)
+				throw std::runtime_error("WatsonSTT_cpp.cgt: Unable to create a new websocket client opject.");
 
 			// https://docs.websocketpp.org/reference_8logging.html
 			// Set the logging policy as needed
