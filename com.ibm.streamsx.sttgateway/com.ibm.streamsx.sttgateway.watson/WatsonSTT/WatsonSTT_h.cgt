@@ -39,8 +39,8 @@ public:
 	typedef websocketpp::lib::shared_ptr<boost::asio::ssl::context> context_ptr;
 
 	// Operator related member variables
-	std::string operatorPhysicalName;
-	SPL::int32 udpChannelNumber;
+	const std::string operatorPhysicalName;
+	const SPL::int32 udpChannelNumber;
 	
 	// Websocket operations related member variables.
 	bool wsConnectionEstablished;
@@ -64,22 +64,22 @@ public:
 	std::string transcriptionResult;
 	bool transcriptionErrorOccurred;
 	bool sttResultTupleWaitingToBeSent;
-	SPL::float64 cpuYieldTimeInAudioSenderThread;
-	SPL::float64 waitTimeBeforeSTTServiceConnectionRetry;
-	SPL::int32 maxAllowedConnectionAttempts;
-	bool sttLiveMetricsUpdateNeeded;
-	std::string uri;
+	const SPL::float64 cpuYieldTimeInAudioSenderThread;
+	const SPL::float64 waitTimeBeforeSTTServiceConnectionRetry;
+	const SPL::int32 maxAllowedConnectionAttempts;
+	const bool sttLiveMetricsUpdateNeeded;
+	const std::string uri;
 	std::string accessToken;
-	std::string baseLanguageModel;
-	std::string contentType;
-	SPL::int32 sttResultMode;
-	bool sttRequestLogging;
-	std::string baseModelVersion;
-	std::string customizationId;
+	const std::string baseLanguageModel;
+	const std::string contentType;
+	const SPL::int32 sttResultMode;
+	const bool sttRequestLogging;
+	const std::string baseModelVersion;
+	const std::string customizationId;
 	SPL::float64 customizationWeight;
-	std::string acousticCustomizationId;
-	bool filterProfanity;
-	bool sttJsonResponseDebugging;
+	const std::string acousticCustomizationId;
+	const bool filterProfanity;
+	const bool sttJsonResponseDebugging;
 	SPL::int32 maxUtteranceAlternatives;
 	SPL::float64 wordAlternativesThreshold;
 	bool wordConfidenceNeeded;
@@ -88,15 +88,15 @@ public:
 	SPL::list<SPL::int32> utteranceWordsSpeakers;
 	SPL::list<SPL::float64> utteranceWordsSpeakersConfidences;
 	SPL::list<SPL::float64> utteranceWordsStartTimes;
-	bool smartFormattingNeeded;
+	const bool smartFormattingNeeded;
 	SPL::float64 keywordsSpottingThreshold;
 	SPL::list<SPL::rstring> keywordsToBeSpotted;
 	
 	// Custom metrics for this operator.
-	Metric *nWebsocketConnectionAttemptsMetric;
-	Metric *nFullAudioConversationsReceivedMetric;
-	Metric *nFullAudioConversationsTranscribedMetric;
-	Metric *nSTTResultModeMetric;
+	Metric * const nWebsocketConnectionAttemptsMetric;
+	Metric * const nFullAudioConversationsReceivedMetric;
+	Metric * const nFullAudioConversationsTranscribedMetric;
+	Metric * const nSTTResultModeMetric;
 
 public:
 	// Constructor

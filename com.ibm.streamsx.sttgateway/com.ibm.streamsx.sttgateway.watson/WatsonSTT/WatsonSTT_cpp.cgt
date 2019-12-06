@@ -122,7 +122,7 @@ using websocketpp::lib::bind;
 
 	# Record the optional parameter values if present. Otherwise, set the default value.
     my $contentType = $model->getParameterByName("contentType");
-    $contentType = $contentType ? $contentType->getValueAt(0)->getCppExpression() : "";
+    $contentType = $contentType ? $contentType->getValueAt(0)->getCppExpression() : "\"audio/wav\"";
 
     my $sttResultMode = $model->getParameterByName("sttResultMode");
 	# Default: 3 for full text result
@@ -132,16 +132,16 @@ using websocketpp::lib::bind;
     $sttRequestLogging = $sttRequestLogging ? $sttRequestLogging->getValueAt(0)->getCppExpression() : 0;
     
     my $baseModelVersion = $model->getParameterByName("baseModelVersion");
-    $baseModelVersion = $baseModelVersion ? $baseModelVersion->getValueAt(0)->getCppExpression() : "";
+    $baseModelVersion = $baseModelVersion ? $baseModelVersion->getValueAt(0)->getCppExpression() : "\"\"";
     
     my $customizationId = $model->getParameterByName("customizationId");
-    $customizationId = $customizationId ? $customizationId->getValueAt(0)->getCppExpression() : "";
+    $customizationId = $customizationId ? $customizationId->getValueAt(0)->getCppExpression() : "\"\"";
     
     my $customizationWeight = $model->getParameterByName("customizationWeight");
     $customizationWeight = $customizationWeight ? $customizationWeight->getValueAt(0)->getCppExpression() : 9.9;
     
     my $acousticCustomizationId = $model->getParameterByName("acousticCustomizationId");
-    $acousticCustomizationId = $acousticCustomizationId ? $acousticCustomizationId->getValueAt(0)->getCppExpression() : "";
+    $acousticCustomizationId = $acousticCustomizationId ? $acousticCustomizationId->getValueAt(0)->getCppExpression() : "\"\"";
 
     my $filterProfanity = $model->getParameterByName("filterProfanity");
     $filterProfanity = $filterProfanity ? $filterProfanity->getValueAt(0)->getCppExpression() : 0;
@@ -158,7 +158,7 @@ using websocketpp::lib::bind;
     $wordAlternativesThreshold = $wordAlternativesThreshold ? $wordAlternativesThreshold->getValueAt(0)->getCppExpression() : 0.0;
 
     my $wordConfidenceNeeded = $model->getParameterByName("wordConfidenceNeeded");
-    $wordConfidenceNeeded = $wordConfidenceNeeded ? $wordConfidenceNeeded->getValueAt(0)->getCppExpression() : 0;    
+    $wordConfidenceNeeded = $wordConfidenceNeeded ? $wordConfidenceNeeded->getValueAt(0)->getCppExpression() : 0;
     
     my $wordTimestampNeeded = $model->getParameterByName("wordTimestampNeeded");
     $wordTimestampNeeded = $wordTimestampNeeded ? $wordTimestampNeeded->getValueAt(0)->getCppExpression() : 0;
@@ -192,73 +192,80 @@ using websocketpp::lib::bind;
     $maxAllowedConnectionAttempts = $maxAllowedConnectionAttempts ? $maxAllowedConnectionAttempts->getValueAt(0)->getCppExpression() : 10;
     
     my $sttLiveMetricsUpdateNeeded = $model->getParameterByName("sttLiveMetricsUpdateNeeded");
-    $sttLiveMetricsUpdateNeeded = $sttLiveMetricsUpdateNeeded ? $sttLiveMetricsUpdateNeeded->getValueAt(0)->getCppExpression() : 1;    
+    $sttLiveMetricsUpdateNeeded = $sttLiveMetricsUpdateNeeded ? $sttLiveMetricsUpdateNeeded->getValueAt(0)->getCppExpression() : 1;
 %>
 
 <%SPL::CodeGen::implementationPrologue($model);%>
 
 // Constructor
-MY_OPERATOR::MY_OPERATOR() : wsClient{nullptr}
+MY_OPERATOR::MY_OPERATOR()
+:
+		MY_BASE_OPERATOR{},
+		operatorPhysicalName{getContext().getName()},
+		udpChannelNumber{getContext().getChannel()},
+		wsConnectionEstablished{false},
+		makeNewWebsocketConnection{false},
+		websocketConnectionErrorOccurred{false},
+		numberOfWebsocketConnectionAttempts{0},
+		websocketLoggingNeeded{<%=$websocketLoggingNeeded%>},
+		wsClient{},
+		wsHandle{},
+		audioFiles{},
+		audioBytes{},
+		audioSize{},
+		oTupleList{},
+		sttMutex1{},
+		numberOfAudioBlobFragmentsReceivedInCurrentConversation{0},
+		numberOfFullAudioConversationsReceived{0},
+		numberOfFullAudioConversationsTranscribed{0},
+		// 0 = NO_AUDIO_DATA_SENT_TO_STT, 1 = PARITAL_BLOB_FRAGMENTS_BEING_SENT_TO_STT,
+		// 2 = FULL_AUDIO_DATA_SENT_TO_STT
+		statusOfAudioDataTransmissionToSTT{NO_AUDIO_DATA_SENT_TO_STT},
+		transcriptionResult{},
+		transcriptionErrorOccurred{false},
+		sttResultTupleWaitingToBeSent{false},
+		cpuYieldTimeInAudioSenderThread{<%=$cpuYieldTimeInAudioSenderThread%>},
+		waitTimeBeforeSTTServiceConnectionRetry{<%=$waitTimeBeforeSTTServiceConnectionRetry%>},
+		maxAllowedConnectionAttempts{<%=$maxAllowedConnectionAttempts%>},
+		sttLiveMetricsUpdateNeeded{<%=$sttLiveMetricsUpdateNeeded%>},
+		uri{<%=$uri%>},
+		accessToken{},
+		baseLanguageModel{<%=$baseLanguageModel%>},
+		contentType{<%=$contentType%>},
+		sttResultMode{<%=$sttResultMode%>},
+		sttRequestLogging{ <%=$sttRequestLogging%>},
+		baseModelVersion{<%=$baseModelVersion%>},
+		customizationId{<%=customizationId%>},
+		customizationWeight{<%=$customizationWeight%>},
+		acousticCustomizationId{<%=$acousticCustomizationId%>},
+		filterProfanity{<%=$filterProfanity%>},
+		sttJsonResponseDebugging{<%=$sttJsonResponseDebugging%>},
+		maxUtteranceAlternatives{<%=$maxUtteranceAlternatives%>},
+		wordAlternativesThreshold{<%=$wordAlternativesThreshold%>},
+		wordConfidenceNeeded{<%=$wordConfidenceNeeded%>},
+		wordTimestampNeeded{<%=$wordTimestampNeeded%>},
+		identifySpeakers{<%=$identifySpeakers%>},
+		utteranceWordsSpeakers{},
+		utteranceWordsSpeakersConfidences{},
+		utteranceWordsStartTimes{},
+		smartFormattingNeeded{<%=$smartFormattingNeeded%>},
+		keywordsSpottingThreshold{<%=$keywordsSpottingThreshold%>},
+		keywordsToBeSpotted{},
+		// Custom metrics for this operator are already defined in the operator model XML file. 
+		// Hence, there is no need to explicitly create them here.
+		// Simply get the custom metrics already defined for this operator.
+		// The update of metrics nFullAudioConversationsReceived and nFullAudioConversationsTranscribed depends on parameter sttLiveMetricsUpdateNeeded
+		nWebsocketConnectionAttemptsMetric{ & getContext().getMetrics().getCustomMetricByName("nWebsocketConnectionAttempts")},
+		nFullAudioConversationsReceivedMetric{ & getContext().getMetrics().getCustomMetricByName("nFullAudioConversationsReceived")},
+		nFullAudioConversationsTranscribedMetric{ & getContext().getMetrics().getCustomMetricByName("nFullAudioConversationsTranscribed")},
+		nSTTResultModeMetric{ & getContext().getMetrics().getCustomMetricByName("nSTTResultMode")}
 {
-	// Custom metrics for this operator are already defined in the operator model XML file. 
-	// Hence, there is no need to explicitly create them here.
-	// Simply get the custom metrics already defined for this operator.
-	// The update of metrics nFullAudioConversationsReceived and nFullAudioConversationsTranscribed depends on parameter sttLiveMetricsUpdateNeeded
-	OperatorMetrics  & opm = getContext().getMetrics();
-	nSTTResultModeMetric = & opm.getCustomMetricByName("nSTTResultMode");
-	nWebsocketConnectionAttemptsMetric = & opm.getCustomMetricByName("nWebsocketConnectionAttempts");
-	nFullAudioConversationsReceivedMetric = & opm.getCustomMetricByName("nFullAudioConversationsReceived");
-	nFullAudioConversationsTranscribedMetric = & opm.getCustomMetricByName("nFullAudioConversationsTranscribed");
 	
-	numberOfAudioBlobFragmentsReceivedInCurrentConversation = 0;
-	numberOfFullAudioConversationsReceived = 0;
-	numberOfFullAudioConversationsTranscribed = 0;
-	
-	// Initialize the member variables as needed from the operator parameter values read above.	
-	<%
-		if ($contentType eq "") {
-			print "contentType = \"audio/wav\";\n";
-		} else {
-			print "contentType = $contentType;\n";
-		}
-	
-		if ($baseModelVersion eq "") {
-			print "baseModelVersion = \"\";\n";
-		} else {
-			print "baseModelVersion = $baseModelVersion;\n";
-		}
-	
-		if ($customizationId eq "") {
-			print "customizationId = \"\";\n";
-		} else {
-			print "customizationId = $customizationId;\n";
-		}	
-		
-		if ($acousticCustomizationId eq "") {
-			print "acousticCustomizationId = \"\";\n";
-		} else {
-			print "acousticCustomizationId = $acousticCustomizationId;\n";
-		}		
-	%>
-
-	uri = <%=$uri%>;	
-	// It must be set via the second input stream for this operator.
-	accessToken = "";
-	
-	baseLanguageModel = <%=$baseLanguageModel%>;	
-	customizationWeight = <%=$customizationWeight%>;
-	
-    if (customizationId == "") {
+	if (customizationId == "") {
 		// No customization id configured. Hence, set the customization weight to 
-    	// 9.9 which will be ignored by the C++ logic later in the on_open method.
-    	customizationWeight = 9.9;
-    }
-	
-	filterProfanity = <%=$filterProfanity%>;
-	sttJsonResponseDebugging = <%=$sttJsonResponseDebugging%>;
-	sttRequestLogging = <%=$sttRequestLogging%>;
-	
-	sttResultMode = <%=$sttResultMode%>;
+		// 9.9 which will be ignored by the C++ logic later in the on_open method.
+		customizationWeight = 9.9;
+	}
 	
 	if (sttResultMode < 1 || sttResultMode > 3) {
 		throw std::runtime_error(
@@ -266,8 +273,6 @@ MY_OPERATOR::MY_OPERATOR() : wsClient{nullptr}
 			boost::to_string(sttResultMode) + " is given for the sttResultMode parameter." +
 			" Valid value must be either 1 or 2 or 3.");
 	}
-		
-	maxUtteranceAlternatives = <%=$maxUtteranceAlternatives%>;
 	
 	if (maxUtteranceAlternatives <= 0) {
 		throw std::runtime_error(
@@ -276,22 +281,13 @@ MY_OPERATOR::MY_OPERATOR() : wsClient{nullptr}
 			" Valid value must be greater than 0.");
 	}
 	
-	wordAlternativesThreshold = <%=$wordAlternativesThreshold%>;
-	
 	if (wordAlternativesThreshold < 0.0 || wordAlternativesThreshold >= 1.0) {
 		throw std::runtime_error(
 			"WatsonSTT_cpp.cgt: Invalid value of " + 
 			boost::to_string(wordAlternativesThreshold) + " is given for the wordAlternativesThreshold parameter." +
 			" Valid value must be greater than or equal to 0.0 and less than 1.0.");		
 	}
-		
-	wordConfidenceNeeded = <%=$wordConfidenceNeeded%>;	
-	wordTimestampNeeded = <%=$wordTimestampNeeded%>;
-	identifySpeakers = <%=$identifySpeakers%>;
-	smartFormattingNeeded = <%=$smartFormattingNeeded%>;
 	
-	keywordsSpottingThreshold = <%=$keywordsSpottingThreshold%>;
-
 	if (keywordsSpottingThreshold < 0.0 || keywordsSpottingThreshold >= 1.0) {
 		throw std::runtime_error(
 			"WatsonSTT_cpp.cgt: Invalid value of " + 
@@ -308,17 +304,12 @@ MY_OPERATOR::MY_OPERATOR() : wsClient{nullptr}
 		keywordsSpottingThreshold = 0.0;
 	}
 	
-	websocketLoggingNeeded = <%=$websocketLoggingNeeded%>;
-	cpuYieldTimeInAudioSenderThread = <%=$cpuYieldTimeInAudioSenderThread%>;
-
 	if (cpuYieldTimeInAudioSenderThread < 0.0) {
 		throw std::runtime_error(
 			"WatsonSTT_cpp.cgt: Invalid value of " + 
 			boost::to_string(cpuYieldTimeInAudioSenderThread) + " is given for the cpuYieldTimeInAudioSenderThread parameter." +
-			" Valid value must be greater than or equal to 0.0.");		
+			" Valid value must be greater than or equal to 0.0.");
 	}
-	
-	waitTimeBeforeSTTServiceConnectionRetry = <%=$waitTimeBeforeSTTServiceConnectionRetry%>;
 	
 	if (waitTimeBeforeSTTServiceConnectionRetry < 1.0) {
 		throw std::runtime_error(
@@ -327,17 +318,13 @@ MY_OPERATOR::MY_OPERATOR() : wsClient{nullptr}
 			" Valid value must be greater than or equal to 1.0.");		
 	}
 	
-	maxAllowedConnectionAttempts = <%=$maxAllowedConnectionAttempts%>;
-
 	if (maxAllowedConnectionAttempts < 1) {
 		throw std::runtime_error(
 			"WatsonSTT_cpp.cgt: Invalid value of " + 
 			boost::to_string(maxAllowedConnectionAttempts) + " is given for the maxAllowedConnectionAttempts parameter." +
 			" Valid value must be greater than or equal to 1.");	
-	}	
+	}
 
-	sttLiveMetricsUpdateNeeded = <%=$sttLiveMetricsUpdateNeeded%>;
-	
 	// We are not going to support the following utterance based 
 	// features when the STT result mode is 3 (full transcript).
 	// Many of these features return the results in individual arrays for a 
@@ -393,13 +380,14 @@ MY_OPERATOR::MY_OPERATOR() : wsClient{nullptr}
 	<< "\nkeywordsToBeSpotted                     = " << keywordsToBeSpotted
 	<< "\naudioInputAsBlob                        = " << "<%=$audioInputAsBlob%>"
 	<< "\n----------------------------------------------------------------" << std::endl;
-
 }
 
 // Destructor
 MY_OPERATOR::~MY_OPERATOR() 
 {
-    // Finalization code goes here
+	if (wsClient) {
+		delete wsClient;
+	}
 }
 
 // To set the static variable present inside this method, 
@@ -440,20 +428,6 @@ void MY_OPERATOR::allPortsReady()
 	// the Websocket event handler methods present below in this file.
 	myOp(this);
 	*/
-	
-	operatorPhysicalName = getContext().getName();
-	// This operator is usually part of a UDP parallel region in many application scenarios.
-	udpChannelNumber = getContext().getChannel();
-	wsConnectionEstablished = false;
-	makeNewWebsocketConnection = false;
-	// 0 = NO_AUDIO_DATA_SENT_TO_STT, 1 = PARITAL_BLOB_FRAGMENTS_BEING_SENT_TO_STT,
-	// 2 = FULL_AUDIO_DATA_SENT_TO_STT
-	statusOfAudioDataTransmissionToSTT = NO_AUDIO_DATA_SENT_TO_STT;
-	transcriptionErrorOccurred = false;
-	websocketConnectionErrorOccurred = false;
-	numberOfWebsocketConnectionAttempts = 0;
-	sttResultTupleWaitingToBeSent = false;
-	transcriptionResult = "";
 	
 	// Initialize Websocket with the Watson STT service for the
 	// very first time when this operator comes up. We are going to 
