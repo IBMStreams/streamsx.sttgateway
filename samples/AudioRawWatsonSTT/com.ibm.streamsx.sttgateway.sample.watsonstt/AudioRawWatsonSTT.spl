@@ -8,7 +8,6 @@
 /*
 ==============================================
 First created on: Jul/01/2018
-Last modified on: Nov/13/2019
 
 This example demonstrates transcription of raw audio data to text using the WatsonSTT operator. 
 This example code is suitable for processing the raw audio binary data that is either 
@@ -445,7 +444,7 @@ public composite AudioRawWatsonSTT {
 						// There may be many blob fragments arriving for a given audio conversation.
 						// So, display only when the very first blob fragment for a given audio arrives.
 						_conversationId = ABC.conversationId;
-						appTrc(Trace.error, "Channel " + (rstring)getChannel() + 
+						printStringLn(hourMinuteSecondMillisec(getTimestamp()) + " Channel " + (rstring)getChannel() + 
 							", Speech input " + (rstring)++_conversationCnt +
 							": " + _conversationId);
 					}

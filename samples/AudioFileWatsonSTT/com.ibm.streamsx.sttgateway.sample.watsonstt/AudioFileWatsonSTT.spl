@@ -8,7 +8,6 @@
 /*
 ==============================================
 First created on: Jul/01/2018
-Last modified on: Nov/13/2019
 
 This example demonstrates transcription of audio files into text using the WatsonSTT operator. 
 This example code is suitable for processing audio data that is already saved into 
@@ -242,7 +241,7 @@ public composite AudioFileWatsonSTT {
 				}
 				
 				onTuple AFN: {
-					appTrc(Trace.error, "Channel " + (rstring)getChannel() + 
+					printStringLn(hourMinuteSecondMillisec(getTimestamp()) + " Channel " + (rstring)getChannel() + 
 						", Speech input " + (rstring)++_conversationCnt +
 						": " + (rstring)AFN.speech);
 				}
