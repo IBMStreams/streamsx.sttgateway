@@ -39,15 +39,17 @@ public:
 	typedef websocketpp::lib::shared_ptr<boost::asio::ssl::context> context_ptr;
 
 	// Operator related member variables
+	// Not all trace outputs have the operator name and channel as intro per default
+	// so we build our own intro fro trace outputs
 	const std::string operatorPhysicalName;
 	const SPL::int32 udpChannelNumber;
+	const std::string traceIntro;
 	
 	// Websocket operations related member variables.
 	bool wsConnectionEstablished;
 	bool makeNewWebsocketConnection;
 	bool websocketConnectionErrorOccurred;
 	SPL::int32 numberOfWebsocketConnectionAttempts;
-	bool websocketLoggingNeeded;
 	client *wsClient;
 	websocketpp::connection_hdl wsHandle;
 	
@@ -64,12 +66,19 @@ public:
 	std::string transcriptionResult;
 	bool transcriptionErrorOccurred;
 	bool sttResultTupleWaitingToBeSent;
+	SPL::list<SPL::int32> utteranceWordsSpeakers;
+	SPL::list<SPL::float64> utteranceWordsSpeakersConfidences;
+	SPL::list<SPL::float64> utteranceWordsStartTimes;
+	
+	std::string accessToken;
+	
+	//Configuration values
+	const bool websocketLoggingNeeded;
 	const SPL::float64 cpuYieldTimeInAudioSenderThread;
 	const SPL::float64 waitTimeBeforeSTTServiceConnectionRetry;
 	const SPL::int32 maxAllowedConnectionAttempts;
 	const bool sttLiveMetricsUpdateNeeded;
 	const std::string uri;
-	std::string accessToken;
 	const std::string baseLanguageModel;
 	const std::string contentType;
 	const SPL::int32 sttResultMode;
@@ -85,9 +94,6 @@ public:
 	bool wordConfidenceNeeded;
 	bool wordTimestampNeeded;
 	bool identifySpeakers;
-	SPL::list<SPL::int32> utteranceWordsSpeakers;
-	SPL::list<SPL::float64> utteranceWordsSpeakersConfidences;
-	SPL::list<SPL::float64> utteranceWordsStartTimes;
 	const bool smartFormattingNeeded;
 	SPL::float64 keywordsSpottingThreshold;
 	SPL::list<SPL::rstring> keywordsToBeSpotted;
