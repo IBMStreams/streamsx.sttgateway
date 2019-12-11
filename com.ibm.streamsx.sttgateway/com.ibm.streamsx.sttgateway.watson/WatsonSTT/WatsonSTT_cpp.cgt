@@ -908,9 +908,7 @@ void MY_OPERATOR::ws_audio_blob_sender() {
 %>
 
 						// Send this tuple that carries the audio file not found error message.
-						if (sttJsonResponseDebugging == false) {
-							submit(*(oTupleList.at(0)), 0);
-						}
+						submit(*(oTupleList.at(0)), 0);
 						
 						// Free the oTuple object since it is no longer needed.
 						delete oTupleList.at(0);
@@ -1274,11 +1272,8 @@ void MY_OPERATOR::on_message(MY_OPERATOR::client* c, websocketpp::connection_hdl
 	// This debugging variable is enabled/disabled via an operator parameter.
 	// When enabled, it will simply display the full JSON message and 
 	// a few important fields resulting from parsing that JSON message.
-	// After the display is done, it will return without doing any
-	// further tuple submission. This debugging mode is useful during
+	// This debugging mode is useful during
 	// toolkit development to verify any new fields in the STT result JSON.
-	// The if segments around this variable is like a sandbox to do 
-	// experiments with the STT JSON result.
 	// During the development of this toolkit, this debug variable helped 
 	// immensely to test the JSON parsing as well as to prepare the data to be
 	// sent to the caller. Hence, I decided to leave this code here for future
@@ -1510,9 +1505,7 @@ void MY_OPERATOR::on_message(MY_OPERATOR::client* c, websocketpp::connection_hdl
 						
 					} catch (std::exception const& e) {
 						if (sttJsonResponseDebugging == true) {
-							SPLAPPTRC(L_ERROR, traceIntro <<
-								"-->X5 JSON parsing error when reading the from field : " << e.what(),
-								"STT_Result_Processing");
+							std::cout << traceIntro << "-->X5 ERROR JSON parsing error when reading the from field : " << e.what() << std::endl;
 						}
 
 						break;
@@ -1562,9 +1555,7 @@ void MY_OPERATOR::on_message(MY_OPERATOR::client* c, websocketpp::connection_hdl
 						"speaker_labels.[" + boost::to_string(idx1) + "].speaker").get_value<int32_t>();
 				} catch (std::exception const& e) {
 					if (sttJsonResponseDebugging == true) {
-						SPLAPPTRC(L_ERROR, traceIntro <<
-							"-->X9 JSON parsing error when reading the speaker field : " << e.what(),
-							"STT_Result_Processing");
+						std::cout << traceIntro << "-->X9 ERROR JSON parsing error when reading the speaker field : " << e.what() << std::endl;
 					}
 					
 					break;
@@ -1576,9 +1567,7 @@ void MY_OPERATOR::on_message(MY_OPERATOR::client* c, websocketpp::connection_hdl
 						"speaker_labels.[" + boost::to_string(idx1) + "].confidence").get_value<float>();
 				} catch (std::exception const& e) {
 					if (sttJsonResponseDebugging == true) {
-						SPLAPPTRC(L_ERROR, traceIntro <<
-							"-->X10 JSON parsing error when reading the confidence field : " << e.what(),
-							"STT_Result_Processing");
+						std::cout << traceIntro << "-->X10 ERROR JSON parsing error when reading the confidence field : " << e.what() << std::endl;
 					}
 					
 					break;
@@ -1609,9 +1598,7 @@ void MY_OPERATOR::on_message(MY_OPERATOR::client* c, websocketpp::connection_hdl
 				sttResultTupleWaitingToBeSent = false;
 				// Send this tuple now.
 				// Dereference the oTuple object from the object pointer and send it.
-				if (sttJsonResponseDebugging == false) {
-					submit(*(oTupleList.at(0)), 0);
-				}
+				submit(*(oTupleList.at(0)), 0);
 				
 				if (sttJsonResponseDebugging == true) {
 					std::cout << traceIntro << "-->X52a At the tuple submission point for reporting interim transcription results." << std::endl;
@@ -1631,9 +1618,7 @@ void MY_OPERATOR::on_message(MY_OPERATOR::client* c, websocketpp::connection_hdl
 				utteranceNumber = root.get<int32_t>("result_index");
 			} catch (std::exception const& e) {
 				if (sttJsonResponseDebugging == true) {
-					SPLAPPTRC(L_ERROR, traceIntro <<
-						"-->X12 JSON parsing error when reading the result_index field : " << e.what(),
-						"STT_Result_Processing");
+					std::cout << traceIntro << "-->X12 ERROR JSON parsing error when reading the result_index field : " << e.what() << std::endl;
 				}
 				
 				// If speaker_labels is enabled, it is possible not to receive the 
@@ -1659,9 +1644,7 @@ void MY_OPERATOR::on_message(MY_OPERATOR::client* c, websocketpp::connection_hdl
 						"results.[" + boost::to_string(idx1) + "].final").get_value<bool>();
 				} catch (std::exception const& e) {
 					if (sttJsonResponseDebugging == true) {
-						SPLAPPTRC(L_ERROR, traceIntro <<
-							"-->X13 JSON parsing error when reading the final field : " << e.what(),
-							"STT_Result_Processing");
+						std::cout << traceIntro << "-->X13 ERROR JSON parsing error when reading the final field : " << e.what() << std::endl;
 						
 						if (idx1 == 0) {
 							std::cout << traceIntro << "-->X14 idx1=0, size of speaker_labels list=" << utteranceWordsSpeakers.size() << std::endl;
@@ -1686,8 +1669,7 @@ void MY_OPERATOR::on_message(MY_OPERATOR::client* c, websocketpp::connection_hdl
 					final = true;
 
 					if (sttJsonResponseDebugging == true) {
-						std::cout << traceIntro <<
-							"-->X15 Forcing final = true after receiving the speaker_labels message." << std::endl;
+						std::cout << traceIntro << "-->X15 Forcing final = true after receiving the speaker_labels message." << std::endl;
 					}
 
 				}
@@ -1839,9 +1821,7 @@ void MY_OPERATOR::on_message(MY_OPERATOR::client* c, websocketpp::connection_hdl
 
 				if (exitThisLoop == true) {
 					if (sttJsonResponseDebugging == true) {
-						SPLAPPTRC(L_ERROR, traceIntro <<
-							"-->X17 Exiting the main loop after reaching array index " << idx1 << ".",
-							"STT_Result_Processing");
+						std::cout << traceIntro << "-->X17 ERROR Exiting the main loop after reaching array index " << idx1 << "." << std::endl;
 					}
 					
 					break;
@@ -1886,10 +1866,8 @@ void MY_OPERATOR::on_message(MY_OPERATOR::client* c, websocketpp::connection_hdl
 							}
 						} catch(std::exception const& e) {
 							if (sttJsonResponseDebugging == true) {
-								SPLAPPTRC(L_ERROR, traceIntro <<
-									"-->X19 idx2=" << idx2 << ", idx3=" << idx3 <<
-									". JSON parsing error when reading the word_confidence[0] word field: " << e.what(),
-									"STT_Result_Processing");
+								std::cout << traceIntro << "-->X19 ERROR idx2=" << idx2 << ", idx3=" << idx3 <<
+									". JSON parsing error when reading the word_confidence[0] word field: " << e.what() << std::endl;
 							}
 							
 							break;
@@ -1910,10 +1888,9 @@ void MY_OPERATOR::on_message(MY_OPERATOR::client* c, websocketpp::connection_hdl
 							}
 						} catch(std::exception const& e) {
 							if (sttJsonResponseDebugging == true) {
-							SPLAPPTRC(L_ERROR, traceIntro <<
-								"-->X21 idx2=" << idx2 << ", idx3=" << idx3 <<
-								". JSON parsing error when reading the word_confidence[1] confidence field: " << e.what(),
-								"STT_Result_Processing");
+								std::cout << traceIntro << "-->X21 ERROR idx2=" << idx2 << ", idx3=" << idx3 <<
+									". JSON parsing error when reading the word_confidence[1] confidence field: " <<
+									e.what() << std::endl;
 							}
 							
 							break;
@@ -1953,10 +1930,8 @@ void MY_OPERATOR::on_message(MY_OPERATOR::client* c, websocketpp::connection_hdl
 								}
 							} catch(std::exception const& e) {
 								if (sttJsonResponseDebugging == true) {
-									SPLAPPTRC(L_ERROR, traceIntro <<
-										"-->X25 idx2=" << idx2 << ", idx3=" << idx3 <<
-										". JSON parsing error when reading the timestamps[0] word field: " << e.what(),
-										"STT_Result_Processing");
+									std::cout << traceIntro << "-->X25 ERROR idx2=" << idx2 << ", idx3=" << idx3 <<
+										". JSON parsing error when reading the timestamps[0] word field: " << e.what() << std::endl;
 								}
 								
 								break;
@@ -1978,10 +1953,8 @@ void MY_OPERATOR::on_message(MY_OPERATOR::client* c, websocketpp::connection_hdl
 							}
 						} catch(std::exception const& e) {
 							if (sttJsonResponseDebugging == true) {
-								SPLAPPTRC(L_ERROR, traceIntro <<
-									"-->X27 idx2=" << idx2 << ", idx3=" << idx3 <<
-									". JSON parsing error when reading the timestamps[1] startTime field: " << e.what(),
-									"STT_Result_Processing");
+								std::cout << traceIntro << "-->X27 ERROR idx2=" << idx2 << ", idx3=" << idx3 <<
+									". JSON parsing error when reading the timestamps[1] startTime field: " << e.what() << std::endl;
 							}
 							
 							break;
@@ -2002,10 +1975,8 @@ void MY_OPERATOR::on_message(MY_OPERATOR::client* c, websocketpp::connection_hdl
 							}
 						} catch(std::exception const& e) {
 							if (sttJsonResponseDebugging == true) {
-								SPLAPPTRC(L_ERROR, traceIntro <<
-									"-->X29 idx2=" << idx2 << ", idx3=" << idx3 <<
-									". JSON parsing error when reading the timestamps[2] endTime field: " << e.what(),
-									"STT_Result_Processing");
+								std::cout << traceIntro << "-->X29 ERROR idx2=" << idx2 << ", idx3=" << idx3 <<
+									". JSON parsing error when reading the timestamps[2] endTime field: " << e.what() << std::endl;
 							}
 							
 							break;
@@ -2049,10 +2020,8 @@ void MY_OPERATOR::on_message(MY_OPERATOR::client* c, websocketpp::connection_hdl
 							}
 						} catch (std::exception const& e) {
 							if (sttJsonResponseDebugging == true) {
-								SPLAPPTRC(L_ERROR, traceIntro <<
-									"-->X36 idx2=" << idx2 << 
-									". JSON parsing error when reading the confidence field: " << e.what(),
-									"STT_Result_Processing");
+								std::cout << traceIntro << "-->X36 ERROR idx2=" << idx2 << 
+									". JSON parsing error when reading the confidence field: " << e.what() << std::endl;
 							}
 						}
 					}
@@ -2100,9 +2069,8 @@ void MY_OPERATOR::on_message(MY_OPERATOR::client* c, websocketpp::connection_hdl
 						confidenceFound = false;
 					} catch (std::exception const& e) {
 						if (sttJsonResponseDebugging == true) {
-							SPLAPPTRC(L_ERROR, traceIntro <<
-								"-->X38 JSON parsing error when reading the transcript field: " << e.what(),
-								"STT_Result_Processing");
+							std::cout << traceIntro <<
+								"-->X38 ERROR JSON parsing error when reading the transcript field: " << e.what() << std::endl;
 						}
 						
 						// A special case for STT resule mode 1 (partial utterance) where
@@ -2149,10 +2117,8 @@ void MY_OPERATOR::on_message(MY_OPERATOR::client* c, websocketpp::connection_hdl
 						}
 					} catch (std::exception const& e) {
 						if (sttJsonResponseDebugging == true) {
-							SPLAPPTRC(L_ERROR, traceIntro <<
-								"-->X41 idx2=" << idx2 << 
-								". JSON parsing error when reading the word_alternatives.startTime field: " << e.what(),
-								"STT_Result_Processing");
+							std::cout << traceIntro << "-->X41 ERROR idx2=" << idx2 << 
+								". JSON parsing error when reading the word_alternatives.startTime field: " << e.what() << std::endl;
 						}
 						
 						break;
@@ -2169,10 +2135,8 @@ void MY_OPERATOR::on_message(MY_OPERATOR::client* c, websocketpp::connection_hdl
 						}
 					} catch (std::exception const& e) {
 						if (sttJsonResponseDebugging == true) {
-							SPLAPPTRC(L_ERROR, traceIntro <<
-								"-->X43 idx2=" << idx2 << 
-								". JSON parsing error when reading the word_alternatives.endTime field: " << e.what(),
-								"STT_Result_Processing");
+							std::cout << traceIntro << "-->X43 ERROR idx2=" << idx2 << 
+								". JSON parsing error when reading the word_alternatives.endTime field: " << e.what() << std::endl;
 						}
 						
 						break;
@@ -2201,14 +2165,13 @@ void MY_OPERATOR::on_message(MY_OPERATOR::client* c, websocketpp::connection_hdl
 							
 							if (sttJsonResponseDebugging == true) {
 								std::cout << traceIntro <<
-										"-->X44 word_alternatives.alternatives.confidence=" << wordConfidence << std::endl;
+									"-->X44 word_alternatives.alternatives.confidence=" << wordConfidence << std::endl;
 							}
 						} catch (std::exception const& e) {
 							if (sttJsonResponseDebugging == true) {
-								SPLAPPTRC(L_ERROR, traceIntro <<
-									"-->X45 idx2=" << idx2 << ", idx3=" << idx3 <<
-									". JSON parsing error when reading the word_alternatives.alternatives.confidence field: " << e.what(),
-									"STT_Result_Processing");
+								std::cout << traceIntro << "-->X45 ERROR idx2=" << idx2 << ", idx3=" << idx3 <<
+									". JSON parsing error when reading the word_alternatives.alternatives.confidence field: " <<
+									e.what() << std::endl;
 							}
 							
 							break;
@@ -2226,10 +2189,9 @@ void MY_OPERATOR::on_message(MY_OPERATOR::client* c, websocketpp::connection_hdl
 							}
 						} catch (std::exception const& e) {
 							if (sttJsonResponseDebugging == true) {
-								SPLAPPTRC(L_ERROR, traceIntro <<
-									"-->X47 idx2=" << idx2 << ", idx3=" << idx3 <<
-									". JSON parsing error when reading the word_alternatives.alternatives.word field: " << e.what(),
-									"STT_Result_Processing");
+								std::cout << traceIntro << "-->X47 ERROR idx2=" << idx2 << ", idx3=" << idx3 <<
+									". JSON parsing error when reading the word_alternatives.alternatives.word field: " <<
+									e.what() << std::endl;
 							}
 							
 							break;
@@ -2304,11 +2266,10 @@ void MY_OPERATOR::on_message(MY_OPERATOR::client* c, websocketpp::connection_hdl
 							}
 						} catch (std::exception const& e) {
 							if (sttJsonResponseDebugging == true) {
-								SPLAPPTRC(L_ERROR, traceIntro <<
-									"-->X55 idx2=" << idx2 << ", idx3=" << idx3 << ". JSON parsing error when reading the " <<
-									"results.[" + boost::to_string(idx1) + "].keywords_result." <<
-									keyword << ".[" + boost::to_string(idx3) << "].start_time field. " << e.what(),
-									"STT_Result_Processing");
+								std::cout << traceIntro << "-->X55 ERROR idx2=" << idx2 << ", idx3=" << idx3 <<
+									". JSON parsing error when reading the " <<
+									"results.[" << boost::to_string(idx1) <<"].keywords_result." <<
+									keyword << ".[" << boost::to_string(idx3) << "].start_time field. " << e.what() << std::endl;
 							}
 							
 							break;
@@ -2328,11 +2289,10 @@ void MY_OPERATOR::on_message(MY_OPERATOR::client* c, websocketpp::connection_hdl
 							}
 						} catch (std::exception const& e) {
 							if (sttJsonResponseDebugging == true) {
-								SPLAPPTRC(L_ERROR, traceIntro <<
-									"-->X57 idx2=" << idx2 << ", idx3=" << idx3 << ". JSON parsing error when reading the " <<
-									"results.[" + boost::to_string(idx1) + "].keywords_result." <<
-									keyword << ".[" + boost::to_string(idx3) << "].end_time field. " << e.what(),
-									"STT_Result_Processing");
+								std::cout << traceIntro << "-->X57 ERROR idx2=" << idx2 << ", idx3=" << idx3 <<
+									". JSON parsing error when reading the " <<
+									"results.[" << boost::to_string(idx1) << "].keywords_result." <<
+									keyword << ".[" << boost::to_string(idx3) << "].end_time field. " << e.what() << std::endl;
 							}
 							
 							break;
@@ -2348,15 +2308,14 @@ void MY_OPERATOR::on_message(MY_OPERATOR::client* c, websocketpp::connection_hdl
 							
 							if (sttJsonResponseDebugging == true) {
 								std::cout << traceIntro << "-->X58 keywords_result." <<
-										keyword << ".[" << idx3 << "].confidence=" << matchConfidence << std::endl;
+									keyword << ".[" << idx3 << "].confidence=" << matchConfidence << std::endl;
 							}
 						} catch (std::exception const& e) {
 							if (sttJsonResponseDebugging == true) {
-								SPLAPPTRC(L_ERROR, traceIntro <<
-									"-->X59 idx2=" << idx2 << ", idx3=" << idx3 << ". JSON parsing error when reading the " <<
-									"results.[" + boost::to_string(idx1) + "].keywords_result." <<
-									keyword << ".[" + boost::to_string(idx3) << "].confidence field. " << e.what(),
-									"STT_Result_Processing");
+								std::cout << traceIntro << "-->X59 ERROR idx2=" << idx2 << ", idx3=" << idx3 <<
+									". JSON parsing error when reading the " <<
+									"results.[" << boost::to_string(idx1) << "].keywords_result." <<
+									keyword << ".[" + boost::to_string(idx3) << "].confidence field. " << e.what() << std::endl;
 							}
 							
 							break;
@@ -2422,9 +2381,7 @@ void MY_OPERATOR::on_message(MY_OPERATOR::client* c, websocketpp::connection_hdl
 			// Send either the very last tuple with transcriptionCompleted set to true or
 			// with the STT error message set.
 			// Dereference the oTuple object from the object pointer and send it.
-			if (sttJsonResponseDebugging == false) {
-				submit(*(oTupleList.at(0)), 0);
-			}
+			submit(*(oTupleList.at(0)), 0);
 
 			numberOfFullAudioConversationsTranscribed++;
 			// Update the operator metric only if the user asked for a live update.

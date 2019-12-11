@@ -327,14 +327,7 @@
 
       <parameter>
         <name>sttJsonResponseDebugging</name>
-        <description>
-        This parameter is used for debugging the STT JSON response message. Mostly for IBM internal use. 
-        When enabled, it will simply display the full JSON message and a few important fields resulting from parsing that JSON message. 
-        After the display is done, it will return without doing any further tuple submission. This debugging mode is useful during 
-        toolkit development to verify any new fields in the STT result JSON. It is like a sandbox to do experiments with the STT JSON result. 
-        
-        (Default is false)
-        </description>
+        <description>This parameter is used for debugging the STT JSON response message. Mostly for IBM internal use. (Default is false)</description>
         <optional>true</optional>
         <rewriteAllowed>true</rewriteAllowed>
         <expressionMode>AttributeFree</expressionMode>
