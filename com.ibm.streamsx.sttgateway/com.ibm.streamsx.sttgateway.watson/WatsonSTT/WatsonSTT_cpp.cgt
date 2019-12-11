@@ -479,14 +479,25 @@ void MY_OPERATOR::prepareToShutdown()
 {
 	// Close the Websocket connection to the Watson STT service.
 	// wsClient->get_alog().write(websocketpp::log::alevel::app, "Client is closing the Websocket connection to the Watson STT service.");
-	if (wsClient) {
-		SPLAPPTRC(L_INFO, traceIntro <<
-			"-->Client is closing the Websocket connection to the Watson STT service.",
-			"prepareToShutdown");
-		wsClient->close(wsHandle,websocketpp::close::status::normal,"");
-	} else {
-		SPLAPPTRC(L_INFO, traceIntro <<
-			"-->client is null.",
+	try {
+		if (wsClient) {
+			SPLAPPTRC(L_INFO, traceIntro <<
+				"-->Client is trying to close the Websocket connection to the Watson STT service.",
+				"prepareToShutdown");
+			if ( ! wsHandle.expired()) {
+				SPLAPPTRC(L_INFO, traceIntro <<
+					"-->Client is closing the Websocket connection to the Watson STT service.",
+					"prepareToShutdown");
+				wsClient->close(wsHandle,websocketpp::close::status::normal,"");
+			}
+		} else {
+			SPLAPPTRC(L_INFO, traceIntro <<
+				"-->Client is null.",
+				"prepareToShutdown");
+		}
+	} catch (const std::exception& e) {
+		SPLAPPTRC(L_ERROR, traceIntro <<
+			"-->Exception during closing. " << e.what(),
 			"prepareToShutdown");
 	}
 }
@@ -587,7 +598,6 @@ void MY_OPERATOR::process(Tuple & tuple, uint32_t port)
 		// end of transmitting all the non-empty blob content belonging to a 
 		// given audio either in full or in partial fragments.
 		//
-		unsigned char * ptr = NULL;
 		SPL::blob & speechBlob = <%=$inputTupleName%>.get_speech();
 		uint64_t sizeOfBlob = SPL::Functions::Collections::blobSize(speechBlob);
 
@@ -611,7 +621,7 @@ void MY_OPERATOR::process(Tuple & tuple, uint32_t port)
 			numberOfAudioBlobFragmentsReceivedInCurrentConversation++;
 		} else {
 			// Append a NULL pointer to indicate the end of blob data for a given audio.
-			audioBytes.push_back(ptr);
+			audioBytes.push_back(nullptr);
 			// All blob fragments for the current audio conversation have been received.
 			numberOfAudioBlobFragmentsReceivedInCurrentConversation = 0;
 			numberOfFullAudioConversationsReceived++;
@@ -708,13 +718,23 @@ void MY_OPERATOR::ws_audio_blob_sender() {
 			// There is no audio data available at this time.
 			// Yield the CPU for slightly a longer time.
 			// 1 second instead of 1 msec.
+			SPLAPPTRC(L_TRACE, traceIntro <<
+					"-->Nothing to send in thread ws_audio_blob_sender, block for 1 second",
+					"ws_audio_blob_sender");
 			SPL::Functions::Utility::block(1.0);
 		} else if (cpuYieldTimeInAudioSenderThread > 0.0) {
 			// Audio data available for processing. Yield the CPU briefly and get to work soon.
 			// Even a tiny value of 1 millisecond (0.001 second) will yield the
 			// CPU and will not show 0% idle in the Linux top command.
+			SPLAPPTRC(L_TRACE, traceIntro << "-->Going to send data in thread ws_audio_blob_sender, "
+					"block for cpuYieldTimeInAudioSenderThread=" << cpuYieldTimeInAudioSenderThread,
+					"ws_audio_blob_sender");
 			SPL::Functions::Utility::block(cpuYieldTimeInAudioSenderThread);
 		}
+		//SPL::Functions::Utility::block interrupts if shutdown is requested
+		//do not sent any further data is shutdown is requested 
+		if (getPE().getShutdownRequested())
+			continue;
 		
 		// Check if the Websocket connection needs to be established.
 		if ((audioBytesVectorSize > 0 || audioFilesVectorSize > 0) && 
@@ -972,7 +992,10 @@ void MY_OPERATOR::ws_audio_blob_sender() {
 				continue;
 <%			} # End of if (audioInputAsBlob == false) %>
 		} // End of if ((audioBytesVectorSize > 0 ||
-	} // End of the while loop	
+	} // End of the while loop
+	SPLAPPTRC(L_INFO, traceIntro <<
+			"-->End of loop ws_audio_blob_sender: getShutdownRequested()=" << getPE().getShutdownRequested(),
+			"ws_audio_blob_sender");
 }
 
 // This method initializes the Websocket driver, TLS and then
@@ -986,6 +1009,7 @@ void MY_OPERATOR::ws_init() {
 			// Keep waiting in this while loop until
 			// a need arises to make a new Websocket connection.
 			// 1 second wait.
+			SPLAPPTRC(L_TRACE, traceIntro << "-->No connection request in thread ws_init, block for 1 second", "ws_init");
 			SPL::Functions::Utility::block(1.0);
 			continue;
 		}
@@ -1068,7 +1092,9 @@ void MY_OPERATOR::ws_init() {
 			websocketpp::lib::error_code ec;
 			// https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-basic-request#using-the-websocket-interface
 			client::connection_ptr con = wsClient->get_connection(uri, ec);
-			SPLAPPTRC(L_DEBUG, traceIntro << "-->Reached 2 (get_connection", "ws_init");
+			SPLAPPTRC(L_DEBUG, traceIntro << "-->Reached 2 (get_connection) ec.value=" << ec.value(), "ws_init");
+			if (ec)
+				throw ec;
 
 			wsClient->connect(con);
 			// A new Websocket connection has just been made. Reset this flag.
@@ -1082,6 +1108,7 @@ void MY_OPERATOR::ws_init() {
 			SPLAPPTRC(L_ERROR, traceIntro << "-->std::exception: " << e.what(), "ws_init");
 			SPL::Functions::Utility::abort(__FILE__, __LINE__);
 		} catch (const websocketpp::lib::error_code & e) {
+			//websocketpp::lib::error_code is a class -> catching by reference makes sense
 			SPLAPPTRC(L_ERROR, traceIntro << "-->websocketpp::lib::error_code: " << e.message(), "ws_init");
 			SPL::Functions::Utility::abort(__FILE__, __LINE__);
 		} catch (...) {
@@ -1089,6 +1116,9 @@ void MY_OPERATOR::ws_init() {
 			SPL::Functions::Utility::abort(__FILE__, __LINE__);
 		}	
 	} // End of while loop.
+	SPLAPPTRC(L_INFO, traceIntro <<
+			"-->End of loop ws_init: getShutdownRequested()=" << getPE().getShutdownRequested(),
+			"ws_init");
 }
 
 // When the Websocket connection to the Watson STT service is made successfully, 

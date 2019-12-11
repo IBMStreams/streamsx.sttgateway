@@ -407,7 +407,11 @@ public composite AudioRawWatsonSTT {
 					// after reading it from a file or receiving it from a network switch.
 					//
 					if (atleastOneBlobFragmentWasSent == true) {
-						clearM(oTuple.speech);
+						//this code 
+						//clearM(oTuple.speech);
+						//causes a SIGSEV if this operator is not fused with its downstream operator
+						blob newBlob = [];
+						oTuple.speech = newBlob;
 						// Send an empty blob as the very last one for this audio conversation.
 						submit(oTuple, ABC);
 					}
