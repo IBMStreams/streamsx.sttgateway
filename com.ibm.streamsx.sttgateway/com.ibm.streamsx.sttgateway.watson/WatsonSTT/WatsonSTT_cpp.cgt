@@ -1566,9 +1566,6 @@ void MY_OPERATOR::on_message(MY_OPERATOR::client* c, websocketpp::connection_hdl
 							"-->X9 JSON parsing error when reading the speaker field : " << e.what(),
 							"STT_Result_Processing");
 					}
-					SPLAPPTRC(L_ERROR, traceIntro <<
-						"-->X9 JSON parsing error when reading the speaker field : " << e.what(),
-						"STT_Result_Processing");
 					
 					break;
 				}
@@ -1583,9 +1580,6 @@ void MY_OPERATOR::on_message(MY_OPERATOR::client* c, websocketpp::connection_hdl
 							"-->X10 JSON parsing error when reading the confidence field : " << e.what(),
 							"STT_Result_Processing");
 					}
-					SPLAPPTRC(L_ERROR, traceIntro <<
-						"-->X10 JSON parsing error when reading the confidence field : " << e.what(),
-						"STT_Result_Processing");
 					
 					break;
 				}
@@ -1641,9 +1635,6 @@ void MY_OPERATOR::on_message(MY_OPERATOR::client* c, websocketpp::connection_hdl
 						"-->X12 JSON parsing error when reading the result_index field : " << e.what(),
 						"STT_Result_Processing");
 				}
-				SPLAPPTRC(L_WARN, traceIntro <<
-					"-->X12 JSON parsing error when reading the result_index field : " << e.what(),
-					"STT_Result_Processing");
 				
 				// If speaker_labels is enabled, it is possible not to receive the 
 				// result_index field and the results array field in certain situations with 
@@ -1698,9 +1689,6 @@ void MY_OPERATOR::on_message(MY_OPERATOR::client* c, websocketpp::connection_hdl
 						std::cout << traceIntro <<
 							"-->X15 Forcing final = true after receiving the speaker_labels message." << std::endl;
 					}
-					SPLAPPTRC(L_ERROR, traceIntro <<
-						"-->X15 Forcing final = true after receiving the speaker_labels message.",
-						"STT_Result_Processing");
 
 				}
 				
@@ -2509,6 +2497,9 @@ void MY_OPERATOR::on_message(MY_OPERATOR::client* c, websocketpp::connection_hdl
 			// Websocket connection establishment phase.
 			std::cout << traceIntro <<
 				"-->Error received from the Watson Speech To Text service: " << sttErrorString << std::endl;
+			SPLAPPTRC(L_ERROR, traceIntro <<
+					"-->Error received from the Watson Speech To Text service: " << sttErrorString,
+					"STT_Result_Processing");
 		}
 		
 		// Reset this flag to indicate that STT service has no full audio data at this time.
