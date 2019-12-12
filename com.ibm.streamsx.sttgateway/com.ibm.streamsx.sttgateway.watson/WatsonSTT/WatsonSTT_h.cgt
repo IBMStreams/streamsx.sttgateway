@@ -26,17 +26,15 @@ Last modified on: Jun/11/2019
 
 <%SPL::CodeGen::headerPrologue($model);%>
 
-#define NO_AUDIO_DATA_SENT_TO_STT 0
-#define AUDIO_BLOB_FRAGMENTS_BEING_SENT_TO_STT 1
-#define FULL_AUDIO_DATA_SENT_TO_STT 2
-
 class MY_OPERATOR : public MY_BASE_OPERATOR {
-public:
+
 	// Websocket related type definitions.
 	typedef websocketpp::client<websocketpp::config::asio_tls_client> client;
 	// Pull out the type of messages sent by our config
 	typedef websocketpp::config::asio_tls_client::message_type::ptr message_ptr;
 	typedef websocketpp::lib::shared_ptr<boost::asio::ssl::context> context_ptr;
+
+	enum StatusOfAudioDataTransmission {NO_AUDIO_DATA_SENT_TO_STT, AUDIO_BLOB_FRAGMENTS_BEING_SENT_TO_STT, FULL_AUDIO_DATA_SENT_TO_STT};
 
 	// Operator related member variables
 	// We build our own intro for trace outputs
@@ -61,7 +59,7 @@ public:
 	SPL::uint32 numberOfAudioBlobFragmentsReceivedInCurrentConversation;
 	SPL::uint64 numberOfFullAudioConversationsReceived;
 	SPL::uint64 numberOfFullAudioConversationsTranscribed;
-	SPL::int32 statusOfAudioDataTransmissionToSTT;
+	StatusOfAudioDataTransmission statusOfAudioDataTransmissionToSTT;
 	std::string transcriptionResult;
 	bool transcriptionErrorOccurred;
 	bool sttResultTupleWaitingToBeSent;
@@ -128,6 +126,7 @@ public:
 	// Processing for websocket client threads
 	void process(uint32_t idx);
 
+private:
 	// All the public methods below used to be static methods with
 	// a static keyword at the beginning of every prototype 
 	// declaration. On Aug/28/2018, I removed the need for them to be static.
@@ -153,7 +152,6 @@ public:
 	// Websocket audio blob sender thread method
 	void ws_audio_blob_sender();
 	
-private:
 	// These are the output attribute assignment functions
 	SPL::int32 getUtteranceNumber(int32_t const & utteranceNumber);
 	SPL::rstring getUtteranceText(std::string const & utteranceText);
