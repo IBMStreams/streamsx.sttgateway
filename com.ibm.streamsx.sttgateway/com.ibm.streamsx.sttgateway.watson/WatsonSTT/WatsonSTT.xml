@@ -206,14 +206,6 @@
           </cmn:managedLibrary>
         </library>
 
-         <library>
-          <cmn:description>Boost Library thread</cmn:description>
-          <cmn:managedLibrary>
-            <cmn:lib>boost_thread</cmn:lib>
-            <cmn:libPath>../../impl/lib</cmn:libPath>
-          </cmn:managedLibrary>
-        </library>
-
       </libraryDependencies>
       
       <providesSingleThreadedContext>Never</providesSingleThreadedContext>

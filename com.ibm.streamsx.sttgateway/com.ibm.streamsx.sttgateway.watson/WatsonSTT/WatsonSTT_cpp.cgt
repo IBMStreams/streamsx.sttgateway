@@ -30,9 +30,7 @@ https://github.com/IBMStreams/administration/issues/136
 #include <websocketpp/config/asio_client.hpp>
 #include <websocketpp/client.hpp>
 
-#include <boost/algorithm/string/predicate.hpp>
 #include <boost/exception/to_string.hpp>
-#include <boost/thread/thread.hpp>
 
 // A nice read in this URL about using property_tree for JSON parsing:
 // http://zenol.fr/blog/boost-property-tree/en.html
@@ -432,48 +430,22 @@ void MY_OPERATOR::allPortsReady()
 	// the Websocket event handler methods present below in this file.
 	myOp(this);
 	*/
-	
-	// Initialize Websocket with the Watson STT service for the
-	// very first time when this operator comes up. We are going to 
-	// create a new thread that will do the Websocket initialization and
-	// keep doing the Boost asio run loop inside of that thread.
-	// That will make the Websocket operations to run on its own 
-	// thread away from our Streams tuple processing thread.
-	try {
-		// This C++11 technique to pass a class member method as a
-		// callback function is discussed here:
-		// http://coliru.stacked-crooked.com/a/860dd7e0bb98502d
-		//
-		// C++ boost thread reference: http://www.cplusplus.com/forum/beginner/152951/
-		auto callback1 = std::bind(&MY_OPERATOR::ws_init, this);
-		boost::thread* myThread1 = new boost::thread(callback1);
-	} catch(std::exception& e) {
-		SPLAPPTRC(L_ERROR, traceIntro <<
-			"-->Exception in creating the ws_init thread. " << e.what(),
-			"ws_init thread creation");
-		// We can't do much without this thread. Abort this operator now.
-		SPL::Functions::Utility::abort(__FILE__, __LINE__);
-	}
-	
-	// Create another thread to periodically watch for the
-	// audio data availability so that the audio blob can be 
-	// sent to the Watson STT service via Websocket.
-	// This thread will also monitor for any Websocket 
-	// connection termination due to inactivity/session timeout or
-	// due to invalid audio data that was sent for transcription which 
-	// forced the Watson STT service to terminate the connection. 
-	try {
-		auto callback2 = std::bind(&MY_OPERATOR::ws_audio_blob_sender, this);
-		boost::thread* myThread2 = new boost::thread(callback2);
-	} catch(std::exception& e) {
-		SPLAPPTRC(L_ERROR, traceIntro <<
-			"-->Exception in creating the ws_audio_blob_sender thread. " << e.what(),
-			"ws_audio_blob_sender thread creation");
-		// We can't do much without this thread. Abort this operator now.
-		SPL::Functions::Utility::abort(__FILE__, __LINE__);
+	// Use Streams runtime controlled threads
+	uint32_t userThreadIndex = createThreads(2);
+	if (userThreadIndex != 0) {
+		std::cout << "MY_OPERATOR::allPortsReady() userThreadIndex=" << userThreadIndex << std::endl;
+		throw std::invalid_argument("WatsonSTT invalid userThreadIndex");
 	}
 }
- 
+
+void MY_OPERATOR::process(uint32_t idx) {
+	SPLAPPTRC(L_INFO, traceIntro << "--Run thread idx=" << idx, "process");
+	if (idx == 0)
+		ws_init();
+	else
+		ws_audio_blob_sender();
+}
+
 // Notify pending shutdown
 void MY_OPERATOR::prepareToShutdown() 
 {

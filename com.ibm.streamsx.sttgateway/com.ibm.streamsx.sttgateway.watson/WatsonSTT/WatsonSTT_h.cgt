@@ -39,8 +39,7 @@ public:
 	typedef websocketpp::lib::shared_ptr<boost::asio::ssl::context> context_ptr;
 
 	// Operator related member variables
-	// Not all trace outputs have the operator name and channel as intro per default
-	// so we build our own intro fro trace outputs
+	// We build our own intro for trace outputs
 	const std::string operatorPhysicalName;
 	const SPL::int32 udpChannelNumber;
 	const std::string traceIntro;
@@ -126,6 +125,9 @@ public:
 	// Punctuation processing
 	void process(Punctuation const & punct, uint32_t port);
 	
+	// Processing for websocket client threads
+	void process(uint32_t idx);
+
 	// All the public methods below used to be static methods with
 	// a static keyword at the beginning of every prototype 
 	// declaration. On Aug/28/2018, I removed the need for them to be static.
@@ -146,7 +148,7 @@ public:
 	void on_fail(client* c, websocketpp::connection_hdl hdl);
 	
 	// Websocket initialization thread method
-	void ws_init();  
+	void ws_init();
 	
 	// Websocket audio blob sender thread method
 	void ws_audio_blob_sender();

@@ -358,7 +358,7 @@ https://gist.github.com/1duo/2d1d851f76f8297be264b52c1f31a2ab
 b) After that, copy a few .so files from the <YOUR_HOME_DIRECTORY>/boost_1_69_0/lib
    directory into the impl/lib directory of this toolkit.
    (libboost_chrono.so.1.69.0, libboost_random.so.1.69.0, 
-    libboost_system.so.1.69.0, libboost_thread.so.1.69.0)
+    libboost_system.so.1.69.0
     
    For all those .so files you copied, you must also create a 
    symbolic link within the impl/lib directory of this toolkit.

@@ -155,7 +155,6 @@
 			<arg value="--with-chrono"/>
 			<arg value="--with-random"/>
 			<arg value="--with-system"/>
-			<arg value="--with-thread"/>
 			<arg value="-j${no.cpus}"/>
 		</exec>
 	</target>
