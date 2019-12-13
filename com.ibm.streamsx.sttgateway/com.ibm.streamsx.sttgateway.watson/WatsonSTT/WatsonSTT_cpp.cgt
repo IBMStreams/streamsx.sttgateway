@@ -185,15 +185,17 @@ using websocketpp::lib::bind;
 	# Default: 3.0 seconds.
 	$waitTimeBeforeSTTServiceConnectionRetry = $waitTimeBeforeSTTServiceConnectionRetry ? $waitTimeBeforeSTTServiceConnectionRetry->getValueAt(0)->getCppExpression() : 3.0;
 
-	my $maxAllowedConnectionAttempts = $model->getParameterByName("maxAllowedConnectionAttempts");
+	my $connectionAttemptsThreshold = $model->getParameterByName("connectionAttemptsThreshold");
 	# Default: 10 attempts
-	$maxAllowedConnectionAttempts = $maxAllowedConnectionAttempts ? $maxAllowedConnectionAttempts->getValueAt(0)->getCppExpression() : 10;
+	$connectionAttemptsThreshold = $connectionAttemptsThreshold ? $connectionAttemptsThreshold->getValueAt(0)->getCppExpression() : 10;
 	
 	my $sttLiveMetricsUpdateNeeded = $model->getParameterByName("sttLiveMetricsUpdateNeeded");
 	$sttLiveMetricsUpdateNeeded = $sttLiveMetricsUpdateNeeded ? $sttLiveMetricsUpdateNeeded->getValueAt(0)->getCppExpression() : 1;
 %>
 
 <%SPL::CodeGen::implementationPrologue($model);%>
+
+const SPL::float64 MY_OPERATOR::waitTimeBeforeSTTServiceConnectionRetryLong = 60.0;
 
 // Constructor
 MY_OPERATOR::MY_OPERATOR()
@@ -236,7 +238,7 @@ MY_OPERATOR::MY_OPERATOR()
 		websocketLoggingNeeded{<%=$websocketLoggingNeeded%>},
 		cpuYieldTimeInAudioSenderThread{<%=$cpuYieldTimeInAudioSenderThread%>},
 		waitTimeBeforeSTTServiceConnectionRetry{<%=$waitTimeBeforeSTTServiceConnectionRetry%>},
-		maxAllowedConnectionAttempts{<%=$maxAllowedConnectionAttempts%>},
+		connectionAttemptsThreshold{<%=$connectionAttemptsThreshold%>},
 		sttLiveMetricsUpdateNeeded{<%=$sttLiveMetricsUpdateNeeded%>},
 		uri{<%=$uri%>},
 		baseLanguageModel{<%=$baseLanguageModel%>},
@@ -324,10 +326,10 @@ MY_OPERATOR::MY_OPERATOR()
 			" Valid value must be greater than or equal to 1.0.");		
 	}
 	
-	if (maxAllowedConnectionAttempts < 1) {
+	if (connectionAttemptsThreshold < 1) {
 		throw std::runtime_error(
 			"WatsonSTT_cpp.cgt: Invalid value of " + 
-			boost::to_string(maxAllowedConnectionAttempts) + " is given for the maxAllowedConnectionAttempts parameter." +
+			boost::to_string(connectionAttemptsThreshold) + " is given for the connectionAttemptsThreshold parameter." +
 			" Valid value must be greater than or equal to 1.");	
 	}
 
@@ -363,7 +365,8 @@ MY_OPERATOR::MY_OPERATOR()
 	<< "\nOperatorName                            = " << getContext().getName()
 	<< "\ncpuYieldTimeInAudioSenderThread         = " << cpuYieldTimeInAudioSenderThread
 	<< "\nwaitTimeBeforeSTTServiceConnectionRetry = " << waitTimeBeforeSTTServiceConnectionRetry
-	<< "\nmaxAllowedConnectionAttempts            = " << maxAllowedConnectionAttempts
+	<< "\nwaitTimeBeforeSTTServiceConnectionRetryLong=" << waitTimeBeforeSTTServiceConnectionRetryLong
+	<< "\nconnectionAttemptsThreshold             = " << connectionAttemptsThreshold
 	<< "\nsttLiveMetricsUpdateNeeded              = " << sttLiveMetricsUpdateNeeded
 	<< "\nuri                                     = " << uri
 	<< "\nbaseLanguageModel                       = " << baseLanguageModel
@@ -741,34 +744,20 @@ void MY_OPERATOR::ws_audio_blob_sender() {
 			// In that case, we will try to reestablish the connection.
 			// There is audio data waiting in the vector. Reestablish the connection.
 
-			// If we have already done enough connection retry attempts, we will stop
-			// making any more connection attempts. In this case, this operator will
-			// simply go idle without doing any transcription work. (Alternatively,
-			// we can throw an exception. That is something to do later if really needed.)
-			if (numberOfWebsocketConnectionAttempts >= maxAllowedConnectionAttempts) {
-				SPLAPPTRC(L_ERROR, traceIntro <<
-					"-->Audio data is waiting to be processed. "
-					"Must establish the Websocket connection to the Watson STT service now, "
-					"but maxAllowedConnectionAttempts is reached. Block for 60 sec.!",
-					"establish_ws_connection");
-				// Block for a minute or until the operator shutdown is requested.
-				SPL::Functions::Utility::block(60.00);
-				// In this situation, there is no work to do. Simply loop around.
-				continue;
-			}
-
 			//update numberOfWebsocketConnectionAttempts
 			++numberOfWebsocketConnectionAttempts;
-			
+			//nWebsocketConnectionAttemptsMetric is set only from this thread, thus we use setValueNoLock
 			nWebsocketConnectionAttemptsMetric->setValueNoLock(numberOfWebsocketConnectionAttempts);
 			std::string msg = traceIntro +
 				"-->Audio data is waiting to be processed. "
 				"Establishing the Websocket connection to the Watson STT service now. "
-				"This is attempt: " + boost::to_string(numberOfWebsocketConnectionAttempts);
-			if (numberOfWebsocketConnectionAttempts > 1)
-				SPLAPPTRC(L_WARN,  msg, "ws_connection_attempt");
+				"This is attempt: ";
+			if (numberOfWebsocketConnectionAttempts >= connectionAttemptsThreshold)
+				SPLAPPTRC(L_ERROR, msg << numberOfWebsocketConnectionAttempts, "ws_connection_attempt");
+			else if (numberOfWebsocketConnectionAttempts > 1)
+				SPLAPPTRC(L_WARN,  msg << numberOfWebsocketConnectionAttempts, "ws_connection_attempt");
 			else
-				SPLAPPTRC(L_INFO,  msg, "ws_connection_attempt");
+				SPLAPPTRC(L_INFO,  msg << numberOfWebsocketConnectionAttempts, "ws_connection_attempt");
 			websocketConnectionErrorOccurred = false;
 			makeNewWebsocketConnection = true;
 			
@@ -782,40 +771,40 @@ void MY_OPERATOR::ws_audio_blob_sender() {
 			// wsConnectionEstablished to true.
 			// Wait until the Websocket connection is fully made as explained above.
 			while(wsConnectionEstablished == false) {
-				if (websocketConnectionErrorOccurred == true) {
-					// We will do a total of max allowed connection attempts.
-					if (numberOfWebsocketConnectionAttempts >= maxAllowedConnectionAttempts) {
-						// This means some problem occurred during the attempt to
-						// establish the Websocket connection in the on_open method.
-						// We can't proceed further at this point.
-						SPLAPPTRC(L_ERROR, traceIntro <<
-							"-->WatsonSTT_cpp.cgt: Unable to establish a Websocket connection to "
-							"the STT service. It could be either due to network issues or "
-							"invalid service URL or invalid access token or "
-							"invalid configuration done for the STT service parameters. "
-							"Giving up after 10 attempts. This operator instance will "
-							"be idle from this point onwards without doing any transcription work.",
-							"ws_connection_attempt_failure");
+				if (websocketConnectionErrorOccurred == false) {
+					SPLAPPTRC(L_DEBUG, traceIntro <<
+						"-->Reached 9 Still no connection established and no connection error occurred; wait 0.500",
+						"reestablish_ws_connection");
+					SPL::Functions::Utility::block(0.500);
+				} else {
+					// connection error occured
+					if (numberOfWebsocketConnectionAttempts >= connectionAttemptsThreshold) {
+						// Slow down the frequency of connection attempts after unsucessfull connectionAttemptsThreshold
+						// We keep on trying to connect to stt service
+						SPL::Functions::Utility::block(waitTimeBeforeSTTServiceConnectionRetryLong);
 					} else {
 						// Back off for a few seconds and then try to connect again.
 						SPL::Functions::Utility::block(waitTimeBeforeSTTServiceConnectionRetry);
-					} // End of if (numberOfWebsocketConnectionAttempts > maxAllowedConnectionAttempts)
+					} // End of if (numberOfWebsocketConnectionAttempts > connectionAttemptsThreshold)
 					
 					// Break from this inner loop and then continue the 
 					// outer loop to retry the connection attempt.
 					break;
 				} // End of if (websocketConnectionErrorOccurred == true)
 				
-				SPLAPPTRC(L_DEBUG, traceIntro <<
-					"-->Reached 9 Still no connection established; wait 0.500",
-					"reestablish_ws_connection");
-				SPL::Functions::Utility::block(0.500);
 			} // End of the while loop.
 			
 			// Continue from the top of the outer loop.
 			continue;
-		} // End of the if segment
+		} // End of the if (bytesAreToSend && wsConnectionEstablished == false)
 
+		if (bytesAreToSend && wsConnectionEstablished == true) {
+			//reset numberOfWebsocketConnectionAttempts
+			numberOfWebsocketConnectionAttempts = 0;
+			//nWebsocketConnectionAttemptsMetric is set only from this thread, thus we use setValueNoLock
+			nWebsocketConnectionAttemptsMetric->setValueNoLock(numberOfWebsocketConnectionAttempts);
+		}
+		
 		// It is a special delay to give enough time for the 
 		// Websocket thread's on_close event handler method below to 
 		// complete its cleanup during a connection termination
@@ -879,7 +868,7 @@ void MY_OPERATOR::ws_audio_blob_sender() {
 					
 					if (oTupleList.size() > 0) {
 						// Set the error message attribute via the corresponding output function.
-<% 
+<%
 						my $oport = $model->getOutputPortAt(0); 
 						foreach my $attribute (@{$oport->getAttributes()}) { 
 							my $name = $attribute->getName(); 

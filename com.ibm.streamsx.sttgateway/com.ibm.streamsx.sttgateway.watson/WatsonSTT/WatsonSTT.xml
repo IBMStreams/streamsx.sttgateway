@@ -48,13 +48,13 @@
         <metric>
           <name>nSTTResultMode</name>
           <description>STT result mode currently in effect for a given operator instance.</description>
-          <kind>Counter</kind>
+          <kind>Gauge</kind>
         </metric>
         
         <metric>
           <name>nWebsocketConnectionAttempts</name>
-          <description>Number of STT service Websocket connection attempts made by this operator instance.</description>
-          <kind>Counter</kind>
+          <description>Number of STT service Websocket connection attempts made by this operator instance. The value is reset to zero when a connection attempt succeeds.</description>
+          <kind>Gauge</kind>
         </metric>
         
         <metric>
@@ -458,7 +458,11 @@
       
       <parameter>
         <name>waitTimeBeforeSTTServiceConnectionRetry</name>
-        <description>This parameter specifies the time (in seconds) to wait before retrying a connection attempt to the Watson STT service. It must be >= 1.0 (Default is 3.0)</description>
+        <description>
+        This parameter specifies the time (in seconds) to wait before retrying a connection attempt to the Watson STT service. 
+        This parameter is effective until connectionAttemptsThreshold is reached. When connectionAttemptsThreshold is reached 
+        the operator retries a connection after 60 seconds. the It must be greater 1.0 and below 60.0 (Default is 3.0)
+        </description>
         <optional>true</optional>
         <rewriteAllowed>true</rewriteAllowed>
         <expressionMode>AttributeFree</expressionMode>
@@ -467,8 +471,12 @@
       </parameter>
 
       <parameter>
-        <name>maxAllowedConnectionAttempts</name>
-        <description>This parameter specifies the maximum number of attempts to make a Websocket connection to the STT service. It must be >= 1 (Default is 10)</description>
+        <name>connectionAttemptsThreshold</name>
+        <description>
+        This parameter specifies the threshold of the number of connection attempts to slow down the 
+        frequency of reconnection attempts to the STT service. see parameter `waitTimeBeforeSTTServiceConnectionRetry` 
+        It must be >= 1 (Default is 10)
+        </description>
         <optional>true</optional>
         <rewriteAllowed>true</rewriteAllowed>
         <expressionMode>AttributeFree</expressionMode>

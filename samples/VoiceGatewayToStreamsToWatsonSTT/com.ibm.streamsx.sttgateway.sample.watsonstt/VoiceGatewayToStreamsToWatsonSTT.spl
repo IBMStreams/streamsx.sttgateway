@@ -212,8 +212,8 @@ public composite VoiceGatewayToStreamsToWatsonSTT {
 			(float64)getSubmissionTimeValue("cpuYieldTimeInAudioSenderThread", "0.001");
 		expression<float64> $waitTimeBeforeSTTServiceConnectionRetry : 
 			(float64)getSubmissionTimeValue("waitTimeBeforeSTTServiceConnectionRetry", "3.0");
-		expression<int32> $maxAllowedConnectionAttempts : 
-			(int32)getSubmissionTimeValue("maxAllowedConnectionAttempts", "10");
+		expression<int32> $connectionAttemptsThreshold : 
+			(int32)getSubmissionTimeValue("connectionAttemptsThreshold", "10");
 		expression<boolean> $sttLiveMetricsUpdateNeeded : 
 			(boolean)getSubmissionTimeValue("sttLiveMetricsUpdateNeeded", "true");
 
@@ -730,8 +730,8 @@ public composite IBMWatsonSpeechToText(input AudioBlobContent, AccessToken;
 			(float64)getSubmissionTimeValue("cpuYieldTimeInAudioSenderThread", "0.001");
 		expression<float64> $waitTimeBeforeSTTServiceConnectionRetry : 
 			(float64)getSubmissionTimeValue("waitTimeBeforeSTTServiceConnectionRetry", "3.0");
-		expression<int32> $maxAllowedConnectionAttempts : 
-			(int32)getSubmissionTimeValue("maxAllowedConnectionAttempts", "10");
+		expression<int32> $connectionAttemptsThreshold : 
+			(int32)getSubmissionTimeValue("connectionAttemptsThreshold", "10");
 		expression<boolean> $sttLiveMetricsUpdateNeeded : 
 			(boolean)getSubmissionTimeValue("sttLiveMetricsUpdateNeeded", "true");
 
@@ -782,7 +782,7 @@ public composite IBMWatsonSpeechToText(input AudioBlobContent, AccessToken;
 				websocketLoggingNeeded: $sttWebsocketLoggingNeeded;
 				cpuYieldTimeInAudioSenderThread: $cpuYieldTimeInAudioSenderThread;
 				waitTimeBeforeSTTServiceConnectionRetry : $waitTimeBeforeSTTServiceConnectionRetry;
-				maxAllowedConnectionAttempts : $maxAllowedConnectionAttempts;
+				connectionAttemptsThreshold : $connectionAttemptsThreshold;
 				sttLiveMetricsUpdateNeeded : $sttLiveMetricsUpdateNeeded;
 								
 				// Use the following operator parameters as needed.

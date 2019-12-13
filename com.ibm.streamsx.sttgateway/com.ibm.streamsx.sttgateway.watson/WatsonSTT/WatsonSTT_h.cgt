@@ -72,7 +72,7 @@ class MY_OPERATOR : public MY_BASE_OPERATOR {
 	bool wsConnectionEstablished;
 	bool makeNewWebsocketConnection;
 	bool websocketConnectionErrorOccurred;
-	SPL::int32 numberOfWebsocketConnectionAttempts;
+	SPL::int64 numberOfWebsocketConnectionAttempts;
 	client *wsClient;
 	websocketpp::connection_hdl wsHandle;
 	
@@ -86,8 +86,8 @@ class MY_OPERATOR : public MY_BASE_OPERATOR {
 <%	} %>
 	std::vector<OPort0Type *> oTupleList;
 	SPL::Mutex sttMutex1;
-	SPL::uint64 numberOfFullAudioConversationsReceived;
-	SPL::uint64 numberOfFullAudioConversationsTranscribed;
+	SPL::int64 numberOfFullAudioConversationsReceived;
+	SPL::int64 numberOfFullAudioConversationsTranscribed;
 	StatusOfAudioDataTransmission statusOfAudioDataTransmissionToSTT;
 	std::string transcriptionResult;
 	bool transcriptionErrorOccurred;
@@ -102,7 +102,9 @@ class MY_OPERATOR : public MY_BASE_OPERATOR {
 	const bool websocketLoggingNeeded;
 	const SPL::float64 cpuYieldTimeInAudioSenderThread;
 	const SPL::float64 waitTimeBeforeSTTServiceConnectionRetry;
-	const SPL::int32 maxAllowedConnectionAttempts;
+	//This time becomes effective, when the connectionAttemptsThreshold limit is exceeded
+	static const SPL::float64 waitTimeBeforeSTTServiceConnectionRetryLong;
+	const SPL::int32 connectionAttemptsThreshold;
 	const bool sttLiveMetricsUpdateNeeded;
 	const std::string uri;
 	const std::string baseLanguageModel;
