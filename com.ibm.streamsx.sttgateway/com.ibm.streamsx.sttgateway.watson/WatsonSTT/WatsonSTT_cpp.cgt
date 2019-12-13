@@ -209,12 +209,16 @@ MY_OPERATOR::MY_OPERATOR()
 		numberOfWebsocketConnectionAttempts{0},
 		wsClient{},
 		wsHandle{},
-		audioFiles{},
+<%		if ( $audioInputAsBlob == 1 ) {%>
 		audioBytes{},
 		audioSize{},
+		numberOfAudioBlobFragmentsReceivedInCurrentConversation{0},
+<%		} else { %>
+		audioFiles{},
+<%		} %>
 		oTupleList{},
 		sttMutex1{},
-		numberOfAudioBlobFragmentsReceivedInCurrentConversation{0},
+
 		numberOfFullAudioConversationsReceived{0},
 		numberOfFullAudioConversationsTranscribed{0},
 		// 0 = NO_AUDIO_DATA_SENT_TO_STT, 1 = PARITAL_BLOB_FRAGMENTS_BEING_SENT_TO_STT,
@@ -675,7 +679,9 @@ void MY_OPERATOR::process(Punctuation const & punct, uint32_t port) {
 // This method provides a thread for the Websocket audio blob sender
 // as well as the Websocket connection termination monitor.
 void MY_OPERATOR::ws_audio_blob_sender() {
+<%	if ( $audioInputAsBlob == 0 ) {%>
 	struct stat fileStat;
+<%	} %>
 
 	while (!getPE().getShutdownRequested()) {
 		// Keep waiting in this while loop until
@@ -684,9 +690,19 @@ void MY_OPERATOR::ws_audio_blob_sender() {
 		// audio data actively available for processing.
 		// When there is no audio data available, yield the CPU for
 		// slightly a longer time.
-		int32_t audioBytesVectorSize = audioBytes.size();
-		int32_t audioFilesVectorSize = audioFiles.size();
-		if(audioBytesVectorSize <= 0 && audioFilesVectorSize <= 0) {
+		bool bytesAreToSend;
+		{
+			//block other threads from accessing the vectors
+			SPL::AutoMutex autoMutex(sttMutex1);
+
+<%			if ( $audioInputAsBlob == 1 ) {%>
+			bytesAreToSend = audioBytes.size() > 0;
+<%			} else { %>
+			bytesAreToSend = audioFiles.size() > 0;
+<%			} %>
+			//unblock
+		}
+		if( ! bytesAreToSend) {
 			// There is no audio data available at this time.
 			// Yield the CPU for slightly a longer time.
 			// 1 second instead of 1 msec.
@@ -704,13 +720,12 @@ void MY_OPERATOR::ws_audio_blob_sender() {
 			SPL::Functions::Utility::block(cpuYieldTimeInAudioSenderThread);
 		}
 		//SPL::Functions::Utility::block interrupts if shutdown is requested
-		//do not sent any further data is shutdown is requested 
+		//do not sent any further data if shutdown is requested and exit from loop
 		if (getPE().getShutdownRequested())
 			continue;
 		
 		// Check if the Websocket connection needs to be established.
-		if ((audioBytesVectorSize > 0 || audioFilesVectorSize > 0) && 
-			wsConnectionEstablished == false) {
+		if (bytesAreToSend && wsConnectionEstablished == false) {
 			// When there is audio data waiting to be processed and
 			// if the Websocket connection is not active at that time, 
 			// it could be due to one of these reasons.
@@ -818,7 +833,7 @@ void MY_OPERATOR::ws_audio_blob_sender() {
 		}
 		
 		// Check if there is audio data waiting to be sent to the STT service.
-		if ((audioBytesVectorSize > 0 || audioFilesVectorSize > 0) && 
+		if (bytesAreToSend && 
 			wsConnectionEstablished == true &&
 			statusOfAudioDataTransmissionToSTT != FULL_AUDIO_DATA_SENT_TO_STT) {
 			// If an error happened in the STT processing (invalid audio data or
@@ -2390,7 +2405,8 @@ void MY_OPERATOR::on_message(MY_OPERATOR::client* c, websocketpp::connection_hdl
 			// audio transcription that we just stopped due to an STT error, it is important for
 			// us to clean up the remaining audio blob fragments from that audio converstion that are
 			// still waiting in the vector to be sent to the STT service.
-			if (sttErrorString != "" && <%=$audioInputAsBlob%> &&
+<%			if ( $audioInputAsBlob == 1 ) {%>
+			if (sttErrorString != "" &&
 				statusOfAudioDataTransmissionToSTT == AUDIO_BLOB_FRAGMENTS_BEING_SENT_TO_STT) {
 				// We got an STT error in the middle of a transcription of the
 				// partial audio blob fragments. If all the blob fragments
@@ -2417,7 +2433,8 @@ void MY_OPERATOR::on_message(MY_OPERATOR::client* c, websocketpp::connection_hdl
 				if(audioBytes.size() <= 0) {
 					numberOfAudioBlobFragmentsReceivedInCurrentConversation = 0;
 				}
-			} // End of if (sttErrorString != "" && 
+			} // End of if (sttErrorString != "" &&
+<%			} %>
 		} // End of if (oTupleList.size() > 0)
 		
 		if (wsConnectionEstablished == false && sttErrorString != "") {

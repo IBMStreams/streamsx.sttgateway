@@ -26,6 +26,32 @@ Last modified on: Jun/11/2019
 
 <%SPL::CodeGen::headerPrologue($model);%>
 
+<%
+# Check the input port 0 i.e. the first input port. 
+my $inputPort = $model->getInputPortAt(0);
+my $inputTupleName = $inputPort->getCppTupleName();
+my $audioInputAsBlob = 0;
+my $inputAttrs = $inputPort->getAttributes();
+
+foreach my $inputAttr (@$inputAttrs) {
+	my $inAttrName = $inputAttr->getName();
+	my $inAttrType = $inputAttr->getSPLType();
+	
+	if ($inAttrName eq "speech") {
+		
+		if ($inAttrType eq "rstring") {
+			# This tuple attribute will carry the name of a file containing the audio data.
+			$audioInputAsBlob = 0;
+		}
+		
+		if ($inAttrType eq "blob") {
+			# This tuple attribute will carry a blob containing either full or partial audio data.
+			$audioInputAsBlob = 1;
+		}
+	}
+}
+%>
+
 class MY_OPERATOR : public MY_BASE_OPERATOR {
 
 	// Websocket related type definitions.
@@ -51,12 +77,15 @@ class MY_OPERATOR : public MY_BASE_OPERATOR {
 	websocketpp::connection_hdl wsHandle;
 	
 	// STT operations related member variables.
-	std::vector<std::string> audioFiles;
+<%	if ( $audioInputAsBlob == 1 ) {%>
 	std::vector<unsigned char *> audioBytes;
 	std::vector<uint64_t> audioSize;
+	int numberOfAudioBlobFragmentsReceivedInCurrentConversation;
+<%	} else { %>
+	std::vector<std::string> audioFiles;
+<%	} %>
 	std::vector<OPort0Type *> oTupleList;
 	SPL::Mutex sttMutex1;
-	SPL::uint32 numberOfAudioBlobFragmentsReceivedInCurrentConversation;
 	SPL::uint64 numberOfFullAudioConversationsReceived;
 	SPL::uint64 numberOfFullAudioConversationsTranscribed;
 	StatusOfAudioDataTransmission statusOfAudioDataTransmissionToSTT;
