@@ -44,6 +44,8 @@
 	<property name="samples.dir"        value="samples"/>
 	<property name="samples.doc.dir"    value="samples/${doc.string}/spldoc"/>
 
+	<property name="test.dir"           location="tests/frameworktests"/>
+
 	<property name="release.dir"        location="releases"/>
 	<property name="release.info.file"  value="${toolkit.dir}/build.info"/>
 
@@ -61,8 +63,8 @@
 		<mkdir dir="${ext.dir}"/>
 	</target>
 
-	<target name="all" depends="toolkit"
-		description="Build the toolkit index. This is compatibility target for production">
+	<target name="all" depends="toolkit,spldoc"
+		description="Build the toolkit index and the doc. This is compatibility target for production">
 	</target>
 	
 	<target name="clean" depends="spldoc-clean,samples-clean,toolkit-clean,releaseinfo-clean"
@@ -244,6 +246,27 @@
 		<exec executable="make" failonerror="true" dir="${basedir}">
 			<arg value="clean" />
 			<arg value="PWD=${basedir}"/>
+		</exec>
+	</target>
+
+	<!-- Test targets -->
+	<target name="test" depends="toolkit"
+		description="Execute the toolkit test. Requires an up to date toolkit build">
+		<echo message="Start full test"/>
+		<exec executable="./runTest.sh" dir="${test.dir}" failonerror="true">
+			<arg value="--noprompt"/>
+			<arg value="--no-browser"/>
+		</exec>
+	</target>
+
+	<target name="test-quick" depends="toolkit"
+		description="Execute the toolkit quick test. Requires an up to date toolkit build">
+		<echo message="Start quick test"/>
+		<exec executable="./runTest.sh" dir="${test.dir}" failonerror="true">
+			<arg value="--noprompt"/>
+			<arg value="--no-browser"/>
+			<arg value="--category"/>
+			<arg value="quick"/>
 		</exec>
 	</target>
 
