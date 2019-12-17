@@ -209,7 +209,6 @@ public composite AudioRawWatsonSTT {
 				// This delay should give sufficient time for the
 				// WatsonSTT operator(s) to come up and be ready to
 				// receive the access token that will be sent from this composite.
-				initDelay: 15.0;
 		}
 		
 		// If the user provided an STT on CP4D access token, then send that to the WatsonSTT operator.
@@ -255,7 +254,7 @@ public composite AudioRawWatsonSTT {
 				// Give sufficient delay here so that the
 				// previous operator can complete generating the
 				// IAM access token and send it to the WatsonSTT operator.
-				initDelay : 30.0;
+				initDelay : 15.0;
 				sortBy: name;
 				
 			config

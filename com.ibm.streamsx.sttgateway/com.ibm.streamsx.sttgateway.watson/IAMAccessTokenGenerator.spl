@@ -8,7 +8,7 @@
 /*
 ==============================================
 First created on: Jun/11/2019
-Last modified on: Sep/04/2019
+Last modified on: Dec/16/2019
 
 This non-main composite provides a way to generate a
 new IAM access token for the IBM STT service on
@@ -29,6 +29,7 @@ namespace com.ibm.streamsx.sttgateway.watson;
 // This non-main composite uses JSON native functions.
 // So, the following toolkit (v1.4.6 or higher) is a dependency.
 use com.ibm.streamsx.json::*;
+use com.ibm.streamsx.inet.http::HTTPRequest;
 
 // This type represents the data format for the 
 // result returned by the "Generate IAM access token" and the
@@ -55,7 +56,7 @@ public composite IAMAccessTokenGenerator(output IamAccessToken) {
 		// Specify the access token refresh interval in minutes.
 		expression<float64> $sttAccessTokenRefreshInterval;
 		// Initial delay before generating the IAM access token.
-		expression<float64> $initDelay;
+		expression<float64> $initDelay: 0.0;
 
 	graph
 		// ========== START OF GENERATING AND REFRESHING AN IAM ACCESS TOKEN ==========
@@ -67,150 +68,127 @@ public composite IAMAccessTokenGenerator(output IamAccessToken) {
 		// also keep refreshing the access token for it to stay valid and not get expired.
 		// By default, an IAM access token will expire after one hour. So, we will do a 
 		// special logic here to keep the IAM access token unexpired.
-		(stream<boolean signal> IamTokenSignal) = Beacon() {
+		(stream<uint64 counter, rstring method, rstring grant_type, rstring apikey> IamTokenSignal as O) = Beacon() {
 			param
 				initDelay: $initDelay;
 				period: $sttAccessTokenRefreshInterval * 60.00;
+			output O:
+				counter = IterationCount(),
+				method = IterationCount() == 0ul ? "POST" : "NONE",
+				grant_type = IterationCount() == 0ul ? "urn:ibm:params:oauth:grant-type:apikey" : "refresh_token",
+				apikey = $sttApiKey;
 		}
 	
-		// Prepare the data required to generate a new IAM access token.
-		(stream<rstring jsonString> IamAccessTokenJson as IATJ) = 
-			Custom(IamTokenSignal as ITS) {
+		// The initial request is made from this operator
+		// It must deliver the first access token and the refresh token for
+		// subsequent refresh requests
+		// Attributes of this request are grant_type and apikey
+		stream<uint64 counter, rstring method, rstring grant_type, rstring response, rstring status, int32 statusCode, 
+			rstring outContentType, list<rstring> outHeader, 
+			rstring diags> IamAccessTokenJson1
+		= HTTPRequest(IamTokenSignal){
+			param
+				fixedUrl: $sttIAMTokenURL;
+				method: method;
+				fixedContentType: "application/x-www-form-urlencoded";
+				extraHeaders: "Authorization: Basic Yng6Yng=", "Accept: application/json";
+				requestAttributes: "grant_type", "apikey";
+				outputStatus: "status";
+				outputStatusCode: "statusCode";
+				outputBody: "response";
+				outputContentType: "outContentType";
+				outputHeader: "outHeader";
+				errorDiagnostics: "diags";
+		}
+		
+		// This operator extracts the first access_token and the refresh token, if the request succeeds
+		stream<uint64 counter, rstring method, rstring grant_type, rstring refresh_token, IamAccessToken_t firstResponse> GeneratedIamAccessToken1 as O
+		= Custom(IamAccessTokenJson1 as I) {
 			logic
-				state: {
-					mutable uint64 _tupleCnt = 0ul;
-					mutable IamAccessTokenJson _oTuple = {};
-				}
-				onTuple ITS: {
-					++_tupleCnt;
-					
-					if ($sttApiKey == "" || _tupleCnt > 1ul) {
-						// We must generate a new IAM access token only once within this application.
-						// After generating it once, all we have to do is to keep refreshing it at
-						// a periodic interval in a different operator below.
-						// In addition, if the user provided an empty STT API Key, then skip the
-						// generation of an IAM Access Token. An empty STT API key means that the user is
-						// going to use the IBM STT on Cloud Pak for Data (CP4D i.e. private cloud). 
-						return;
-					}
-					
-					// Let us form a CURL command to generate a new IAM access token.
-					mutable rstring curlCommand = "";
-					curlCommand += 'curl -s -k -X POST ';
-					curlCommand += '--header "Authorization: Basic Yng6Yng=" ';
-					curlCommand += '--header "Content-Type: application/x-www-form-urlencoded" ';
-					curlCommand += '--header "Accept: application/json" ';
-					curlCommand += '--data-urlencode "grant_type=urn:ibm:params:oauth:grant-type:apikey" ';
-					curlCommand += '--data-urlencode "apikey=' + $sttApiKey + '" ';
-					curlCommand += '"' + $sttIAMTokenURL + '"';
-					
-					mutable rstring resultStringOutput = "";
-					// This is a C++ native function available as part of the
-					// streamsx.sttgateway toolkit (look in impl/include/CppUtilFunctions.h).
-					int32 rc = launch_app(curlCommand, resultStringOutput);
-					
-					if (rc == 0) {
-						_oTuple.jsonString = resultStringOutput;
-						submit(_oTuple, IATJ);
+				state: mutable rstring my_refresh_token = "";
+				onTuple I: {
+					if (counter == 0ul) {
+						if ((statusCode >= 200) && (statusCode < 300)) {
+							appTrc(Trace.trace, "Received response1=" + (rstring)I, "GeneratedIamAccessToken1");
+							mutable O otuple = {};
+							assignFrom(I,O);
+							extractFromJSON(response, otuple.firstResponse);
+							if (otuple.firstResponse.access_token != "") {
+								// save resfresh token for following refresh operations
+								my_refresh_token = otuple.firstResponse.refresh_token;
+								// Change method to NONE for second HTTPRequest operator
+								otuple.method = "NONE";
+								submit(otuple, O);
+							} else {
+								appTrc(Trace.error, "An empty IAM access token was obtained during token generation 1. " +
+									"response1=" + (rstring)I + ". Aborting now.", "GeneratedIamAccessToken1");
+								abort();
+							}
+						} else {
+							appTrc(Trace.error, "Non successful response received during token generation 1. " +
+								"Tuple=" + (rstring)I + ". Aborting now.", "GeneratedIamAccessToken1");
+							abort();
+						}
 					} else {
-						appTrc(Trace.error, 
-							"Error occurred while running the Curl command to generate a new IAM access token. Error=" +
-							resultStringOutput + ". Aborting now.");
-						abort();
+						mutable O otuple = {};
+						assignFrom(otuple, I);
+						// Change method to POST for second HTTPRequest operator
+						otuple.method = "POST";
+						otuple.grant_type = "refresh_token";
+						// restore refresh_token
+						otuple.refresh_token = my_refresh_token;
+						appTrc(Trace.trace, "Send=" + (rstring)otuple, "GeneratedIamAccessToken1");
+						submit(otuple, O);
 					}
 				}
 		}
 		
-		// Convert the generated IAM access token JSON string into a tuple.
-		(stream<IamAccessToken_t> GeneratedIamAccessToken as GIAT;
-		 stream<rstring jsonString> JsonConversionError as JCE) = JSONToTuple(IamAccessTokenJson) {
+		// Operator for subsequent refresh requests
+		// Attributes of this request are grant_type and apikey
+		stream<uint64 counter, rstring response, rstring status, int32 statusCode, IamAccessToken_t firstResponse,
+			rstring outContentType, list<rstring> outHeader, rstring diags> IamAccessTokenJson2
+		= HTTPRequest(GeneratedIamAccessToken1){
+			param
+				fixedUrl: $sttIAMTokenURL;
+				method: method;
+				fixedContentType: "application/x-www-form-urlencoded";
+				extraHeaders: "Authorization: Basic Yng6Yng=", "Accept: application/json";
+				requestAttributes: "grant_type", "refresh_token";
+				outputStatus: "status";
+				outputStatusCode: "statusCode";
+				outputBody: "response";
+				outputContentType: "outContentType";
+				outputHeader: "outHeader";
+				errorDiagnostics: "diags";
 		}
 
-		// This operator converts the generated IAM access token JSON string into a tuple.
-		// It then stores the generated IAM access token in memory. After that, it does the
-		// periodic refreshing of that stored access token.
-		// It also sends the generated and refreshed access tokens out to downstream consumption.
-		(stream<IamAccessToken_t> IamAccessToken as IAT) = 
-			Custom(GeneratedIamAccessToken as GIAT; JsonConversionError as JCE; 
-			IamTokenSignal as ITS) {
+		// This operator extracts the first access_token and the refresh token, if the request succeeds
+		stream<IamAccessToken_t> IamAccessToken as O
+		= Custom(IamAccessTokenJson2 as I) {
 			logic
-				state: {
-					mutable uint64 _iamAccessTokenRefreshCount = 0;
-					mutable IamAccessToken_t _iamAccessToken = {};
-				}
-				
-				onTuple JCE: {
-					appTrc(Trace.error, "Error occurred while converting the " +
-						"IAM access token JSON string to a tuple. " +
-						"Error=" + JCE.jsonString + ". Aborting now.");
-					abort();
-				}
-				
-				onTuple GIAT: {
-					if (GIAT.access_token != "") {
-						// Store the IAM access token for future refresh activities.
-						assignFrom(_iamAccessToken, GIAT);
-						// Send the newly generated access token for downstream consumption.
-						submit(_iamAccessToken, IAT);
-					} else {
-						appTrc(Trace.error, "An empty IAM access token was obtained during token generation. " +
-							"Tuple=" + (rstring)GIAT + ". Aborting now.");
-						abort();					
-					}
-				}
-				
-				onTuple ITS: {
-					++_iamAccessTokenRefreshCount;
-					
-					// It is time now to do a periodic refresh of the IAM access token.
-					// If the user provided an empty STT API Key, then skip the
-					// refreshing of an IAM Access Token. An empty STT API key means that 
-					// the user is going to use the IBM STT on Cloud Pak for Data (CP4D i.e. private cloud).
-					if ($sttApiKey == "" || _iamAccessTokenRefreshCount <= 1ul) {
-						// We must refresh an existing IAM access token only from the
-						// second timer tick onwards. During the first timer tick,
-						// IAM access token gets generated in the operators above.
-						// So, we will skip the first timer signal and start refreshing
-						// the access token in the subsequent timer ticks.
-						return;
-					}
-					
-					// Let us form a CURL command to refresh our existing IAM access token.
-					mutable rstring curlCommand = "";
-					curlCommand += 'curl -s -k -X POST ';
-					curlCommand += '--header "Authorization: Basic Yng6Yng=" ';
-					// curlCommand += '--header "Content-Type: application/x-www-form-urlencoded" ';
-					// curlCommand += '--header "Accept: application/json" ';
-					curlCommand += '--data-urlencode "grant_type=refresh_token" ';
-					curlCommand += '--data-urlencode "refresh_token=' + 
-						_iamAccessToken.refresh_token + '" ';
-					curlCommand += '"' + $sttIAMTokenURL + '"';
-					
-					mutable rstring resultStringOutput = "";
-					int32 rc = launch_app(curlCommand, resultStringOutput);
-					
-					if (rc == 0) {
-						_iamAccessToken = (IamAccessToken_t){};
-						extractFromJSON(resultStringOutput, _iamAccessToken);
-						
-						if (_iamAccessToken.access_token != "") {
-							appTrc(Trace.error, "IAM access token refreshed successfully.");
-							// Send the refreshed token for downstream consumption.
-							submit(_iamAccessToken, IAT);
+				onTuple I: {
+					if (counter != 0ul) {
+						if ((statusCode >= 200) && (statusCode < 300)) {
+							appTrc(Trace.trace, "Received response2=" + (rstring)I, "GeneratedIamAccessToken2");
+							mutable O otuple = {};
+							extractFromJSON(response, otuple);
+							if (otuple.access_token != "") {
+								appTrc(Trace.trace, "Send IamAccessToken=" + (rstring)otuple, "GeneratedIamAccessToken2");
+								submit(otuple, O);
+							} else {
+								appTrc(Trace.error, "An empty IAM access token was obtained during token generation 2. " +
+									"response1=" + (rstring)I + ". Aborting now.", "GeneratedIamAccessToken2");
+								abort();
+							}
 						} else {
-							appTrc(Trace.error, "An empty IAM access token was obtained during token refresh. " +
-								"Tuple=" + (rstring)_iamAccessToken + ". Aborting now.");
-							abort();											
+							appTrc(Trace.error, "Non successful response received during token generation 2. " +
+								"Tuple=" + (rstring)I + ". Aborting now.", "GeneratedIamAccessToken2");
+							abort();
 						}
 					} else {
-						appTrc(Trace.error, 
-							"Error occurred while running the Curl command to refresh an " +
-							"existing IAM access token. Error=" +
-							resultStringOutput + ". Aborting now.");
-						abort();
+						appTrc(Trace.trace, "Send IamAccessToken=" + (rstring)I.firstResponse, "GeneratedIamAccessToken2");
+						submit(I.firstResponse, O);
 					}
 				}
 		}
-		// ========== END OF GENERATING AND REFRESHING AN IAM ACCESS TOKEN ==========
 } // End of the non-main composite
-
