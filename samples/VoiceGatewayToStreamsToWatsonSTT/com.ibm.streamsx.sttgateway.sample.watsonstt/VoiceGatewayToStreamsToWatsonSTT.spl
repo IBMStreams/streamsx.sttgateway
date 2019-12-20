@@ -536,9 +536,9 @@ public composite VoiceGatewayToStreamsToWatsonSTT {
 			as IamAccessTokenGenerator = IAMAccessTokenGenerator() {
 			param
 				// This operator takes these four parameters.
-				sttApiKey: $sttApiKey;
-				sttIAMTokenURL: $sttIAMTokenURL;
-				sttAccessTokenRefreshInterval: $sttAccessTokenRefreshInterval;
+				apiKey: $sttApiKey;
+				iamTokenURL: $sttIAMTokenURL;
+				//sttAccessTokenRefreshInterval: $sttAccessTokenRefreshInterval;
 				// Initial delay before generating the IAM access token.
 				// This delay should give sufficient time for the
 				// WatsonSTT operator(s) to come up and be ready to

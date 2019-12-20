@@ -1,0 +1,32 @@
+namespace com.ibm.streamsx.sttgateway.sample.watsonstt;
+
+use com.ibm.streamsx.sttgateway.watson::IAMAccessTokenGenerator;
+use com.ibm.streamsx.sttgateway.watson::IAMAccessToken;
+use com.ibm.streamsx.sttgateway.watson::hourMinuteSecondMillisec;
+
+composite AccessTokenGenerator {
+	param
+		expression<rstring> $iamTokenURL : getSubmissionTimeValue("iamTokenURL", "https://iam.cloud.ibm.com/identity/token");
+		expression<int64> $expiresInTestValue : (int64)getSubmissionTimeValue("expiresInTestValue", "0");
+		expression<float64> $failureDelay : (float64)getSubmissionTimeValue("failureDelay", "10.0");
+
+	graph
+		stream<IAMAccessToken> IAMAccessTokenStream = IAMAccessTokenGenerator() {
+			param
+				iamTokenURL: $iamTokenURL;
+				expiresInTestValue: $expiresInTestValue;
+				failureDelay: $failureDelay;
+				initDelay: 2.5;
+		}
+		
+		() as Sink = Custom(IAMAccessTokenStream as I) {
+			logic onTuple I: {
+				printStringLn(hourMinuteSecondMillisec(getTimestamp()) + ": " + (rstring)I);
+				// emulate processing time here
+				block(15.0);
+			}
+		}
+
+	config
+		restartable: false;
+}
