@@ -49,6 +49,11 @@ type IAMAccessToken = rstring access_token, rstring refresh_token,
  * generate and periodically refresh the IAM access token which will be required by the WatsonSTT operator. 
  * Without having an unexpired IAM access token, STT service on public cloud will not allow the speech to text 
  * transcription to happen.
+ * This operator connects to the IAM authorization service specified by parameter `iamTokenURL` and requests an access token 
+ * by using the provided `apiKey`. The received access token is submitted to the output port. This operator refreshes the 
+ * access token automatically after the expiration time by using the received refresh token and submits the refreshed 
+ * access token to the output port. 
+ * If IAM authentication server responses with a non successful result, the operator re-tries the operation after 
  * 
  * **Metrics:**
  * 
@@ -73,35 +78,38 @@ type IAMAccessToken = rstring access_token, rstring refresh_token,
  * string*, no access token is requested from IAM cloud service. When the value has changed, 
  * the operator requests an initial access token when the current token becomes invalid. 
  * If this parameter is not provided in operator invocation, the value is taken from application configuration 
- * **sttConnection** property **apiKey**. Default is the *empty string*
+ * **sttConnection** property **apiKey**. Type: *rstring*; Default: the *empty string*
  * 
  * @param	iamTokenURL	The service url of the IAM Token authorization service to fetch and refresh the IAM access
  *  token. If this parameter is not provided in operator invocation, the value is taken from application configuration 
- * **sttConnection** property **iamTokenURL**. Default is the *empty string*
+ * **sttConnection** property **iamTokenURL**. Type *rstring*; Default: the *empty string*
  * 
  * @param	defaultExpiresIn The default value for the access token expiration time in seconds. This value is used, when no 
  * expires_in value is returned from the authorization service. If this parameter is not provided in operator invocation, 
- * the value is taken from application configuration **sttConnection** property **defaultExpiresIn**. Default is the *3600*
+ * the value is taken from application configuration **sttConnection** 
+ * property **defaultExpiresIn**. Type: *int64*; Default: *3600*
  * 
  * @param	guardTime	The guard time in seconds. A refresh token is requested 'guard time' seconds before the expiration 
  * was determined. If this parameter is not provided in operator invocation, the value is taken from application 
- * configuration **sttConnection** property **guardTime**. Default is the *300*
+ * configuration **sttConnection** property **guardTime**. Type: *int64*; Default: *300*
  * 
  * @param	maxRetryDelay	The maximum wait time in seconds before a connection re-try is made. The connection re-try 
  * delay increases exponentially starting from 2 seconds but not exceeding 'maxRetryDelay'. This value is used 
  * in case of unsuccessful connection attempts due to (temporary) network issues. If this parameter is not provided in 
- * operator invocation, the value is taken from application configuration **sttConnection** property **maxRetryDelay**. 
- * Default is the *60*
+ * operator invocation, the value is taken from application configuration **sttConnection** 
+ * property **maxRetryDelay**. Type: *float64*; Default: *60.0*
  * 
- * @param	failureDelay	The maximum wait time in seconds before a new authorization attempt is made. This value is used 
- * in case of unsuccessful authorization attempts due to a final failure response from the authorization server or due to 
- * an empty *apiKey*. If this parameter is not provided in operator invocation, the value is taken from application 
- * configuration **sttConnection** property **failureDelay**. Default is the *60*
+ * @param	failureRetryDelay	The maximum wait time in seconds before a new authorization attempt is made after a non
+ * successful server response. This value is used in case of unsuccessful authorization attempts due to a final failure 
+ * response from the authorization server or due to an empty *apiKey*. If this parameter is not provided in operator 
+ * invocation, the value is taken from application configuration **sttConnection** 
+ * property **failureRetryDelay**. Type: *float64*; Default *120.0*
  * 
- * @param	initDelay	The initial delay before the operation starts in seconds. Default *0.0*
+ * @param	initDelay	The initial delay before the operation starts in seconds. Type: *float64*; Default *0.0*
  * 
  * @param	expiresInTestValue	This value is used mainly for tests. If this value is different from *0.0*, it 
- * overwrites the received expires_in value. Default 0.0
+ * overwrites the received expires_in value. Type *float64*; Default *0.0*
+ * 
  */
 public composite IAMAccessTokenGenerator(output IamAccessTokenStream) {
 	param
@@ -115,13 +123,17 @@ public composite IAMAccessTokenGenerator(output IamAccessTokenStream) {
 		// IAM access token periodically in order for it to stay unexpired.
 		// https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-websockets#WSopen
 
-		expression<rstring> $apiKey:                    getApplicationConfigurationProperty("sttConnection", "apiKey", "");
-		expression<rstring> $iamTokenURL:               getApplicationConfigurationProperty("sttConnection", "iamTokenURL", "");
-		expression<int64>   $defaultExpiresIn:   (int64)getApplicationConfigurationProperty("sttConnection", "defaultExpiresIn", "3600");
-		expression<int64>   $guardTime:          (int64)getApplicationConfigurationProperty("sttConnection", "guardTime", "300");
+		//expression<rstring> $applicationConfiguration:   "sttConnection";
+		//expression<rstring> $apiKey:                     getApplicationConfigurationProperty($applicationConfiguration, "apiKey", "");
+		//CDISP0725E ERROR: The default initializer for the $apiKey composite formal parameter contains a reference to the $applicationConfiguration composite formal parameter. The composite formal initializers cannot reference other composite formals.
+		
+		expression<rstring> $apiKey:                     getApplicationConfigurationProperty("sttConnection", "apiKey", "");
+		expression<rstring> $iamTokenURL:                getApplicationConfigurationProperty("sttConnection", "iamTokenURL", "");
+		expression<int64>   $defaultExpiresIn:    (int64)getApplicationConfigurationProperty("sttConnection", "defaultExpiresIn", "3600");
+		expression<int64>   $guardTime:           (int64)getApplicationConfigurationProperty("sttConnection", "guardTime", "300");
 		expression<float64> $initDelay: 0.0;
-		expression<float64> $maxRetryDelay:    (float64)getApplicationConfigurationProperty("sttConnection", "maxRetryDelay", "60");
-		expression<float64> $failureDelay:     (float64)getApplicationConfigurationProperty("sttConnection", "failureDelay", "120");
+		expression<float64> $maxRetryDelay:     (float64)getApplicationConfigurationProperty("sttConnection", "maxRetryDelay", "60.0");
+		expression<float64> $failureRetryDelay: (float64)getApplicationConfigurationProperty("sttConnection", "failureRetryDelay", "120.0");
 		
 		// test expiration value
 		// use this value for tests to overwrite the returned expires_in value
@@ -152,14 +164,14 @@ public composite IAMAccessTokenGenerator(output IamAccessTokenStream) {
 					// but not more than maxRetryDelay = 60.0 seconds
 					float64 maxRetryDelay = $maxRetryDelay;
 					// In case of unsuccessful authorization requests use this wait time before a new authorization attempt is made
-					float64 failureDelay = $failureDelay;
+					float64 failureRetryDelay = $failureRetryDelay;
 
 					// print operator configuration
 					printStringLn("**** Configuration : " + getThisOperatorName()
 							+ "\ndefaultExpiresIn:      " + (rstring)defaultExpiresIn
 							+ "\nguardTime:             " + (rstring)guardTime
 							+ "\nmaxRetryDelay:         " + (rstring)maxRetryDelay
-							+ "\nfailureDelay:          " + (rstring)failureDelay
+							+ "\nfailureRetryDelay:     " + (rstring)failureRetryDelay
 							+ "\ninitDelay:             " + (rstring)$initDelay
 							+ "\niamTokenURL:           " + iamTokenURL
 							+ "\nexpiresInTestValue:    " + (rstring)expiresInTestValue
@@ -210,8 +222,8 @@ public composite IAMAccessTokenGenerator(output IamAccessTokenStream) {
 					mutable boolean authorizationSucess = true;
 					while ( ! isShutdown() ) {
 						if ( ! authorizationSucess ) {
-							appTrc(Trace.debug, "authorizationSucess is false. Authorization has failed. Block for " + (rstring)failureDelay + " seconds");
-							block(failureDelay);
+							appTrc(Trace.debug, "authorizationSucess is false. Authorization has failed. Block for " + (rstring)failureRetryDelay + " seconds");
+							block(failureRetryDelay);
 							// short cut when block was interrupted due to shutdown request
 							if (isShutdown())
 								continue;
