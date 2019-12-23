@@ -1,0 +1,37 @@
+use com.ibm.streamsx.sttgateway.watson::IAMAccessTokenGenerator;
+use com.ibm.streamsx.sttgateway.watson::IAMAccessToken;
+use com.ibm.streamsx.testframe::FileSink1;
+
+composite AccessTokenGenerator {
+	param
+		expression<rstring> $apiKey :      getSubmissionTimeValue("apiKey", "valid");
+		expression<rstring> $iamTokenURL : getSubmissionTimeValue("iamTokenURL", "http://localhost:8097/access");
+		expression<int64> $expiresInTestValue : (int64)getSubmissionTimeValue("expiresInTestValue", "0");
+		expression<float64> $failureDelay : (float64)getSubmissionTimeValue("failureDelay", "10.0");
+
+	graph
+		stream<IAMAccessToken> IAMAccessTokenStream = IAMAccessTokenGenerator() {
+			param
+				apiKey: $apiKey;
+				iamTokenURL: $iamTokenURL;
+				expiresInTestValue: $expiresInTestValue;
+				failureRetryDelay: $failureDelay;
+		}
+		
+		stream<IAMAccessToken> IAMAccessTokenStream2 as O = Custom(IAMAccessTokenStream as I) {
+			logic
+				state : mutable int32 count = 0;
+				onTuple I: {
+					submit(I, O);
+					++count;
+					if (count == 4)
+						submit(Sys.WindowMarker, O);
+				}
+				
+		}
+		
+		() as Sink = FileSink1(IAMAccessTokenStream2) { }
+
+	config
+		restartable: false;
+}
