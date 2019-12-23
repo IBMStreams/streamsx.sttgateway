@@ -6,6 +6,7 @@ use com.ibm.streamsx.sttgateway.watson::hourMinuteSecondMillisec;
 
 composite AccessTokenGenerator {
 	param
+		expression<rstring> $apiKey :      getSubmissionTimeValue("apiKey", "");
 		expression<rstring> $iamTokenURL : getSubmissionTimeValue("iamTokenURL", "https://iam.cloud.ibm.com/identity/token");
 		expression<int64> $expiresInTestValue : (int64)getSubmissionTimeValue("expiresInTestValue", "0");
 		expression<float64> $failureDelay : (float64)getSubmissionTimeValue("failureDelay", "10.0");
@@ -13,6 +14,7 @@ composite AccessTokenGenerator {
 	graph
 		stream<IAMAccessToken> IAMAccessTokenStream = IAMAccessTokenGenerator() {
 			param
+				apiKey: $apiKey;
 				iamTokenURL: $iamTokenURL;
 				expiresInTestValue: $expiresInTestValue;
 				failureRetryDelay: $failureDelay;

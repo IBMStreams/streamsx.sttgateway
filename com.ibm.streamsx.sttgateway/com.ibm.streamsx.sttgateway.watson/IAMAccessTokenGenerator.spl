@@ -53,7 +53,11 @@ type IAMAccessToken = rstring access_token, rstring refresh_token,
  * by using the provided `apiKey`. The received access token is submitted to the output port. This operator refreshes the 
  * access token automatically after the expiration time by using the received refresh token and submits the refreshed 
  * access token to the output port. 
- * If IAM authentication server responses with a non successful result, the operator re-tries the operation after 
+ * If IAM authentication server responses with a non successful result, the operator re-tries the operation after *failureRetryDelay*. 
+ * 
+ * The operator gets the configuration information either from the operator invocation or from Streams Application 
+ * Configuration properties. The name of the Application Configuration is defined by a compile time parameter 
+ * *applicationConfiguration*, default **sttConnection**.
  * 
  * **Metrics:**
  * 
@@ -127,13 +131,19 @@ public composite IAMAccessTokenGenerator(output IamAccessTokenStream) {
 		//expression<rstring> $apiKey:                     getApplicationConfigurationProperty($applicationConfiguration, "apiKey", "");
 		//CDISP0725E ERROR: The default initializer for the $apiKey composite formal parameter contains a reference to the $applicationConfiguration composite formal parameter. The composite formal initializers cannot reference other composite formals.
 		
-		expression<rstring> $apiKey:                     getApplicationConfigurationProperty("sttConnection", "apiKey", "");
-		expression<rstring> $iamTokenURL:                getApplicationConfigurationProperty("sttConnection", "iamTokenURL", "");
-		expression<int64>   $defaultExpiresIn:    (int64)getApplicationConfigurationProperty("sttConnection", "defaultExpiresIn", "3600");
-		expression<int64>   $guardTime:           (int64)getApplicationConfigurationProperty("sttConnection", "guardTime", "300");
+		expression<rstring> $apiKey:                     getApplicationConfigurationProperty(
+					getCompileTimeValue("applicationConfiguration", "sttConnection"), "apiKey", "");
+		expression<rstring> $iamTokenURL:                getApplicationConfigurationProperty(
+					getCompileTimeValue("applicationConfiguration", "sttConnection"), "iamTokenURL", "");
+		expression<int64>   $defaultExpiresIn:    (int64)getApplicationConfigurationProperty(
+					getCompileTimeValue("applicationConfiguration", "sttConnection"), "defaultExpiresIn", "3600");
+		expression<int64>   $guardTime:           (int64)getApplicationConfigurationProperty(
+					getCompileTimeValue("applicationConfiguration", "sttConnection"), "guardTime", "300");
 		expression<float64> $initDelay: 0.0;
-		expression<float64> $maxRetryDelay:     (float64)getApplicationConfigurationProperty("sttConnection", "maxRetryDelay", "60.0");
-		expression<float64> $failureRetryDelay: (float64)getApplicationConfigurationProperty("sttConnection", "failureRetryDelay", "120.0");
+		expression<float64> $maxRetryDelay:     (float64)getApplicationConfigurationProperty(
+					getCompileTimeValue("applicationConfiguration", "sttConnection"), "maxRetryDelay", "60.0");
+		expression<float64> $failureRetryDelay: (float64)getApplicationConfigurationProperty(
+					getCompileTimeValue("applicationConfiguration", "sttConnection"), "failureRetryDelay", "120.0");
 		
 		// test expiration value
 		// use this value for tests to overwrite the returned expires_in value
@@ -237,7 +247,7 @@ public composite IAMAccessTokenGenerator(output IamAccessTokenStream) {
 						}
 						
 						if ((apiKeyTemp != previousApiKey) && (refreshToken != "")) {
-							appTrc(Trace.info, "apiKey has changed during a valit authorization. Reset refreshToken");
+							appTrc(Trace.info, "apiKey has changed during a valid authorization. Reset refreshToken");
 							refreshToken = "";
 						}
 						mutable rstring requestBody = "";
