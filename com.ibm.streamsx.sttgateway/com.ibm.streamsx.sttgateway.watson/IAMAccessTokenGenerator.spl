@@ -82,31 +82,31 @@ type IAMAccessToken = rstring access_token, rstring refresh_token,
  * string*, no access token is requested from IAM cloud service. When the value has changed, 
  * the operator requests an initial access token when the current token becomes invalid. 
  * If this parameter is not provided in operator invocation, the value is taken from application configuration 
- * **sttConnection** property **apiKey**. Type: *rstring*; Default: the *empty string*
+ * (Configured during compile time. Default: **sttConnection**) property **apiKey**. Type: *rstring*; Default: the *empty string*
  * 
- * @param	iamTokenURL	The service url of the IAM Token authorization service to fetch and refresh the IAM access
- *  token. If this parameter is not provided in operator invocation, the value is taken from application configuration 
- * **sttConnection** property **iamTokenURL**. Type *rstring*; Default: the *empty string*
+ * @param	iamTokenURL	The service url of the IAM Token authorization service to fetch and refresh the IAM access 
+ * token. If this parameter is not provided in operator invocation, the value is taken from application configuration 
+ * (Configured during compile time. Default: **sttConnection**) property **iamTokenURL**. Type *rstring*; Default: the *empty string*
  * 
  * @param	defaultExpiresIn The default value for the access token expiration time in seconds. This value is used, when no 
  * expires_in value is returned from the authorization service. If this parameter is not provided in operator invocation, 
- * the value is taken from application configuration **sttConnection** 
+ * the value is taken from application configuration (Configured during compile time. Default: **sttConnection**) 
  * property **defaultExpiresIn**. Type: *int64*; Default: *3600*
  * 
  * @param	guardTime	The guard time in seconds. A refresh token is requested 'guard time' seconds before the expiration 
- * was determined. If this parameter is not provided in operator invocation, the value is taken from application 
- * configuration **sttConnection** property **guardTime**. Type: *int64*; Default: *300*
+ * was determined. If this parameter is not provided in operator invocation, the value is taken from application configuration 
+ * (Configured during compile time. Default: **sttConnection**) property **guardTime**. Type: *int64*; Default: *300*
  * 
  * @param	maxRetryDelay	The maximum wait time in seconds before a connection re-try is made. The connection re-try 
  * delay increases exponentially starting from 2 seconds but not exceeding 'maxRetryDelay'. This value is used 
  * in case of unsuccessful connection attempts due to (temporary) network issues. If this parameter is not provided in 
- * operator invocation, the value is taken from application configuration **sttConnection** 
+ * operator invocation, the value is taken from application configuration (Configured during compile time. Default: **sttConnection**) 
  * property **maxRetryDelay**. Type: *float64*; Default: *60.0*
  * 
  * @param	failureRetryDelay	The maximum wait time in seconds before a new authorization attempt is made after a non
  * successful server response. This value is used in case of unsuccessful authorization attempts due to a final failure 
  * response from the authorization server or due to an empty *apiKey*. If this parameter is not provided in operator 
- * invocation, the value is taken from application configuration **sttConnection** 
+ * invocation, the value is taken from application configuration (Configured during compile time. Default: **sttConnection**) 
  * property **failureRetryDelay**. Type: *float64*; Default *120.0*
  * 
  * @param	initDelay	The initial delay before the operation starts in seconds. Type: *float64*; Default *0.0*
@@ -255,12 +255,12 @@ public composite IAMAccessTokenGenerator(output IamAccessTokenStream) {
 							//we have no refresh token received -> try to get the initial request
 							requestBody = "grant_type=" + urlEncode("urn:ibm:params:oauth:grant-type:apikey") + "&apikey=" + urlEncode($apiKey);
 							appTrc(Trace.trace, "Try to get the initial request token and refresh token from: " + iamTokenURL);
-							printStringLn(requestBody);
+							//printStringLn(requestBody);
 						} else {
 							//we have a refresh token received -> try to get the refresh request
 							requestBody = "grant_type=" + urlEncode("refresh_token") + "&refresh_token=" + urlEncode(refreshToken);
 							appTrc(Trace.trace, "Try to get the refresh request token and refresh token from: " + iamTokenURL);
-							printStringLn(requestBody);
+							//printStringLn(requestBody);
 						}
 						
 						//this inner loop tries to get the response from the server
