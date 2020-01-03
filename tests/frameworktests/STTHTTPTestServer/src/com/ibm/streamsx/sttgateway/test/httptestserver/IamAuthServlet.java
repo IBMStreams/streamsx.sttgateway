@@ -80,8 +80,8 @@ public class IamAuthServlet extends HttpServlet {
 				response.setContentType("application/json;charset=UTF-8");
 				PrintWriter pw = response.getWriter();
 				pw.println("{");
-				pw.println("	\"access_token\":\"2YotnFZFEjr1zCsicMWpAA\",");
-				pw.println("	\"refresh_token\":\"2YotnFZFEjr1zCsicMWpAA___refresh_0\",");
+				pw.println("	\"access_token\":\"2YotnFZFEjr1zCsicMWpAA_access_0\",");
+				pw.println("	\"refresh_token\":\"2YotnFZFEjr1zCsicMWpAA_refresh_0\",");
 				pw.println("	\"scope\":\"ibm openid\",");
 				pw.println("	\"expiration\":1577116347,");
 				pw.println("	\"token_type\":\"Bearer\",");
@@ -102,13 +102,17 @@ public class IamAuthServlet extends HttpServlet {
 				PrintWriter pw = response.getWriter();
 				pw.print("refreshToken == null");
 				return;
-			} else if (refreshToken.equals("2YotnFZFEjr1zCsicMWpAA___refresh_0")) {
+			} else if (refreshToken.startsWith("2YotnFZFEjr1zCsicMWpAA_refresh_")) {
+				String numberString = refreshToken.substring(31);
+				Integer myi = Integer.valueOf(numberString);
+				int newi = myi.intValue() + 1;
+				String newSequence = Integer.toString(newi);
 				response.setStatus(HttpServletResponse.SC_OK);
 				response.setContentType("application/json;charset=UTF-8");
 				PrintWriter pw = response.getWriter();
 				pw.println("{");
-				pw.println("	\"access_token\":\"2YotnFZFEjr1zCsicMWpAA\",");
-				pw.println("	\"refresh_token\":\"2YotnFZFEjr1zCsicMWpAA___refresh_0\",");
+				pw.println("	\"access_token\":\"2YotnFZFEjr1zCsicMWpAA_access_" + newSequence + "\",");
+				pw.println("	\"refresh_token\":\"2YotnFZFEjr1zCsicMWpAA_refresh_" + newSequence + "\",");
 				pw.println("	\"scope\":\"ibm openid\",");
 				pw.println("	\"expiration\":1577116347,");
 				pw.println("	\"token_type\":\"Bearer\",");

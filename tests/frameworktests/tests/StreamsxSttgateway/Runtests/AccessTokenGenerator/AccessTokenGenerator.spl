@@ -3,29 +3,35 @@ use com.ibm.streamsx.sttgateway.watson::IAMAccessToken;
 use com.ibm.streamsx.testframe::FileSink1;
 
 composite AccessTokenGenerator {
-	param
-		expression<rstring> $apiKey :      getSubmissionTimeValue("apiKey", "valid");
-		expression<rstring> $iamTokenURL : getSubmissionTimeValue("iamTokenURL", "http://localhost:8097/access");
-		expression<int64> $expiresInTestValue : (int64)getSubmissionTimeValue("expiresInTestValue", "0");
-		expression<float64> $failureDelay : (float64)getSubmissionTimeValue("failureDelay", "10.0");
-
+	//<!appConf*>param
+		//<!appConf*>expression<rstring> $apiKey :      getSubmissionTimeValue("apiKey", "valid");
+		//<!appConf*>expression<rstring> $iamTokenURL : getSubmissionTimeValue("iamTokenURL", "http://localhost:8097/access");
+		//<!appConf*>expression<float64> $failureRetryDelay : (float64)getSubmissionTimeValue("failureRetryDelay", "10.0");
+		//<!appConf*>expression<int64>   $guardTime : (int64)getSubmissionTimeValue("guardTime", "5");
+		
 	graph
 		stream<IAMAccessToken> IAMAccessTokenStream = IAMAccessTokenGenerator() {
-			param
-				apiKey: $apiKey;
-				iamTokenURL: $iamTokenURL;
-				expiresInTestValue: $expiresInTestValue;
-				failureRetryDelay: $failureDelay;
+			//<!appConf*>param
+				//<!appConf*>apiKey: $apiKey;
+				//<!appConf*>iamTokenURL: $iamTokenURL;
+				//<!appConf*>failureRetryDelay: $failureRetryDelay;
+				//<!appConf*>guardTime : $guardTime;
+				//<!appConf*>maxRetryDelay : 66.0;
+				//<!appConf*>defaultExpiresIn : 3666l;
 		}
 		
-		stream<IAMAccessToken> IAMAccessTokenStream2 as O = Custom(IAMAccessTokenStream as I) {
+		stream<IAMAccessToken, tuple<timestamp time>> IAMAccessTokenStream2 as O = Custom(IAMAccessTokenStream as I) {
 			logic
 				state : mutable int32 count = 0;
 				onTuple I: {
-					submit(I, O);
+					mutable O otuple = {};
+					assignFrom(otuple, I);
+					otuple.time = getTimestamp();
+					submit(otuple, O);
 					++count;
 					if (count == 4)
 						submit(Sys.WindowMarker, O);
+					block(5.0);
 				}
 				
 		}
