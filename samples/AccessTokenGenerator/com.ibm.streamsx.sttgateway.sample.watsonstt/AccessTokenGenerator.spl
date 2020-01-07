@@ -25,6 +25,7 @@ public composite AccessTokenGenerator {
 			param
 				iamTokenURL: $iamTokenURL;
 				apiKey:      $apiKey;
+				initDelay: 20.0;
 				//guardTime: 1l;
 				//expiresInTestValue: 65l;
 		}
