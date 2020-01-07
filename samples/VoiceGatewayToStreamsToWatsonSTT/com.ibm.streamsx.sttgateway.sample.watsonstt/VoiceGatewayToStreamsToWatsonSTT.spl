@@ -532,7 +532,7 @@ public composite VoiceGatewayToStreamsToWatsonSTT {
 		// this composite will skip generating an IamAccessToken.
 		// For a correct STT operation, user must set only one of these two
 		// submission time parameters to a non-empty value: sttAPIKey or sttOnCP4DAccessToken.
-		(stream<IamAccessToken_t> IamAccessToken as IAT)
+		(stream<IAMAccessToken> IamAccessToken as IAT)
 			as IamAccessTokenGenerator = IAMAccessTokenGenerator() {
 			param
 				// This operator takes these four parameters.
@@ -547,7 +547,7 @@ public composite VoiceGatewayToStreamsToWatsonSTT {
 		}
 		
 		// If the user provided an STT on CP4D access token, then send that to the WatsonSTT operator.
-		(stream<IamAccessToken_t> AccessTokenForCP4D as AT) as AccessTokenForCP4DSender = Custom() {
+		(stream<IAMAccessToken> AccessTokenForCP4D as AT) as AccessTokenForCP4DSender = Custom() {
 			logic
 				onProcess: {
 					// Do this only if the user provided a non-empty access token for the STT on CP4D.
@@ -557,7 +557,7 @@ public composite VoiceGatewayToStreamsToWatsonSTT {
 						// Do a one time delay.
 						block($initDelayBeforeSendingDataToSttEngines);
 						// Send a single tuple with the STT on CP4D access token.
-						mutable IamAccessToken_t oTuple = {}; 
+						mutable IAMAccessToken oTuple = {}; 
 						oTuple.access_token = $sttOnCP4DAccessToken;
 						submit(oTuple, AT);
 					}		

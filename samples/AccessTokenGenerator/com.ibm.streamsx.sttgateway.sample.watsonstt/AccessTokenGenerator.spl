@@ -4,21 +4,29 @@ use com.ibm.streamsx.sttgateway.watson::IAMAccessTokenGenerator;
 use com.ibm.streamsx.sttgateway.watson::IAMAccessToken;
 use com.ibm.streamsx.sttgateway.watson::hourMinuteSecondMillisec;
 
-composite AccessTokenGenerator {
+/**
+ * This operator demonstrates the usage of the AccessTokenGenerator
+ * As soon as the operator is configured with iamTokenURL and apiKey, the operator
+ * starts to request a valid access from the authentication service. The access token 
+ * is automatically refreshed.
+ * To configure this operator a application configuration sttConnection with property 
+ * iamTokenURL and apiKey is required.
+ * To enter the application configuration execute the following command:
+ * streamtool mkappconfig --property "apiKey=your api key" sttConnection
+ * or
+ * apply the apiKey as submission time parameter
+ */
+public composite AccessTokenGenerator {
 	param
-		expression<rstring> $apiKey :      getSubmissionTimeValue("apiKey", "");
 		expression<rstring> $iamTokenURL : getSubmissionTimeValue("iamTokenURL", "https://iam.cloud.ibm.com/identity/token");
-		expression<int64> $expiresInTestValue : (int64)getSubmissionTimeValue("expiresInTestValue", "0");
-		expression<float64> $failureDelay : (float64)getSubmissionTimeValue("failureDelay", "10.0");
-
+		expression<rstring> $apiKey      : getSubmissionTimeValue("apiKey", "");
 	graph
 		stream<IAMAccessToken> IAMAccessTokenStream = IAMAccessTokenGenerator() {
 			param
-				apiKey: $apiKey;
 				iamTokenURL: $iamTokenURL;
-				expiresInTestValue: $expiresInTestValue;
-				failureRetryDelay: $failureDelay;
-				initDelay: 2.5;
+				apiKey:      $apiKey;
+				//guardTime: 1l;
+				//expiresInTestValue: 65l;
 		}
 		
 		() as Sink = Custom(IAMAccessTokenStream as I) {

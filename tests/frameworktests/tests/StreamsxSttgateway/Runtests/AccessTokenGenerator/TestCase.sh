@@ -18,7 +18,7 @@ declare -A description=(
 PREPS=(
 	'echo "${description[$TTRO_variantCase]}"'
 	'copyAndMorphSpl'
-	'myCompile'
+	'splCompile'
 	'cleanAppConf'
 	'setAppConf'
 	'TT_traceLevel="warn"'
@@ -56,14 +56,6 @@ myEvaluate() {
 	fi
 }
 
-myCompile() {
-	if [[ $TTRO_variantCase == 'appConfSpecial' ]]; then
-		splCompile 'applicationConfiguration=specialSttConnection'
-	else
-		splCompile
-	fi
-}
-
 mySubmitJob() {
 	if [[ $TTRO_variantCase == 'paramsSecure' ]]; then
 		submitJob -P 'iamTokenURL=https://localhost:1443/access'
@@ -91,7 +83,7 @@ setAppConf() {
 		if [[ $TTRO_variantCase == 'appConfSpecial' ]]; then
 			appconfname='specialSttConnection'
 		fi
-		streamtool mkappconfig --description 'A test propperty' \
+		streamtool mkappconfig --description 'A test configuration' \
 			--property "apiKey=valid" \
 			--property "iamTokenURL=http://localhost:8097/access" \
 			--property "failureRetryDelay=10.0" \

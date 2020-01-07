@@ -12,6 +12,9 @@ composite AccessTokenGenerator {
 	graph
 		stream<IAMAccessToken> IAMAccessTokenStream = IAMAccessTokenGenerator() {
 			//<!appConf*>param
+			//<appConfSpecial>param
+				//<!appConf*>appConfigName: "";
+				//<appConfSpecial>appConfigName: "specialSttConnection";
 				//<!appConf*>apiKey: $apiKey;
 				//<!appConf*>iamTokenURL: $iamTokenURL;
 				//<!appConf*>failureRetryDelay: $failureRetryDelay;
