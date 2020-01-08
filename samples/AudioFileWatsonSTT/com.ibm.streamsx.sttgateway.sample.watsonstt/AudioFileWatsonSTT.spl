@@ -58,9 +58,6 @@ public composite AudioFileWatsonSTT {
 		// Specify either the public cloud IAM Token fetch/refresh URL.
 		expression<rstring> $sttIAMTokenURL : 
 			getSubmissionTimeValue("sttIAMTokenURL", "https://iam.cloud.ibm.com/identity/token");
-		// Specify the access token refresh interval in minutes.
-		expression<float64> $sttAccessTokenRefreshInterval :
-			(float64)getSubmissionTimeValue("sttAccessTokenRefreshInterval", "55.00");
 		// Specify the IBM STT on Cloud Pak for Data (CP4D i.e. private cloud) access token.
 		// You should leave this submission time value empty when not using STT on CP4D.
 		expression<rstring> $sttOnCP4DAccessToken : getSubmissionTimeValue("sttOnCP4DAccessToken", "");
@@ -150,19 +147,12 @@ public composite AudioFileWatsonSTT {
 	graph
 		// IMPORTANT: IBM STT service on public cloud requires
 		// an unexpired valid IAM access token to perform the 
-		// speech to text task in a secure manner. One way to meet this
-		// requirement is to invoke and use a non-main composite operator
-		// that is available as part of the streamsx.sttgateway. By invoking
-		// that composite operator, we can make it to generate a new 
-		// access token and then periodically refresh it. This composite
-		// operator expects three operator parameters for you to
-		// provide at the time of invoking it i.e. your
-		// STT service instance's API key, IAM token generation/refresh URL and
-		// the required IAM access token refresh interval.
+		// speech to text task in a secure manner. You may either 
+		// provide the token in parameter sttOnCP4DAccessToken, or provide 
+		// the parameter sttIAMTokenURL and sttApiKey and the operator IAMAccessTokenGenerator
+		// generates a new access token and then periodically refresh it. 
 		// Output stream of this composite operator is connected to the
 		// second input stream of the WatsonSTT operator that is used below.
-		// If the sttAPIKey parameter below is set to an empty string,
-		// this composite will skip generating an IamAccessToken.
 		// For a correct STT operation, user must set only one of these two
 		// submission time parameters to a non-empty value: sttAPIKey or sttOnCP4DAccessToken.
 		(stream<IAMAccessToken> IamAccessToken as IAT)
@@ -171,31 +161,9 @@ public composite AudioFileWatsonSTT {
 				// This operator takes these four parameters.
 				apiKey: $sttApiKey;
 				iamTokenURL: $sttIAMTokenURL;
-				//sttAccessTokenRefreshInterval: $sttAccessTokenRefreshInterval;
-				// Initial delay before generating the IAM access token.
-				// This delay should give sufficient time for the
-				// WatsonSTT operator(s) to come up and be ready to
-				// receive the access token that will be sent from this composite.
+				accessToken: $sttOnCP4DAccessToken;
 		}
-		
-		// If the user provided an STT on CP4D access token, then send that to the WatsonSTT operator.
-		(stream<IAMAccessToken> AccessTokenForCP4D as AT) as AccessTokenForCP4DSender = Custom() {
-			logic
-				onProcess: {
-					// Do this only if the user provided a non-empty access token for the STT on CP4D.
-					// Send this user provided STT on CP4D access token only once from this Custom source operator.
-					// Access token for the STT on CP4D will never expire.
-					if ($sttOnCP4DAccessToken != "") {
-						// Do a one time delay.
-						block(15.0);
-						// Send a single tuple with the STT on CP4D access token.
-						mutable IAMAccessToken oTuple = {}; 
-						oTuple.access_token = $sttOnCP4DAccessToken;
-						submit(oTuple, AT);
-					}		
-				}				
-		}
-			
+
 		// Scan a directory periodically to pick up the audio files and 
 		// send the name of that audio file to the WatsonSTT operator.
 		//
@@ -233,7 +201,7 @@ public composite AudioFileWatsonSTT {
 		// Second input stream into this operator is your STT service instance's IAM access token.
 		@parallel(width = $numberOfSTTEngines, broadcast=[AT])
 		stream<STTResult_t> STTResult = 
-			WatsonSTT(AudioFileName as AFN; IamAccessToken, AccessTokenForCP4D as AT) {
+			WatsonSTT(AudioFileName as AFN; IamAccessToken as AT) {
 			logic
 				state: {
 					mutable int32 _conversationCnt = 0;
