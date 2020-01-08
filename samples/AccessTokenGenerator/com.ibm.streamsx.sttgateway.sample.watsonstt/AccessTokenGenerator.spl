@@ -15,16 +15,21 @@ use com.ibm.streamsx.sttgateway.watson::hourMinuteSecondMillisec;
  * streamtool mkappconfig --property "apiKey=your api key" sttConnection
  * or
  * apply the apiKey as submission time parameter
+ * 
+ * If this sample is provided with a non empty accessToken parameter, the operator 
+ * emits this token.
  */
 public composite AccessTokenGenerator {
 	param
 		expression<rstring> $iamTokenURL : getSubmissionTimeValue("iamTokenURL", "https://iam.cloud.ibm.com/identity/token");
 		expression<rstring> $apiKey      : getSubmissionTimeValue("apiKey", "");
+		expression<rstring> $accessToken : getSubmissionTimeValue("accessToken", "");
 	graph
 		stream<IAMAccessToken> IAMAccessTokenStream = IAMAccessTokenGenerator() {
 			param
 				iamTokenURL: $iamTokenURL;
 				apiKey:      $apiKey;
+				accessToken: $accessToken;
 				initDelay: 20.0;
 				//guardTime: 1l;
 				//expiresInTestValue: 65l;

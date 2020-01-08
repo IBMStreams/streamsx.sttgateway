@@ -1,4 +1,4 @@
-#--variantList='params appConfDefault appConfSpecial paramsSecure paramsInvalid'
+#--variantList='params appConfDefault appConfSpecial paramsSecure paramsInvalid paramsAccessToken'
 #--timeout=600
 #--exclusive=true
 
@@ -13,6 +13,7 @@ declare -A description=(
 	[appConfSpecial]='######################## Get the connection information from special compiled in application configutation. Expect success ###'
 	[paramsSecure]='######################## Get the connection information from operator parameters. Secure connection. Expect success ###'
 	[paramsInvalid]='######################## Get the connection information from operator parameters. Expect no output tuples ###'
+	[paramsAccessToken]='######################## Get the accessToken from operator parameters. Emit tuple and end ###'
 )
 
 PREPS=(
@@ -32,7 +33,7 @@ STEPS=(
 	'myWait'
 	'cancelJobAndLog'
 	'myEvaluate'
-	'if [[ $TTRO_variantCase != 'paramsInvalid' ]]; then checkLogsNoError; fi'
+	'if [[ $TTRO_variantCase != 'paramsInvalid' ]]; then checkLogsNoError2; fi'
 )
 
 FINS=(
@@ -44,6 +45,11 @@ myEvaluate() {
 	if [[ $TTRO_variantCase == 'paramsInvalid' ]]; then
 		if [[ -e data/Tuples ]]; then
 			setFailure "File data/Tuples exists but is not expected"
+		fi
+	elif [[ $TTRO_variantCase == 'paramsAccessToken' ]]; then
+		local linecount=$(grep "access_token=\"maccasdasdfadfdfsdgfdfs fdggg g 123\"" data/Tuples | wc -l)
+		if [[ $linecount -lt 1 ]]; then
+			setFailure "to few access token received: linecount is $linecount i is $i"
 		fi
 	else
 		local i

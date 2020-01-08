@@ -43,15 +43,18 @@ type IAMAccessToken = rstring access_token, rstring refresh_token,
 	rstring scope, int64 expiration, rstring token_type, int64 expires_in;
 
 /**
- * This composite provides a way to generate a new IAM access token for the IBM STT service on public cloud. 
- * IBM Streams applications using the streamsx.sttgateway can use/invoke this non-main composite to 
+ * IBM Streams applications using the streamsx.sttgateway can use/invoke this non-main composite to submit, 
  * generate and periodically refresh the IAM access token which will be required by the WatsonSTT operator. 
  * Without having an unexpired IAM access token, STT service on public cloud will not allow the speech to text 
  * transcription to happen.
- * This operator connects to the IAM authorization service specified by parameter `iamTokenURL` and requests an access token 
- * by using the provided `apiKey`. The received access token is submitted to the output port. This operator refreshes the 
- * access token automatically after the expiration time by using the received refresh token and submits the refreshed 
- * access token to the output port. 
+ * 
+ * This operator has 2 operation modes: 
+ * * If parameter *accessToken* is non empty, the operator emits **one output tuple** with the access token and the operator 
+ * thread ends.
+ * * If parameter *accessToken* is empty, the operator connects to the IAM authorization service specified by parameter 
+ * `iamTokenURL` and requests an access token by using the provided `apiKey`. The received access token is submitted to 
+ * the output port. This operator refreshes the access token automatically after the expiration time by using the received 
+ * refresh token and submits the refreshed access token to the output port. 
  * If IAM authentication server responses with a non successful result, the operator re-tries the operation after *failureRetryDelay*. 
  * 
  * The operator gets the configuration information from operator parameters. These values may be overwritten from Streams Application 
@@ -59,6 +62,8 @@ type IAMAccessToken = rstring access_token, rstring refresh_token,
  * property exists.
  * 
  * **Metrics:**
+ * The following metrics are available if the operator generates and refreshes the access token from IAM authorization 
+ * service (parameter *accessToken* is empty).
  * 
  * *nSuccessfulInitialRequests:*	The number of successful requests with grant_type=urn:ibm:params:oauth:grant-type:apikey. 
  * The authorization was granted in response to the request
@@ -76,6 +81,12 @@ type IAMAccessToken = rstring access_token, rstring refresh_token,
  * @output	IamAccessTokenStream	The output stream with the generated access token and other information received 
  * from IAM authentication service. The stream must be of type [com.ibm.streamsx.sttgateway.watson::IAMAccessToken]. 
  * The output generates a tuple once a initial or refreshed access token is available.
+ * 
+ * @param	accessToken	If parameter *accessToken* is non empty, the operator emits **one output tuple** with the 
+ * access token and the operator thread ends. If parameter *accessToken* is empty, the operator connects to the 
+ * IAM authorization service specified by parameter `iamTokenURL` and requests an access token by using the provided `apiKey`. 
+ * If the application configuration with name *appConfigName* and property *accessToken* exists, this parameter is overwritten. 
+ * Type: *rstring*; Default: *""*
  * 
  * @param	appConfigName	The name of the application configuration to look for connection parameters. If this parameter 
  * is non empty, the properties from this application configuration overwrite the operator parameters. An empty string 
@@ -138,6 +149,7 @@ public composite IAMAccessTokenGenerator(output IamAccessTokenStream) {
 		//The name of the app config to look for
 		expression<rstring> $appConfigName    : "sttConnection";
 		//These parameter values may be overwritten with values from the app config
+		expression<rstring> $accessToken      : "";
 		expression<rstring> $apiKey           : "";
 		expression<rstring> $iamTokenURL      : "";
 		expression<int64>   $defaultExpiresIn : 3600l;
@@ -157,6 +169,28 @@ public composite IAMAccessTokenGenerator(output IamAccessTokenStream) {
 		stream<IAMAccessToken> IamAccessTokenStream as O = Custom() {
 			logic
 				onProcess: {
+					rstring appConfigName = $appConfigName;
+					mutable int32 err = 0;
+					
+					//get parameter accessToken
+					mutable rstring accessToken = $accessToken;
+					if (appConfigName != "") {
+						rstring prop = getApplicationConfigurationProperty(appConfigName, "accessToken", err);
+						if (err == 0)
+							accessToken = prop;
+					}
+					// If accessToken is non empty, emit the access token and end the thread
+					if (accessToken != "") {
+						printStringLn("IamAccessTokenStream: accessToken is configured, emit and end!");
+						O otuple = {access_token=accessToken, refresh_token="", scope="", expiration=0l, token_type="", expires_in=0l};
+						// wait initial delay
+						if ($initDelay > 0.0)
+							block($initDelay);
+						submit(otuple, O);
+						return;
+					}
+
+					// the access token is empty -> connect to IAM authentication service an request access token ...
 					// constant values
 					// list of request headers
 					list<rstring> requestHeaders = [
@@ -166,9 +200,6 @@ public composite IAMAccessTokenGenerator(output IamAccessTokenStream) {
 							"Authorization: Basic Yng6Yng="
 					];
 
-					rstring appConfigName = $appConfigName;
-					mutable int32 err = 0;
-					
 					// stored submission time values evaluated only once at start up time
 					mutable rstring iamTokenURL = $iamTokenURL;
 					if (appConfigName != "") {
@@ -177,9 +208,8 @@ public composite IAMAccessTokenGenerator(output IamAccessTokenStream) {
 							iamTokenURL = prop;
 					}
 					if (iamTokenURL == "") {
-						appTrc(Trace.info, "No iamTokenURL configured, end operator thread!");
-						printStringLn("IamAccessTokenStream: No iamTokenURL configured, end operator thread!");
-						return;
+						appTrc(Trace.error, "No iamTokenURL and no accessToken configured, Abort!");
+						abort();
 					}
 					
 					int64 expiresInTestValue = $expiresInTestValue;
@@ -242,7 +272,6 @@ public composite IAMAccessTokenGenerator(output IamAccessTokenStream) {
 							+ "\ninitDelay:             " + (rstring)$initDelay
 							+ "\niamTokenURL:           " + iamTokenURL
 							+ "\nexpiresInTestValue:    " + (rstring)expiresInTestValue
-							+ "\nrequestHeaders:        " + (rstring)requestHeaders
 					);
 					
 					// create and get custom metrics
