@@ -507,7 +507,7 @@ void MY_OPERATOR::process(Tuple const & tuple, uint32_t port) {
 	// This must be the audio data arriving here via port 0 i.e. first input port.
 	// If we have a non-empty IAM access token, process the audio data.
 	// Otherwise, skip it.
-	if (accessToken == "") {
+	if (accessToken.empty()) {
 		SPLAPPTRC(L_ERROR, traceIntro <<
 			"-->Ignoring the received audio data at this time due "
 			"to an empty IAM access token. User must first provide "
@@ -686,26 +686,26 @@ void MY_OPERATOR::ws_audio_blob_sender() {
 	struct stat fileStat;
 <%	} %>
 
-	while (!getPE().getShutdownRequested()) {
+	while (not getPE().getShutdownRequested()) {
 		// Keep waiting in this while loop until
 		// there is some work that needs to be performed.
 		// Wait for a configured amount of time that is not 0.0 when there is
 		// audio data actively available for processing.
 		// When there is no audio data available, yield the CPU for
 		// slightly a longer time.
-		bool bytesAreToSend;
+		bool bytesAreToSend_;
 		{
 			//block other threads from accessing the vectors
 			SPL::AutoMutex autoMutex(sttMutex1);
 
 <%			if ( $audioInputAsBlob == 1 ) {%>
-			bytesAreToSend = audioBytes.size() > 0;
+			bytesAreToSend_ = audioBytes.size() > 0;
 <%			} else { %>
-			bytesAreToSend = audioFiles.size() > 0;
+			bytesAreToSend_ = audioFiles.size() > 0;
 <%			} %>
 			//unblock
 		}
-		if( ! bytesAreToSend) {
+		if(not bytesAreToSend_) {
 			// There is no audio data available at this time.
 			// Yield the CPU for slightly a longer time.
 			// 1 second instead of 1 msec.
@@ -728,7 +728,7 @@ void MY_OPERATOR::ws_audio_blob_sender() {
 			continue;
 		
 		// Check if the Websocket connection needs to be established.
-		if (bytesAreToSend && wsConnectionEstablished == false) {
+		if (bytesAreToSend_ && not wsConnectionEstablished) {
 			// When there is audio data waiting to be processed and
 			// if the Websocket connection is not active at that time, 
 			// it could be due to one of these reasons.
@@ -770,8 +770,8 @@ void MY_OPERATOR::ws_audio_blob_sender() {
 			// on_message event handler below which will set the 
 			// wsConnectionEstablished to true.
 			// Wait until the Websocket connection is fully made as explained above.
-			while(wsConnectionEstablished == false) {
-				if (websocketConnectionErrorOccurred == false) {
+			while(not wsConnectionEstablished) {
+				if (not websocketConnectionErrorOccurred) {
 					SPLAPPTRC(L_DEBUG, traceIntro <<
 						"-->Reached 9 Still no connection established and no connection error occurred; wait 0.500",
 						"reestablish_ws_connection");
@@ -796,9 +796,9 @@ void MY_OPERATOR::ws_audio_blob_sender() {
 			
 			// Continue from the top of the outer loop.
 			continue;
-		} // End of the if (bytesAreToSend && wsConnectionEstablished == false)
+		} // End of the if (bytesAreToSend_ && wsConnectionEstablished == false)
 
-		if (bytesAreToSend && wsConnectionEstablished == true) {
+		if (bytesAreToSend_ && wsConnectionEstablished == true) {
 			//reset numberOfWebsocketConnectionAttempts
 			numberOfWebsocketConnectionAttempts = 0;
 			//nWebsocketConnectionAttemptsMetric is set only from this thread, thus we use setValueNoLock
@@ -822,7 +822,7 @@ void MY_OPERATOR::ws_audio_blob_sender() {
 		}
 		
 		// Check if there is audio data waiting to be sent to the STT service.
-		if (bytesAreToSend && 
+		if (bytesAreToSend_ && 
 			wsConnectionEstablished == true &&
 			statusOfAudioDataTransmissionToSTT != FULL_AUDIO_DATA_SENT_TO_STT) {
 			// If an error happened in the STT processing (invalid audio data or
@@ -978,8 +978,8 @@ void MY_OPERATOR::ws_audio_blob_sender() {
 // understand our need to run it in a separate thread.
 void MY_OPERATOR::ws_init() {
 
-	while (!getPE().getShutdownRequested()) { 
-		if (makeNewWebsocketConnection == false) {
+	while (not getPE().getShutdownRequested()) { 
+		if (not makeNewWebsocketConnection) {
 			// Keep waiting in this while loop until
 			// a need arises to make a new Websocket connection.
 			// 1 second wait.
@@ -1259,25 +1259,27 @@ void MY_OPERATOR::on_message(MY_OPERATOR::client* c, websocketpp::connection_hdl
 	// In general, you can enable this debug mode and send one file at a time to the STT
 	// service and carefully observe all the messages that get returned back in order to
 	// develop and fine-tune the JSON message parsing logic.
-	bool fullTranscriptionCompleted = false;
-	bool transcriptionResultAvailableForParsing = false;
-	std::string sttErrorString = "";
-	std::string payload = msg->get_payload();
-	std::size_t stateListeningFound = payload.find("\"state\": \"listening\"");
-	// STT error will have the following message format.
-	// {"error": "unable to transcode data stream audio/wav -> audio/x-float-array "}
-	std::size_t sttError = payload.find("\"error\": \"");
+	bool fullTranscriptionCompleted_ = false;
+	bool transcriptionResultAvailableForParsing_ = false;
+
+	const std::string & payload_ = msg->get_payload();
+	const bool stateListeningFound_ = payload_.find("\"state\": \"listening\"") != std::string::npos;
+
 	SPLAPPTRC(L_DEBUG, traceIntro << "-->Reached 7 (on_message)", "on_message");
 	
-	if (sttError != std::string::npos) {
-		sttErrorString = payload;
+	// STT error will have the following message format.
+	// {"error": "unable to transcode data stream audio/wav -> audio/x-float-array "}
+	const bool sttErrorFound_ = payload_.find("\"error\": \"") != std::string::npos;
+	std::string sttErrorString_ = "";
+	if (sttErrorFound_) {
+		sttErrorString_ = payload_;
 
 		if (sttJsonResponseDebugging == true) {
-			std::cout << traceIntro << "-->X3 STT error message=" << payload << std::endl;
+			std::cout << traceIntro << "-->X3 STT error message=" << sttErrorString_ << std::endl;
 		}
-		SPLAPPTRC(L_ERROR, traceIntro << "-->X3 STT error message=" << payload, "on_message");
+		SPLAPPTRC(L_ERROR, traceIntro << "-->X3 STT error message=" << sttErrorString_, "on_message");
 
-	} else if (stateListeningFound != std::string::npos && wsConnectionEstablished == false) {
+	} else if (stateListeningFound_ && not wsConnectionEstablished) {
 		// This is the "listening" response from the STT service for the 
 		// new recognition request that was initiated in the on_open method above.
 		// This response is sent only once for every new Websocket connection request made and
@@ -1287,20 +1289,20 @@ void MY_OPERATOR::on_message(MY_OPERATOR::client* c, websocketpp::connection_hdl
 		numberOfWebsocketConnectionAttempts = 0;
 
 		if (sttJsonResponseDebugging == true) {
-			std::cout << traceIntro << "-->X0 STT response payload=" << payload << std::endl;
+			std::cout << traceIntro << "-->X0 STT response payload=" << payload_ << std::endl;
 		}
 		
 		SPLAPPTRC(L_DEBUG, traceIntro <<
 			"-->Reached 8 Websocket connection established with the Watson STT service.",
 			"on_message");
 		return;
-	} else if (stateListeningFound == std::string::npos && wsConnectionEstablished == true) {
+	} else if (not stateListeningFound_ && wsConnectionEstablished) {
 		// This must be the response for our audio transcription request.
 		// Keep accumulating the transcription result.
-		transcriptionResult += payload;
+		transcriptionResult += payload_;
 		
 		if (sttJsonResponseDebugging == true) {
-			std::cout << traceIntro << "-->X1 STT response payload=" << payload << std::endl;
+			std::cout << traceIntro << "-->X1 STT response payload=" << payload_ << std::endl;
 		}
 		
 		SPLAPPTRC(L_DEBUG, traceIntro <<
@@ -1310,20 +1312,20 @@ void MY_OPERATOR::on_message(MY_OPERATOR::client* c, websocketpp::connection_hdl
 		if (sttResultMode == 1 || sttResultMode == 2) {
 			// We can parse this partial or completed 
 			// utterance result now since the user has asked for it.
-			transcriptionResultAvailableForParsing = true;
+			transcriptionResultAvailableForParsing_ = true;
 		} else {
 			// User didn't ask for the partial or completed utterance result.
 			// We will parse the full transcription result later when it is fully completed.
 			return;
 		}
-	} else if (stateListeningFound != std::string::npos && wsConnectionEstablished == true) {
+	} else if (stateListeningFound_ && wsConnectionEstablished) {
 		// This is the "listening" response from the STT service for the 
 		// transcription completion for the audio data that was sent earlier.
 		// This response also indicates that the STT service is ready to do a new transcription.
-		fullTranscriptionCompleted = true;
+		fullTranscriptionCompleted_ = true;
 
 		if (sttJsonResponseDebugging == true) {
-			std::cout << traceIntro << "-->X2 STT task completion message=" << payload << std::endl;
+			std::cout << traceIntro << "-->X2 STT task completion message=" << payload_ << std::endl;
 		}
 
 		SPLAPPTRC(L_DEBUG, traceIntro <<
@@ -1333,33 +1335,30 @@ void MY_OPERATOR::on_message(MY_OPERATOR::client* c, websocketpp::connection_hdl
 		if (sttResultMode == 3) {
 			// Neither partial nor completed utterance results were parsed earlier.
 			// So, parse the full transcription result now.
-			transcriptionResultAvailableForParsing = true;
+			transcriptionResultAvailableForParsing_ = true;
 		}
 	}
 
-	std::string audioFileName = "";
-	int32_t utteranceNumber = 0;
-	std::string utteranceText = "";
-	SPL::list<SPL::rstring> utteranceAlternatives;
-	SPL::list<SPL::list<SPL::rstring>> wordAlternatives;
-	SPL::list<SPL::list<SPL::float64>> wordAlternativesConfidences;
-	SPL::list<SPL::float64> wordAlternativesStartTimes;
-	SPL::list<SPL::float64> wordAlternativesEndTimes;
-	SPL::list<SPL::rstring> utteranceWords;
-	SPL::list<SPL::float64> utteranceWordsConfidences;
-	SPL::list<SPL::float64> utteranceWordsEndTimes;
-	SPL::float64 utteranceStartTime = 0.0;
-	SPL::float64 utteranceEndTime = 0.0;
-	SPL::map<SPL::rstring, 
-	SPL::list<SPL::map<SPL::rstring, SPL::float64>>> keywordsSpottingResults;
-	SPL::list<SPL::map<SPL::rstring, SPL::float64>> keywordsSpottingResultsList;
-	SPL::map<SPL::rstring, SPL::float64> keywordsSpottingResultsMap;
+	int32_t utteranceNumber_ = 0;
+	std::string utteranceText_ = "";
+	SPL::list<SPL::rstring> utteranceAlternatives_;
+	SPL::list<SPL::list<SPL::rstring>> wordAlternatives_;
+	SPL::list<SPL::list<SPL::float64>> wordAlternativesConfidences_;
+	SPL::list<SPL::float64> wordAlternativesStartTimes_;
+	SPL::list<SPL::float64> wordAlternativesEndTimes_;
+	SPL::list<SPL::rstring> utteranceWords_;
+	SPL::list<SPL::float64> utteranceWordsConfidences_;
+	SPL::list<SPL::float64> utteranceWordsEndTimes_;
+	SPL::float64 utteranceStartTime_ = 0.0;
+	SPL::float64 utteranceEndTime_ = 0.0;
+	SPL::map<SPL::rstring, SPL::list<SPL::map<SPL::rstring, SPL::float64>>> keywordsSpottingResults_;
+	SPL::list<SPL::map<SPL::rstring, SPL::float64>> keywordsSpottingResultsList_;
+	SPL::map<SPL::rstring, SPL::float64> keywordsSpottingResultsMap_;
 	
-	bool final = false;
-	float confidence = 0.0;
-	std::string sttErrorMsg = "";
-	std::string fullTranscriptionText = "";
-	float cumulativeConfidenceForFullTranscription = 0.0;
+	bool final_ = false;
+	float confidence_ = 0.0;
+	std::string fullTranscriptionText_ = "";
+	float cumulativeConfidenceForFullTranscription_ = 0.0;
 	int32_t idx1 = -1;
 	int32_t idx2 = -1;
 	int32_t idx3 = -1;
@@ -1380,7 +1379,7 @@ void MY_OPERATOR::on_message(MY_OPERATOR::client* c, websocketpp::connection_hdl
 	// on_open method above. There is intricate logic here due to 
 	// the order in which different sections of the response JSON message arrive. 
 	// So read and test this code often in a methodical fashion.  
-	if (transcriptionResultAvailableForParsing == true || sttErrorString != "") {
+	if (transcriptionResultAvailableForParsing_ || sttErrorFound_) {
 		// Send either the partial utterance or completed utterance or 
 		// full text result as an output tuple now.
 		// If there is an STT error, send that as well.
@@ -1390,10 +1389,9 @@ void MY_OPERATOR::on_message(MY_OPERATOR::client* c, websocketpp::connection_hdl
 		// We will also add here a condition not to process the STT errors in
 		// this if segment when such errors occur at the time of establishing 
 		// a Websocket connection to the STT service.
-		if (sttErrorString != "" && wsConnectionEstablished == true && 
-			oTupleList.size() > 0) {
+		if (sttErrorFound_ && wsConnectionEstablished && (oTupleList.size() > 0)) {
 			// Parse the STT error string.
-			ss << sttErrorString;
+			ss << sttErrorString_;
 			// Reset the trascriptionResult member variable.
 			transcriptionResult = "";
 			// Due to this STT error, transcription for the given audio data will not continue.
@@ -1401,8 +1399,8 @@ void MY_OPERATOR::on_message(MY_OPERATOR::client* c, websocketpp::connection_hdl
 			transcriptionErrorOccurred = true;
 
 			// Load the json data in the boost ptree
-			pt::read_json(ss, root);	 
-			sttErrorMsg = root.get<std::string>("error");
+			pt::read_json(ss, root);
+			const std::string sttErrorMsg_ = root.get<std::string>("error");
 			
 			// Set the STT error message attribute via the corresponding output function.
 <% 
@@ -1414,7 +1412,7 @@ void MY_OPERATOR::on_message(MY_OPERATOR::client* c, websocketpp::connection_hdl
 
 				if ($operation eq "getSTTErrorMessage") {
 %> 
-				oTupleList.at(0)->set_<%=$name%>(<%=$operation%>(sttErrorMsg));
+				oTupleList.at(0)->set_<%=$name%>(<%=$operation%>(sttErrorMsg_));
 <%
 				}
 			}
@@ -1422,7 +1420,7 @@ void MY_OPERATOR::on_message(MY_OPERATOR::client* c, websocketpp::connection_hdl
 
 			// This prepared tuple with the assigned STT message will be
 			// sent in the very last if segment in this method below.
-		} else if(transcriptionResultAvailableForParsing == true) {
+		} else if(transcriptionResultAvailableForParsing_) {
 			// Parse the relevant fileds from the JSON transcription result.
 			ss << transcriptionResult;
 			// Reset the trascriptionResult member variable.
@@ -1431,7 +1429,7 @@ void MY_OPERATOR::on_message(MY_OPERATOR::client* c, websocketpp::connection_hdl
 			pt::read_json(ss, root);
 
 			// Successful STT result JSON will be at a minimum in the format as shown below.
-			// {"results": [{"alternatives": [{"transcript": "name "}], "final": false}], "result_index": 0}
+			// {"results": [{"alternatives": [{"transcript": "name "}], "final_": false}], "result_index": 0}
 			// 
 			
 			// If speaker labels is enabled in our current STT session, we have to
@@ -1455,8 +1453,8 @@ void MY_OPERATOR::on_message(MY_OPERATOR::client* c, websocketpp::connection_hdl
 			// other with the first one carrying the full set of speaker_labels and the
 			// second one carrying the label for the very last word with its final field set to true.
 			// In the logic below, we are going to ignore this second speaker_labels message.
-			bool secondSpeakerLabelsMessageReceived = false;
-			bool firstSpeakerLabelTimeMatched = false;
+			bool secondSpeakerLabelsMessageReceived_ = false;
+			bool firstSpeakerLabelTimeMatched_ = false;
 
 			while(identifySpeakers == true) {
 				++idx1;
@@ -1469,7 +1467,7 @@ void MY_OPERATOR::on_message(MY_OPERATOR::client* c, websocketpp::connection_hdl
 				// So let us skip the extra ones until we match with the first entry in the
 				// timestamps list which got populated in the previous finalized 
 				// utterance JSON message that came just before the speaker_labels message.
-				if (firstSpeakerLabelTimeMatched == false) {
+				if (not firstSpeakerLabelTimeMatched_) {
 					// Read the from field.
 					try {
 						fromTime = query(root,
@@ -1495,7 +1493,7 @@ void MY_OPERATOR::on_message(MY_OPERATOR::client* c, websocketpp::connection_hdl
 						// We already have populated the speaker id list during the first 
 						// speaker_labels message that came just before this one.
 						// This is clearly the second speaker_lables message.
-						secondSpeakerLabelsMessageReceived = true;
+						secondSpeakerLabelsMessageReceived_ = true;
 						
 						if (sttJsonResponseDebugging == true) {
 							std::cout << traceIntro << "-->X6 Received the second speaker_labels message." << std::endl;
@@ -1510,7 +1508,7 @@ void MY_OPERATOR::on_message(MY_OPERATOR::client* c, websocketpp::connection_hdl
 					// move to the next one until we find a match with the startTime of
 					// the first word belonging to the most recent finalized utterance.
 					if (fromTime == utteranceWordsStartTimes.at(0)) {
-						firstSpeakerLabelTimeMatched = true;
+						firstSpeakerLabelTimeMatched_ = true;
 						
 						if (sttJsonResponseDebugging == true) {
 							std::cout << traceIntro << "-->X7 Speaker labels 'from' time matched at idx1=" << idx1 << std::endl;
@@ -1523,7 +1521,7 @@ void MY_OPERATOR::on_message(MY_OPERATOR::client* c, websocketpp::connection_hdl
 						// Skip this one and continue the loop.
 						continue;
 					}
-				} // End of if (firstSpeakerLabelTimeMatched == false)
+				} // End of if (firstSpeakerLabelTimeMatched_ == false)
 				
 				// Read the speaker field.
 				try {
@@ -1568,9 +1566,9 @@ void MY_OPERATOR::on_message(MY_OPERATOR::client* c, websocketpp::connection_hdl
 			// setting the output tuple attribute (transcriptionCompleted) to true.
 			// If we just now received the second speaker_labels message in a row,
 			// that is redundant and we will not send the output tuple at that time.
-			if (sttResultTupleWaitingToBeSent == true &&
-				fullTranscriptionCompleted == false &&
-				secondSpeakerLabelsMessageReceived == false) {
+			if (sttResultTupleWaitingToBeSent &&
+				not fullTranscriptionCompleted_ &&
+				not secondSpeakerLabelsMessageReceived_) {
 				sttResultTupleWaitingToBeSent = false;
 				// Send this tuple now.
 				// Dereference the oTuple object from the object pointer and send it.
@@ -1591,7 +1589,7 @@ void MY_OPERATOR::on_message(MY_OPERATOR::client* c, websocketpp::connection_hdl
  			
 			try {
 				// Read the result_index field.
-				utteranceNumber = root.get<int32_t>("result_index");
+				utteranceNumber_ = root.get<int32_t>("result_index");
 			} catch (std::exception const& e) {
 				if (sttJsonResponseDebugging == true) {
 					std::cout << traceIntro << "-->X12 ERROR JSON parsing error when reading the result_index field : " << e.what() << std::endl;
@@ -1609,7 +1607,7 @@ void MY_OPERATOR::on_message(MY_OPERATOR::client* c, websocketpp::connection_hdl
 			// If there are multiple elements in the "results" JSON array, iterate through all of them.
 			// If we encountered the speaker_labels message two in a row, ignore the
 			// second one and skip this entire loop.
-			while(secondSpeakerLabelsMessageReceived == false) {
+			while(not secondSpeakerLabelsMessageReceived_) {
 				++idx1;;
 				bool tempFinal = false;
 				bool exitThisLoop = false;
@@ -1636,13 +1634,13 @@ void MY_OPERATOR::on_message(MY_OPERATOR::client* c, websocketpp::connection_hdl
 					exitThisLoop = true;
 				}
 
-				if ((idx1 == 0 && utteranceWordsSpeakers.size() > 0)) {
+				if (idx1 == 0 && utteranceWordsSpeakers.size() > 0) {
 					// We just now got a standalone speaker_labels message right after
 					// processing a finalized utterance (for stt result mode 1 and 2).
 					// We must set the final local variable to true now to meet the
 					// if conditional logic in the next code segment in order to
 					// prepare the output tuple to be sent out.
-					final = true;
+					final_ = true;
 
 					if (sttJsonResponseDebugging == true) {
 						std::cout << traceIntro << "-->X15 Forcing final = true after receiving the speaker_labels message." << std::endl;
@@ -1665,26 +1663,26 @@ void MY_OPERATOR::on_message(MY_OPERATOR::client* c, websocketpp::connection_hdl
 				//
 				// SPECIAL NOTE: We have to prepare an output tuple right after receiving
 				// the speaker_labels message right after a finalized utterance with idx1 = 0.
-				if ((idx1 == 0 && final == true) ||
+				if ((idx1 == 0 && final_ == true) ||
 					((idx1 > 0) && (sttResultMode == 1 ||
-					(sttResultMode == 2 && final == true) ||
+					(sttResultMode == 2 && final_ == true) ||
 					(sttResultMode == 3 && exitThisLoop == true)))) {
 					// If the sttResultMode is 3, we must return only the full transcription text.
 					// Hence, reset the utterance related details.
 					if (sttResultMode == 3) {
 						// Compute the average confidence for the full transcription text.
-						confidence = 
-							cumulativeConfidenceForFullTranscription / (idx1);
+						confidence_ = 
+							cumulativeConfidenceForFullTranscription_ / (idx1);
 						
-						utteranceNumber = -1;
-						utteranceText = "";
-						final = false;
+						utteranceNumber_ = -1;
+						utteranceText_ = "";
+						final_ = false;
 					}
 					
 					// Assign the output attributes via the output functions as configured in the SPL code.
 					//
 					// 1) When the logic enters here right after receiving a speaker_labels message i.e.
-					// when idx1 == 0 && final == true, we must update ONLY the 
+					// when idx1 == 0 && final_l == true, we must update ONLY the 
 					// speaker id related attributes. This will ensure that we will not
 					// overwrite the values of the non-speaker id related attributes whose values
 					// were properly set before the speaker_labels message arrived.
@@ -1703,45 +1701,45 @@ void MY_OPERATOR::on_message(MY_OPERATOR::client* c, websocketpp::connection_hdl
 							if ($operation eq "getUtteranceNumber") {
 %>
 								// Utterance number starts from 0. Hence, add 1 to it.
-								oTupleList.at(0)->set_<%=$name%>(<%=$operation%>(utteranceNumber + 1));
+								oTupleList.at(0)->set_<%=$name%>(<%=$operation%>(utteranceNumber_ + 1));
 <%							} elsif ($operation eq "getUtteranceText") { %>
-								oTupleList.at(0)->set_<%=$name%>(<%=$operation%>(utteranceText));
+								oTupleList.at(0)->set_<%=$name%>(<%=$operation%>(utteranceText_));
 <%							} elsif ($operation eq "isFinalizedUtterance") { %>
-								oTupleList.at(0)->set_<%=$name%>(<%=$operation%>(final));
+								oTupleList.at(0)->set_<%=$name%>(<%=$operation%>(final_));
 <%							} elsif ($operation eq "getConfidence") { %>
-								oTupleList.at(0)->set_<%=$name%>(<%=$operation%>(confidence));
+								oTupleList.at(0)->set_<%=$name%>(<%=$operation%>(confidence_));
 <%							} elsif ($operation eq "getFullTranscriptionText") { %>
-								oTupleList.at(0)->set_<%=$name%>(<%=$operation%>(fullTranscriptionText));
+								oTupleList.at(0)->set_<%=$name%>(<%=$operation%>(fullTranscriptionText_));
 <%							} elsif ($operation eq "isTranscriptionCompleted") { %>
 								oTupleList.at(0)->set_<%=$name%>(<%=$operation%>(false));
 <%							} elsif ($operation eq "getUtteranceAlternatives") { %>
-								oTupleList.at(0)->set_<%=$name%>(<%=$operation%>(utteranceAlternatives));
+								oTupleList.at(0)->set_<%=$name%>(<%=$operation%>(utteranceAlternatives_));
 <%							} elsif ($operation eq "getWordAlternatives") { %>
-								oTupleList.at(0)->set_<%=$name%>(<%=$operation%>(wordAlternatives));
+								oTupleList.at(0)->set_<%=$name%>(<%=$operation%>(wordAlternatives_));
 <%							} elsif ($operation eq "getWordAlternativesConfidences") { %>
-								oTupleList.at(0)->set_<%=$name%>(<%=$operation%>(wordAlternativesConfidences));
+								oTupleList.at(0)->set_<%=$name%>(<%=$operation%>(wordAlternativesConfidences_));
 <%							} elsif ($operation eq "getWordAlternativesStartTimes") { %>
-								oTupleList.at(0)->set_<%=$name%>(<%=$operation%>(wordAlternativesStartTimes));
+								oTupleList.at(0)->set_<%=$name%>(<%=$operation%>(wordAlternativesStartTimes_));
 <%							} elsif ($operation eq "getWordAlternativesEndTimes") { %>
-								oTupleList.at(0)->set_<%=$name%>(<%=$operation%>(wordAlternativesEndTimes));
+								oTupleList.at(0)->set_<%=$name%>(<%=$operation%>(wordAlternativesEndTimes_));
 <%							} elsif ($operation eq "getUtteranceWords") { %>
-								oTupleList.at(0)->set_<%=$name%>(<%=$operation%>(utteranceWords));
+								oTupleList.at(0)->set_<%=$name%>(<%=$operation%>(utteranceWords_));
 <%							} elsif ($operation eq "getUtteranceWordsConfidences") { %>
-								oTupleList.at(0)->set_<%=$name%>(<%=$operation%>(utteranceWordsConfidences));
+								oTupleList.at(0)->set_<%=$name%>(<%=$operation%>(utteranceWordsConfidences_));
 <%							} elsif ($operation eq "getUtteranceWordsStartTimes") { %>
 								oTupleList.at(0)->set_<%=$name%>(<%=$operation%>(utteranceWordsStartTimes));
 <%							} elsif ($operation eq "getUtteranceWordsEndTimes") { %>
-								oTupleList.at(0)->set_<%=$name%>(<%=$operation%>(utteranceWordsEndTimes));
+								oTupleList.at(0)->set_<%=$name%>(<%=$operation%>(utteranceWordsEndTimes_));
 <%							} elsif ($operation eq "getUtteranceStartTime") { %>
-								oTupleList.at(0)->set_<%=$name%>(<%=$operation%>(utteranceStartTime));
+								oTupleList.at(0)->set_<%=$name%>(<%=$operation%>(utteranceStartTime_));
 <%							} elsif ($operation eq "getUtteranceEndTime") { %>
-								oTupleList.at(0)->set_<%=$name%>(<%=$operation%>(utteranceEndTime));
+								oTupleList.at(0)->set_<%=$name%>(<%=$operation%>(utteranceEndTime_));
 <%							} elsif ($operation eq "getUtteranceWordsSpeakers") { %>
 								oTupleList.at(0)->set_<%=$name%>(<%=$operation%>());
 <%							} elsif ($operation eq "getUtteranceWordsSpeakersConfidences") { %>
 								oTupleList.at(0)->set_<%=$name%>(<%=$operation%>());
 <%							} elsif ($operation eq "getKeywordsSpottingResults") { %>
-								oTupleList.at(0)->set_<%=$name%>(<%=$operation%>(keywordsSpottingResults));
+								oTupleList.at(0)->set_<%=$name%>(<%=$operation%>(keywordsSpottingResults_));
 <%
 							}
 						}
@@ -1780,13 +1778,13 @@ void MY_OPERATOR::on_message(MY_OPERATOR::client* c, websocketpp::connection_hdl
 					// 1) identifySpeakers == false will permit all the three STT result modes to
 					//    set the tupleWaiting flag to true.
 					//    speaker id feature is disabled.
-					// 2) final == false will take care of the non-finalized partial utterance when
+					// 2) final_ == false will take care of the non-finalized partial utterance when
 					//    stt result mode is 1. It will set the tupleWaiting flag to true in that case.
 					// 3) The other combined condition will take care of the finalized utterance when 
 					//    result mode is 1 or 2 with speaker id feature enabled.
-					if (identifySpeakers == false || final == false || 
+					if (identifySpeakers == false || final_ == false || 
 						(identifySpeakers == true && 
-						final == true && idx1 == 0)) { 
+						final_ == true && idx1 == 0)) { 
 						sttResultTupleWaitingToBeSent = true;
 						
 						if (sttJsonResponseDebugging == true) {
@@ -1795,7 +1793,7 @@ void MY_OPERATOR::on_message(MY_OPERATOR::client* c, websocketpp::connection_hdl
 					}
 				}
 
-				if (exitThisLoop == true) {
+				if (exitThisLoop) {
 					if (sttJsonResponseDebugging == true) {
 						std::cout << traceIntro << "-->X17 ERROR Exiting the main loop after reaching array index " << idx1 << "." << std::endl;
 					}
@@ -1804,9 +1802,9 @@ void MY_OPERATOR::on_message(MY_OPERATOR::client* c, websocketpp::connection_hdl
 				}
 
 				std::string tempUtteranceText = "";
-				utteranceText = "";
-				final = tempFinal;
-				confidence = 0.0;
+				utteranceText_ = "";
+				final_ = tempFinal;
+				confidence_ = 0.0;
 				SPL::int32 idx2 = -1;
 				bool confidenceFound = false;
 
@@ -1834,7 +1832,7 @@ void MY_OPERATOR::on_message(MY_OPERATOR::client* c, websocketpp::connection_hdl
 								boost::to_string(idx3) + "].[0]" ).get_value<std::string>();
 							
 							// Append this to the list.
-							utteranceWords.push_back(utteranceWord);
+							utteranceWords_.push_back(utteranceWord);
 							utteranceWordsPopulated = true;
 							
 							if (sttJsonResponseDebugging == true) {
@@ -1857,7 +1855,7 @@ void MY_OPERATOR::on_message(MY_OPERATOR::client* c, websocketpp::connection_hdl
 								boost::to_string(idx3) + "].[1]" ).get_value<float>();
 							
 							// Append this to the list.
-							utteranceWordsConfidences.push_back(utteranceWordConfidence);
+							utteranceWordsConfidences_.push_back(utteranceWordConfidence);
 							
 							if (sttJsonResponseDebugging == true) {
 								std::cout << traceIntro << "-->X20 utteranceWordConfidence=" << utteranceWordConfidence << std::endl;
@@ -1874,8 +1872,8 @@ void MY_OPERATOR::on_message(MY_OPERATOR::client* c, websocketpp::connection_hdl
 					} // End of while for parsing "results.alternatives.word_confidence" JSON array.
 
 					if (sttJsonResponseDebugging == true) {
-						std::cout << traceIntro << "-->X22 utteranceWords=" << boost::to_string(utteranceWords) << std::endl;
-						std::cout << traceIntro << "-->X23 utteranceWordsConfidences=" << boost::to_string(utteranceWordsConfidences) << std::endl;
+						std::cout << traceIntro << "-->X22 utteranceWords=" << boost::to_string(utteranceWords_) << std::endl;
+						std::cout << traceIntro << "-->X23 utteranceWordsConfidences=" << boost::to_string(utteranceWordsConfidences_) << std::endl;
 					}
 
 					
@@ -1891,7 +1889,7 @@ void MY_OPERATOR::on_message(MY_OPERATOR::client* c, websocketpp::connection_hdl
 						// Read the results.alternatives.timestamps[0] field i.e. word.
 						// Minor optimization: Do this only if the individual words were not already 
 						// populated in the previous while loop for the word_confidence array.
-						if (utteranceWordsPopulated == false) {
+						if (not utteranceWordsPopulated) {
 							try {
 								std::string utteranceWord = query(root,
 									"results.[" + boost::to_string(idx1) + "].alternatives.[" +
@@ -1899,7 +1897,7 @@ void MY_OPERATOR::on_message(MY_OPERATOR::client* c, websocketpp::connection_hdl
 									boost::to_string(idx3) + "].[0]" ).get_value<std::string>();
 								
 								// Append this to the list.
-								utteranceWords.push_back(utteranceWord);
+								utteranceWords_.push_back(utteranceWord);
 
 								if (sttJsonResponseDebugging == true) {
 									std::cout << traceIntro << "-->X24 utteranceWord=" << utteranceWord << std::endl;
@@ -1944,7 +1942,7 @@ void MY_OPERATOR::on_message(MY_OPERATOR::client* c, websocketpp::connection_hdl
 								boost::to_string(idx3) + "].[2]" ).get_value<float>();
 							
 							// Append this to the list.
-							utteranceWordsEndTimes.push_back(utteranceWordEndTime);
+							utteranceWordsEndTimes_.push_back(utteranceWordEndTime);
 
 							if (sttJsonResponseDebugging == true) {
 								std::cout << traceIntro << "-->X28 utteranceWordEndTime=" << utteranceWordEndTime << std::endl;
@@ -1961,38 +1959,38 @@ void MY_OPERATOR::on_message(MY_OPERATOR::client* c, websocketpp::connection_hdl
 					
 					// Record the utterance start and end times now.
 					if (utteranceWordsStartTimes.size() > 0) {
-						utteranceStartTime = utteranceWordsStartTimes.at(0);
+						utteranceStartTime_ = utteranceWordsStartTimes.at(0);
 					}
 					
-					if (utteranceWordsEndTimes.size() > 0) {
-						utteranceEndTime = utteranceWordsEndTimes.at(utteranceWordsEndTimes.size()-1);
+					if (utteranceWordsEndTimes_.size() > 0) {
+						utteranceEndTime_ = utteranceWordsEndTimes_.at(utteranceWordsEndTimes_.size()-1);
 					}
 					
 					if (sttJsonResponseDebugging == true) {
 						std::cout << traceIntro << "-->X30 utteranceWords=" <<
-							boost::to_string(utteranceWords) << std::endl;
+							boost::to_string(utteranceWords_) << std::endl;
 						std::cout << traceIntro << "-->X31 utteranceWordsStartTimes=" <<
 							boost::to_string(utteranceWordsStartTimes) << std::endl;
 						std::cout << traceIntro << "-->X32 utteranceWordsEndTimes=" <<
-							boost::to_string(utteranceWordsEndTimes) << std::endl;
+							boost::to_string(utteranceWordsEndTimes_) << std::endl;
 						std::cout << traceIntro << "-->X33 utteranceStartTime=" <<
-							boost::to_string(utteranceStartTime) << std::endl;
+							boost::to_string(utteranceStartTime_) << std::endl;
 						std::cout << traceIntro << "-->X34 utteranceEndTime=" <<
-							boost::to_string(utteranceEndTime) << std::endl;
+							boost::to_string(utteranceEndTime_) << std::endl;
 					}
 					
 					// Read the utterance confidence value which will be
 					// available only for the finalized utterance.
-					if (final == true) {
+					if (final_) {
 						try {
-							confidence = query(root,
+							confidence_ = query(root,
 								"results.[" + boost::to_string(idx1) + "].alternatives.[" +
 								boost::to_string(idx2) + "].confidence").get_value<float>();
-							cumulativeConfidenceForFullTranscription += confidence;
+							cumulativeConfidenceForFullTranscription_ += confidence_;
 							confidenceFound = true;
 							
 							if (sttJsonResponseDebugging == true) {
-								std::cout << traceIntro << "-->X35 confidence=" << confidence << std::endl;
+								std::cout << traceIntro << "-->X35 confidence=" << confidence_ << std::endl;
 							}
 						} catch (std::exception const& e) {
 							if (sttJsonResponseDebugging == true) {
@@ -2014,32 +2012,30 @@ void MY_OPERATOR::on_message(MY_OPERATOR::client* c, websocketpp::connection_hdl
 						
 						// If the STT result mode is full text, then keep accumulating it.
 						// Do it only if it is a finalized utterance. 
-						if (sttResultMode == 3 && 
-							final == true && confidenceFound == true) {
-							fullTranscriptionText += tempUtteranceText;
+						if (sttResultMode == 3 && final_ && confidenceFound) {
+							fullTranscriptionText_ += tempUtteranceText;
 							// Since it is a final utterance, add a period.
-							fullTranscriptionText += ". ";
+							fullTranscriptionText_ += ". ";
 						}
 						
 						// In the alternatives JSON array, only one element will have the
 						// best result combined with confidence. We will store that as the
 						// finalized utterance in the n-best alternative hypothesis scenario.
-						if (sttResultMode == 2 && 
-							confidenceFound == true) {
-							utteranceText = tempUtteranceText;
+						if (sttResultMode == 2 && confidenceFound) {
+							utteranceText_ = tempUtteranceText;
 						}
 						
 						// In the case of partial utterance, we have to consider every
 						// utterance that is being sent irrespective of final or not.
 						if (sttResultMode == 1) {
-							utteranceText = tempUtteranceText;
+							utteranceText_ = tempUtteranceText;
 						}
 						
 						// If the STT result mode is 1 (partial utterance) or 2 (full utterance),
 						// we must collect the n-best utterance alternatives.
 						// For result mode 3 (full transcript), we don't support it.
-						if (sttResultMode != 3 && final == true) {
-							utteranceAlternatives.push_back(tempUtteranceText);
+						if (sttResultMode != 3 && final_) {
+							utteranceAlternatives_.push_back(tempUtteranceText);
 						}
 						
 						confidenceFound = false;
@@ -2050,13 +2046,13 @@ void MY_OPERATOR::on_message(MY_OPERATOR::client* c, websocketpp::connection_hdl
 						}
 						
 						// A special case for STT resule mode 1 (partial utterance) where
-						// we must set the utteranceText to the very first alternative
+						// we must set the utteranceText_ to the very first alternative
 						// in the list before we break from this inner loop. Because, that is the
 						// correct finalized utterance with the actual confidence field 
 						// set to a valid value.	
 						if (sttResultMode == 1 &&
-							final == true && utteranceAlternatives.size() > 0) {
-							utteranceText = utteranceAlternatives.at(0);
+							final_ == true && utteranceAlternatives_.size() > 0) {
+							utteranceText_ = utteranceAlternatives_.at(0);
 						}
 						
 						// This means we have iterated through all the alternatives JSON array elements.
@@ -2068,7 +2064,7 @@ void MY_OPERATOR::on_message(MY_OPERATOR::client* c, websocketpp::connection_hdl
 				if (sttJsonResponseDebugging == true) {
 					if (sttResultMode != 3) {
 						std::cout << traceIntro <<
-							"-->X39 Utterance Alternatives=" << boost::to_string(utteranceAlternatives) << std::endl;
+							"-->X39 Utterance Alternatives=" << boost::to_string(utteranceAlternatives_) << std::endl;
 					}
 				}
 				
@@ -2182,23 +2178,23 @@ void MY_OPERATOR::on_message(MY_OPERATOR::client* c, websocketpp::connection_hdl
 					
 					// If we have found at least one word alternative, 
 					// let us store it in the corresponding lists. 
-					if (wordAlternativeFound == true) {
-						wordAlternatives.push_back(words);
-						wordAlternativesConfidences.push_back(confidences);
-						wordAlternativesStartTimes.push_back(startTime);
-						wordAlternativesEndTimes.push_back(endTime);
+					if (wordAlternativeFound) {
+						wordAlternatives_.push_back(words);
+						wordAlternativesConfidences_.push_back(confidences);
+						wordAlternativesStartTimes_.push_back(startTime);
+						wordAlternativesEndTimes_.push_back(endTime);
 					}
 				} // End of outer while for reading the results.word_alternatives array.
 				
 				if (sttJsonResponseDebugging == true) {
 					std::cout << traceIntro <<
-						"-->X48 wordAlternatives=" << boost::to_string(wordAlternatives) << std::endl;
+						"-->X48 wordAlternatives=" << boost::to_string(wordAlternatives_) << std::endl;
 					std::cout << traceIntro <<
-						"-->X49 wordAlternativesConfidences=" << boost::to_string(wordAlternativesConfidences) << std::endl;
+						"-->X49 wordAlternativesConfidences=" << boost::to_string(wordAlternativesConfidences_) << std::endl;
 					std::cout << traceIntro <<
-						"-->X50 wordAlternativesStartTimes=" << boost::to_string(wordAlternativesStartTimes) << std::endl;
+						"-->X50 wordAlternativesStartTimes=" << boost::to_string(wordAlternativesStartTimes_) << std::endl;
 					std::cout << traceIntro <<
-						"-->X51 wordAlternativesEndTimes=" << boost::to_string(wordAlternativesEndTimes) << std::endl;
+						"-->X51 wordAlternativesEndTimes=" << boost::to_string(wordAlternativesEndTimes_) << std::endl;
 				}
 				
 				// Let us now iterate through the "keywords_result" associative array (Keyword Spotting).
@@ -2214,7 +2210,7 @@ void MY_OPERATOR::on_message(MY_OPERATOR::client* c, websocketpp::connection_hdl
 					if (++idx2 >= sizeOfkeywordsToBeSpottedList) {
 						if (sttJsonResponseDebugging == true) {
 							std::cout << traceIntro << "-->X60 keywordsSpottingResults=" <<
-								boost::to_string(keywordsSpottingResults) << std::endl;
+								boost::to_string(keywordsSpottingResults_) << std::endl;
 						}
 						
 						break;
@@ -2298,31 +2294,31 @@ void MY_OPERATOR::on_message(MY_OPERATOR::client* c, websocketpp::connection_hdl
 						}
 
 						// We got all the three values. Store them in a map.
-						keywordsSpottingResultsMap["start_time"] = matchStartTime;
-						keywordsSpottingResultsMap["end_time"] = matchEndTime;
-						keywordsSpottingResultsMap["confidence"] = matchConfidence;
+						keywordsSpottingResultsMap_["start_time"] = matchStartTime;
+						keywordsSpottingResultsMap_["end_time"] = matchEndTime;
+						keywordsSpottingResultsMap_["confidence"] = matchConfidence;
 						// Add this map to the list.
-						keywordsSpottingResultsList.push_back(keywordsSpottingResultsMap);
+						keywordsSpottingResultsList_.push_back(keywordsSpottingResultsMap_);
 						// Since we added it to the list, clear the map now.
-						keywordsSpottingResultsMap.clear();	
+						keywordsSpottingResultsMap_.clear();	
 						keywordMatchFound = true;
 					} // End of while(true)
 
-					if (keywordMatchFound == true) {
+					if (keywordMatchFound) {
 						// If we have found a result for a given keyword, add the
 						// list containing the results for that keyword into the final results map.
-						keywordsSpottingResults[keyword] = keywordsSpottingResultsList;
+						keywordsSpottingResults_[keyword] = keywordsSpottingResultsList_;
 						// Since we added the results list to the final results map, 
 						// we can now delete the list.
-						keywordsSpottingResultsList.clear();
+						keywordsSpottingResultsList_.clear();
 					}
 				} // End of while(keywordsSpottingThreshold > 0.0)
 			} // End of while looping through the "results" array elements.
-		} // End of the else segment in if (sttErrorString != "")
-	} // End of if (transcriptionResultAvailableForParsing == true || sttErrorString != "")
+		} // End of the else segment in if (sttErrorString_ != "")
+	} // End of if (transcriptionResultAvailableForParsing_ == true || sttErrorString_ != "")
 	
-	if (fullTranscriptionCompleted == true || sttErrorString != "") {
-		if (sttResultTupleWaitingToBeSent == true) {
+	if (fullTranscriptionCompleted_ || sttErrorFound_) {
+		if (sttResultTupleWaitingToBeSent) {
 			// Send the final tuple with transcriptionCompleted field set to true.
 			// Set the STT error message attribute via the corresponding output function.
 <% 
@@ -2353,7 +2349,7 @@ void MY_OPERATOR::on_message(MY_OPERATOR::client* c, websocketpp::connection_hdl
 		// in the on_open method. That means our STT connection has not yet been 
 		// established. In that case, we should perform the entire logic in this 
 		// if segment only if our Websocket connection is currently established.
-		if (wsConnectionEstablished == true && oTupleList.size() > 0) {
+		if (wsConnectionEstablished && oTupleList.size() > 0) {
 			// Send either the very last tuple with transcriptionCompleted set to true or
 			// with the STT error message set.
 			// Dereference the oTuple object from the object pointer and send it.
@@ -2361,14 +2357,14 @@ void MY_OPERATOR::on_message(MY_OPERATOR::client* c, websocketpp::connection_hdl
 
 			numberOfFullAudioConversationsTranscribed++;
 			// Update the operator metric only if the user asked for a live update.
-			if (sttLiveMetricsUpdateNeeded == true) {
+			if (sttLiveMetricsUpdateNeeded) {
 				nFullAudioConversationsTranscribedMetric->setValueNoLock(numberOfFullAudioConversationsTranscribed);
 			}
 			
 			if (sttJsonResponseDebugging == true) {
 				std::string tempString = "transcription completion.";
 				
-				if (sttErrorString != "") {
+				if (sttErrorFound_) {
 					tempString = "STT error.";
 				}
 				
@@ -2395,7 +2391,7 @@ void MY_OPERATOR::on_message(MY_OPERATOR::client* c, websocketpp::connection_hdl
 			// us to clean up the remaining audio blob fragments from that audio converstion that are
 			// still waiting in the vector to be sent to the STT service.
 <%			if ( $audioInputAsBlob == 1 ) {%>
-			if (sttErrorString != "" &&
+			if (sttErrorFound_ &&
 				statusOfAudioDataTransmissionToSTT == AUDIO_BLOB_FRAGMENTS_BEING_SENT_TO_STT) {
 				// We got an STT error in the middle of a transcription of the
 				// partial audio blob fragments. If all the blob fragments
@@ -2422,25 +2418,25 @@ void MY_OPERATOR::on_message(MY_OPERATOR::client* c, websocketpp::connection_hdl
 				if(audioBytes.size() <= 0) {
 					numberOfAudioBlobFragmentsReceivedInCurrentConversation = 0;
 				}
-			} // End of if (sttErrorString != "" &&
+			} // End of if (sttErrorFound_ &&
 <%			} %>
-		} // End of if (oTupleList.size() > 0)
+		} // End of if (wsConnectionEstablished && oTupleList.size() > 0)
 		
-		if (wsConnectionEstablished == false && sttErrorString != "") {
+		if (not wsConnectionEstablished && sttErrorFound_) {
 			websocketConnectionErrorOccurred = true;
 			// Always display this STT error message happening during the
 			// Websocket connection establishment phase.
 			std::cout << traceIntro <<
-				"-->Error received from the Watson Speech To Text service: " << sttErrorString << std::endl;
+				"-->Error received from the Watson Speech To Text service: " << sttErrorString_ << std::endl;
 			SPLAPPTRC(L_ERROR, traceIntro <<
-					"-->Error received from the Watson Speech To Text service: " << sttErrorString,
+					"-->Error received from the Watson Speech To Text service: " << sttErrorString_,
 					"STT_Result_Processing");
 		}
 		
 		// Reset this flag to indicate that STT service has no full audio data at this time.
 		// i.e. no active transcription in progress now.
 		statusOfAudioDataTransmissionToSTT = NO_AUDIO_DATA_SENT_TO_STT;
-	} // End of if (fullTranscriptionCompleted == true || sttErrorString != "")
+	} // End of if (fullTranscriptionCompleted_ || sttErrorFound_)
 } // End of the on_message method.
 
 // Whenever our existing Websocket connection to the Watson STT service is closed,
@@ -2452,7 +2448,7 @@ void MY_OPERATOR::on_close(MY_OPERATOR::client* c, websocketpp::connection_hdl h
 	// that this is not a normal connection closure. Instead, the connection attempt has failed.
 	// We must flag this as a connection error so that a connection retry attempt 
 	// can be triggered inside the ws_audio_blob_sender method.
-	if (wsConnectionEstablished == false) {
+	if (not wsConnectionEstablished) {
 		// This connection was not fully established before.
 		// This closure happened during an ongoing connection attempt.
 		// Let us flag this as a connection error.
