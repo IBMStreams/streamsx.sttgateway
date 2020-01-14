@@ -30,10 +30,13 @@
 
 	<property name="toolkit.dir"        value="com.ibm.streamsx.sttgateway"/>
 	<property name="impl.dir"           location="${toolkit.dir}/impl" />
-	<property name="lib.dir"            location="${toolkit.dir}/impl/lib" />
-	<property name="inc.dir"            location="${toolkit.dir}/impl/include"/>
+	<!-- Directories for external libs -->
+	<property name="prefix.dir"         location="${toolkit.dir}"/>
+	<property name="lib.dir"            location="${toolkit.dir}/lib" />
+	<property name="inc.dir"            location="${toolkit.dir}/include"/>
 	<property name="ext.dir"            location="ext"/>
-	<property name="out.dir"            location="${toolkit.dir}/output"/>  <!-- streams studio bin dir / used only on clean target -->
+	<!-- streams studio bin dir / used only on clean target -->
+	<property name="out.dir"            location="${toolkit.dir}/output"/>
 
 	<property name="doc.string"         value="doc"/>
 	<property name="doc.dir"            value="${doc.string}/spldoc"/>
@@ -131,7 +134,7 @@
 			<arg value="boost-${boost.version}.tar.gz"/>
 		</exec>
 		<exec executable="./bootstrap.sh" dir="${ext.dir}/boost-install-files/boost_${boost.version.name}" failonerror="true">
-			<arg value="--prefix=${impl.dir}"/>
+			<arg value="--prefix=${prefix.dir}"/>
 		</exec>
 	</target>
 
@@ -153,7 +156,7 @@
 		</exec>
 		<exec executable="./b2" dir="${ext.dir}/boost-install-files/boost_${boost.version.name}" failonerror="true">
 			<arg value="install"/>
-			<arg value="--prefix=${impl.dir}"/>
+			<arg value="--prefix=${prefix.dir}"/>
 			<arg value="--with-chrono"/>
 			<arg value="--with-random"/>
 			<arg value="--with-system"/>
@@ -164,8 +167,7 @@
 	<target name="requirements-clean"
 		description="Remove the required libraries from toolkit directory">
 		<delete dir="${lib.dir}"/>
-		<delete dir="${inc.dir}/${boost.str}"/>
-		<delete dir="${inc.dir}/${websocket.str}"/>
+		<delete dir="${inc.dir}"/>
 	</target>
 
 	<target name="spldoc" depends="toolkit"

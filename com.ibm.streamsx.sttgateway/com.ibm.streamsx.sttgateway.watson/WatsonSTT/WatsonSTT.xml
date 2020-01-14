@@ -175,18 +175,18 @@
       <libraryDependencies>
       
         <library>
-          <cmn:description>Websocketpp library</cmn:description>
+          <cmn:description>Implementation library</cmn:description>
           <cmn:managedLibrary>
             <cmn:includePath>../../impl/include</cmn:includePath>
           </cmn:managedLibrary>
         </library>
         
         <library>
-          <cmn:description>Boost Library common and system</cmn:description>
+          <cmn:description>Boost Library common/Websocket include and Boost system</cmn:description>
           <cmn:managedLibrary>
             <cmn:lib>boost_system</cmn:lib>
-            <cmn:libPath>../../impl/lib</cmn:libPath>
-            <cmn:includePath>../../impl/include</cmn:includePath>
+            <cmn:libPath>../../lib</cmn:libPath>
+            <cmn:includePath>../../include</cmn:includePath>
           </cmn:managedLibrary>
         </library>
          
@@ -194,7 +194,7 @@
           <cmn:description>Boost Library chrono</cmn:description>
           <cmn:managedLibrary>
             <cmn:lib>boost_chrono</cmn:lib>
-            <cmn:libPath>../../impl/lib</cmn:libPath>
+            <cmn:libPath>../../lib</cmn:libPath>
           </cmn:managedLibrary>
         </library>
                 
@@ -202,7 +202,7 @@
           <cmn:description>Boost Library random</cmn:description>
           <cmn:managedLibrary>
             <cmn:lib>boost_random</cmn:lib>
-            <cmn:libPath>../../impl/lib</cmn:libPath>
+            <cmn:libPath>../../lib</cmn:libPath>
           </cmn:managedLibrary>
         </library>
 
