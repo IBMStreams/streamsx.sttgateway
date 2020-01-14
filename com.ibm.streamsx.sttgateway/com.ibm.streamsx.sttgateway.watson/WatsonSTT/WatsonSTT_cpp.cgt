@@ -266,7 +266,8 @@ MY_OPERATOR::MY_OPERATOR()
 		nWebsocketConnectionAttemptsMetric{ & getContext().getMetrics().getCustomMetricByName("nWebsocketConnectionAttempts")},
 		nFullAudioConversationsReceivedMetric{ & getContext().getMetrics().getCustomMetricByName("nFullAudioConversationsReceived")},
 		nFullAudioConversationsTranscribedMetric{ & getContext().getMetrics().getCustomMetricByName("nFullAudioConversationsTranscribed")},
-		nSTTResultModeMetric{ & getContext().getMetrics().getCustomMetricByName("nSTTResultMode")}
+		nSTTResultModeMetric{ & getContext().getMetrics().getCustomMetricByName("nSTTResultMode")},
+		impl{*this}
 {
 	
 	if (customizationId == "") {

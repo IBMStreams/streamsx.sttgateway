@@ -13,6 +13,8 @@ Last modified on: Jun/11/2019
 */
 
 /* Additional includes go here */
+#include <WatsonSTTImpl.hpp>
+
 #include <websocketpp/config/asio_client.hpp>
 #include <websocketpp/client.hpp>
 #include <iostream>
@@ -207,6 +209,8 @@ private:
 	SPL::map<SPL::rstring, SPL::list<SPL::map<SPL::rstring, SPL::float64>>> 
 		getKeywordsSpottingResults(SPL::map<SPL::rstring, 
 		SPL::list<SPL::map<SPL::rstring, SPL::float64>>> const & keywordsSpottingResults);
+	
+	com::ibm::streams::sttgateway::WatsonSTTImpl<MY_OPERATOR> impl; //Implementation
 }; 
 
 <%SPL::CodeGen::headerEpilogue($model);%>
