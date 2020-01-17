@@ -17,32 +17,10 @@ how it can be used in the Streams applications.
 
 High-level business need for this operator is explained here:
 https://github.com/IBMStreams/administration/issues/136
+
+https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-websockets#advantages
 ============================================================
 */
-
-/* Additional includes go here */
-// https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-websockets#advantages
-// https://docs.websocketpp.org/index.html
-// This operator heavily relies on the Websocket++ header only library.
-// This C++11 library code does the asynchronous full duplex Websocket communication with
-// the Watson STT service via a series of event handlers (a.k.a callback methods).
-// Bulk of the logic in this operator class appears in those event handler methods below.
-#include <websocketpp/config/asio_client.hpp>
-#include <websocketpp/client.hpp>
-
-#include <boost/exception/to_string.hpp>
-
-// A nice read in this URL about using property_tree for JSON parsing:
-// http://zenol.fr/blog/boost-property-tree/en.html
-#include <boost/property_tree/ptree.hpp>
-#include <boost/property_tree/json_parser.hpp>
-
-// Short alias for this namespace
-namespace pt = boost::property_tree;
-
-using websocketpp::lib::placeholders::_1;
-using websocketpp::lib::placeholders::_2;
-using websocketpp::lib::bind;
 
 // Verify the input tuple attribute name and then read the operator parameters.
 <%
@@ -203,7 +181,7 @@ using websocketpp::lib::bind;
 MY_OPERATOR::MY_OPERATOR()
 :
 		MY_BASE_OPERATOR{},
-		impl(
+		com::ibm::streams::sttgateway::WatsonSTTImpl<MY_OPERATOR, OPort0Type>(
 				*this,
 				<%=$websocketLoggingNeeded%>,
 				<%=$cpuYieldTimeInAudioSenderThread%>,
@@ -238,50 +216,21 @@ MY_OPERATOR::~MY_OPERATOR()
 {
 }
 
-// To set the static variable present inside this method, 
-// call this method with a non-null object i.e. this object as input.
-// To get the value of the static variable present inside this method,
-// call this method with a null object as input.
-//
-// NOTE: I originally built this method for a different reason to have
-// static member methods as callback functions for the Websocket event handlers.
-// From those static methods, this method was called to get the object pointer of
-// this operator class to access the member variables like this:
-// MY_OPERATOR::myOp(NULL)->some_member_variable
-// Later (on Aug/28/2018) I removed the need for the static methods. 
-// Hence, this method is no longer in use.
-/*
-MY_OPERATOR* MY_OPERATOR::myOp(MY_OPERATOR* obj) {
-	static MY_OPERATOR* thisObj = NULL;
-
-	if (obj == NULL) {
-		return(thisObj);
-	}
-		
-	thisObj = obj;
-	return(thisObj);
-}
-*/
-
 // Notify port readiness
 void MY_OPERATOR::allPortsReady() 
 {
-	impl.allPortsReady();
-	return;
+	Impl::allPortsReady();
 }
 
 void MY_OPERATOR::process(uint32_t idx) {
-	impl.process(idx);
-	return;
+	Impl::process(idx);
 }
 
 // Notify pending shutdown
 void MY_OPERATOR::prepareToShutdown() 
 {
-	impl.prepareToShutdown();
-	return;
+	Impl::prepareToShutdown();
 }
-
 
 // This operator has two input ports.
 // Port 0: Audio data (a file name or a blob) arrives on this port. (mutating)
@@ -296,9 +245,7 @@ void MY_OPERATOR::process(Tuple const & tuple, uint32_t port) {
 		throw std::invalid_argument("Port number is not 1");
 
 	IPort1Type const & inputTuple = static_cast<IPort1Type const &>(tuple);
-	impl.process_1<IPort1Type, &IPort1Type::get_access_token>(inputTuple);
-	
-	return;
+	Impl::process_1<IPort1Type, &IPort1Type::get_access_token>(inputTuple);
 }
 
 // With the WebSocket interface, audio data is always streamed to the 
@@ -325,9 +272,7 @@ void MY_OPERATOR::process(Tuple & tuple, uint32_t port)
 		throw std::invalid_argument("Port number is not 0");
 
 	IPort0Type & <%=$inputTupleName%> = static_cast<IPort0Type &>(tuple);
-	impl.process_0<IPort0Type, <%=$speechAttributeType%>, &IPort0Type::get_speech>(<%=$inputTupleName%>, <%=$speechAttributeType%>());
-	
-	return;
+	Impl::process_0<IPort0Type, <%=$speechAttributeType%>, &IPort0Type::get_speech>(<%=$inputTupleName%>, <%=$speechAttributeType%>());
 }
 
 // Punctuation processing
@@ -339,7 +284,6 @@ void MY_OPERATOR::process(Punctuation const & punct, uint32_t port) {
 			submit(punct, 0);
 		}
 	}
-	return;
 }
 
 
@@ -386,7 +330,6 @@ void MY_OPERATOR::setErrorAttribute(OPort0Type * tuple, std::string const & erro
 <%		}
 	}
 %>
-	return;
 }
 
 // Assign result attributes except speaker results and transcription complete to output tuple
@@ -445,8 +388,7 @@ void MY_OPERATOR::setResultAttributes(
 <%		} elsif ($operation eq "getUtteranceWordsConfidences") { %>
 			tuple->set_<%=$name%>(utteranceWordsConfidences_);
 <%		} elsif ($operation eq "getUtteranceWordsStartTimes") { %>
-			//tuple->set_<%=$name%>(impl.<%=$operation%>());
-			tuple->set_<%=$name%>(impl.utteranceWordsStartTimes);
+			tuple->set_<%=$name%>(Impl::<%=$operation%>());
 <%		} elsif ($operation eq "getUtteranceWordsEndTimes") { %>
 			tuple->set_<%=$name%>(utteranceWordsEndTimes_);
 <%		} elsif ($operation eq "getUtteranceStartTime") { %>
@@ -454,18 +396,15 @@ void MY_OPERATOR::setResultAttributes(
 <%		} elsif ($operation eq "getUtteranceEndTime") { %>
 			tuple->set_<%=$name%>(utteranceEndTime_);
 <%		} elsif ($operation eq "getUtteranceWordsSpeakers") { %>
-			//tuple->set_<%=$name%>(impl.<%=$operation%>());
-			tuple->set_<%=$name%>(impl.utteranceWordsSpeakers);
+			tuple->set_<%=$name%>(Impl::<%=$operation%>());
 <%		} elsif ($operation eq "getUtteranceWordsSpeakersConfidences") { %>
-			//tuple->set_<%=$name%>(impl.<%=$operation%>());
-			tuple->set_<%=$name%>(impl.utteranceWordsSpeakersConfidences);
+			tuple->set_<%=$name%>(Impl::<%=$operation%>());
 <%		} elsif ($operation eq "getKeywordsSpottingResults") { %>
 			tuple->set_<%=$name%>(keywordsSpottingResults_);
 <%
 		}
 	}
 %>
-	return;
 }
 
 // Assign speaker result to output tuple
@@ -479,16 +418,13 @@ void MY_OPERATOR::setSpeakerResultAttributes(OPort0Type * tuple) {
 
 		if ($operation eq "getUtteranceWordsSpeakers") {
 %>
-			//tuple->set_<%=$name%>(impl.<%=$operation%>());
-			tuple->set_<%=$name%>(impl.utteranceWordsSpeakers);
+			tuple->set_<%=$name%>(Impl::<%=$operation%>());
 <%		} elsif ($operation eq "getUtteranceWordsSpeakersConfidences") { %>
-			//tuple->set_<%=$name%>(impl.<%=$operation%>());
-			tuple->set_<%=$name%>(impl.utteranceWordsSpeakersConfidences);
+			tuple->set_<%=$name%>(Impl::<%=$operation%>());
 <%
 		}
 	}
 %>
-	return;
 }
 
 // Assign transcription complete attribute to output tuple
@@ -506,7 +442,6 @@ void MY_OPERATOR::setTranscriptionCompleteAttribute(OPort0Type * tuple) {
 <%		}
 	}
 %>
-	return;
 }
 
 <%SPL::CodeGen::implementationEpilogue($model);%>

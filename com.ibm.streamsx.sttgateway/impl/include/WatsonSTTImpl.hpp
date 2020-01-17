@@ -13,19 +13,26 @@
 
 #include <string>
 
+// This operator heavily relies on the Websocket++ header only library.
+// https://docs.websocketpp.org/index.html
+// This C++11 library code does the asynchronous full duplex Websocket communication with
+// the Watson STT service via a series of event handlers (a.k.a callback methods).
+// Bulk of the logic in this operator class appears in those event handler methods below.
 #include <websocketpp/config/asio_client.hpp>
 #include <websocketpp/client.hpp>
-
-#include <SPL/Runtime/Type/SPLType.h>
-#include <SPL/Runtime/Function/SPLFunctions.h>
-// Operator metrics related include files.
-#include <SPL/Runtime/Common/Metric.h>
-#include <SPL/Runtime/Utility/Mutex.h>
 
 // A nice read in this URL about using property_tree for JSON parsing:
 // http://zenol.fr/blog/boost-property-tree/en.html
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/json_parser.hpp>
+
+#include <boost/exception/to_string.hpp>
+
+// SPL Operator related includes
+#include <SPL/Runtime/Type/SPLType.h>
+#include <SPL/Runtime/Function/SPLFunctions.h>
+#include <SPL/Runtime/Common/Metric.h>
+#include <SPL/Runtime/Utility/Mutex.h>
 
 namespace com { namespace ibm { namespace streams { namespace sttgateway {
 
@@ -67,11 +74,11 @@ public:
 			SPL::float64 keywordsSpottingThreshold_,
 			const SPL::list<SPL::rstring>& keywordsToBeSpotted_
 );
-	WatsonSTTImpl(WatsonSTTImpl const &) = delete;
+	//WatsonSTTImpl(WatsonSTTImpl const &) = delete;
 
 	//Destructor
 	~WatsonSTTImpl();
-
+protected:
 	// Notify port readiness
 	void allPortsReady();
 
@@ -90,7 +97,7 @@ public:
 	void process(uint32_t idx);
 
 
-public:
+private:
 	// Websocket related type definitions.
 	typedef websocketpp::client<websocketpp::config::asio_tls_client> client;
 	// Pull out the type of messages sent by our config
@@ -99,7 +106,7 @@ public:
 
 	enum StatusOfAudioDataTransmission {NO_AUDIO_DATA_SENT_TO_STT, AUDIO_BLOB_FRAGMENTS_BEING_SENT_TO_STT, FULL_AUDIO_DATA_SENT_TO_STT};
 
-public:
+private:
 	// All the public methods below used to be static methods with
 	// a static keyword at the beginning of every prototype
 	// declaration. On Aug/28/2018, I removed the need for them to be static.
@@ -128,13 +135,13 @@ public:
 private:
 	OP & splOperator;
 
-public:
+protected:
 	// Operator related member variables
 	// We build our own intro for trace outputs
 	const std::string operatorPhysicalName;
 	const SPL::int32 udpChannelNumber;
 	const std::string traceIntro;
-
+private:
 	// Websocket operations related member variables.
 	bool wsConnectionEstablished;
 	bool makeNewWebsocketConnection;
@@ -158,6 +165,7 @@ public:
 	std::string transcriptionResult;
 	bool transcriptionErrorOccurred;
 	bool sttResultTupleWaitingToBeSent;
+
 	SPL::list<SPL::int32> utteranceWordsSpeakers;
 	SPL::list<SPL::float64> utteranceWordsSpeakersConfidences;
 	SPL::list<SPL::float64> utteranceWordsStartTimes;
@@ -199,6 +207,7 @@ public:
 	SPL::Metric * const nSTTResultModeMetric;
 
 	// These are the output attribute assignment functions
+protected:
 	/*SPL::int32 getUtteranceNumber(int32_t const & utteranceNumber) { return(utteranceNumber); }
 	SPL::rstring getUtteranceText(std::string const & utteranceText) { return(utteranceText); }
 	SPL::boolean isFinalizedUtterance(bool const & finalizedUtterance) { return(finalizedUtterance); }
@@ -212,12 +221,12 @@ public:
 	SPL::list<SPL::float64> getWordAlternativesEndTimes(SPL::list<SPL::float64> const & wordAlternativesEndTimes) { return(wordAlternativesEndTimes); }
 	SPL::list<SPL::rstring> getUtteranceWords(SPL::list<SPL::rstring> const & utteranceWords) { return(utteranceWords); }
 	SPL::list<SPL::float64> getUtteranceWordsConfidences(SPL::list<SPL::float64> const & utteranceWordsConfidences) { return(utteranceWordsConfidences); }*/
-	//SPL::list<SPL::float64> getUtteranceWordsStartTimes() { return(utteranceWordsStartTimes); }
+	inline SPL::list<SPL::float64> getUtteranceWordsStartTimes() { return(utteranceWordsStartTimes); }
 	/*SPL::list<SPL::float64> getUtteranceWordsEndTimes(SPL::list<SPL::float64> const & utteranceWordsEndTimes) { return(utteranceWordsEndTimes); }
 	SPL::float64 getUtteranceStartTime(SPL::float64 const & utteranceStartTime) { return(utteranceStartTime); }
 	SPL::float64 getUtteranceEndTime(SPL::float64 const & utteranceEndTime) { return(utteranceEndTime); }*/
-	//SPL::list<SPL::int32> getUtteranceWordsSpeakers() { return(utteranceWordsSpeakers); }
-	//SPL::list<SPL::float64> getUtteranceWordsSpeakersConfidences() { return(utteranceWordsSpeakersConfidences); }
+	inline SPL::list<SPL::int32> getUtteranceWordsSpeakers() { return(utteranceWordsSpeakers); }
+	inline SPL::list<SPL::float64> getUtteranceWordsSpeakersConfidences() { return(utteranceWordsSpeakersConfidences); }
 	/*SPL::map<SPL::rstring, SPL::list<SPL::map<SPL::rstring, SPL::float64>>>
 		getKeywordsSpottingResults(SPL::map<SPL::rstring,
 		SPL::list<SPL::map<SPL::rstring, SPL::float64>>> const & keywordsSpottingResults) { return(keywordsSpottingResults); }*/
@@ -524,8 +533,6 @@ void WatsonSTTImpl<OP, OT>::process_1(IT const & inputTuple) {
 			" the IAM access token before sending any audio data to this operator.",
 			"process");
 	}
-
-	return;
 }
 
 //Definition of the template function getSpeechSamples if data type is SPL::blob
@@ -915,6 +922,10 @@ void WatsonSTTImpl<OP, OT>::ws_audio_blob_sender() {
 template<typename OP, typename OT>
 void WatsonSTTImpl<OP, OT>::ws_init() {
 
+	using websocketpp::lib::placeholders::_1;
+	using websocketpp::lib::placeholders::_2;
+	using websocketpp::lib::bind;
+
 	while (not splOperator.getPE().getShutdownRequested()) {
 		if (not makeNewWebsocketConnection) {
 			// Keep waiting in this while loop until
@@ -1182,6 +1193,7 @@ static Tree query(Tree& pt, typename Tree::path_type path) {
 // https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-websockets#WSexample
 template<typename OP, typename OT>
 void WatsonSTTImpl<OP, OT>::on_message(WatsonSTTImpl<OP, OT>::client* c, websocketpp::connection_hdl hdl, message_ptr msg) {
+
 	// Short alias for this namespace
 	namespace pt = boost::property_tree;
 
