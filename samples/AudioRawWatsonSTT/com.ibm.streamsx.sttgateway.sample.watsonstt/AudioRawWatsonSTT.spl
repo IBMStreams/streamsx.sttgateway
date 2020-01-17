@@ -546,7 +546,8 @@ public composite AudioRawWatsonSTT {
 				}
 				
 			config
-				threadedPort: queue(SR, Sys.Wait);
+				//Place this operator into an own PE to separate the final result printouts from all other printouts
+				placement: partitionIsolation;
 		}
 
 	config restartable: false;
