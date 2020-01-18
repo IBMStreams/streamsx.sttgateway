@@ -272,7 +272,7 @@ void MY_OPERATOR::process(Tuple & tuple, uint32_t port)
 		throw std::invalid_argument("Port number is not 0");
 
 	IPort0Type & <%=$inputTupleName%> = static_cast<IPort0Type &>(tuple);
-	Impl::process_0<IPort0Type, <%=$speechAttributeType%>, &IPort0Type::get_speech>(<%=$inputTupleName%>, <%=$speechAttributeType%>());
+	Impl::process_0<IPort0Type, <%=$speechAttributeType%>, &IPort0Type::get_speech>(<%=$inputTupleName%>);
 }
 
 // Punctuation processing

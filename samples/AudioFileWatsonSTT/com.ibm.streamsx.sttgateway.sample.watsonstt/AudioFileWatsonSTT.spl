@@ -128,7 +128,7 @@ public composite AudioFileWatsonSTT {
 		STTResult_t = rstring conversationId, int32 utteranceNumber,
 			rstring utteranceText, boolean finalizedUtterance,
 			float32 confidence, rstring fullTranscriptionText,
-			rstring sttErrorMessage, boolean transcriptionCompleted,
+			rstring sttErrorMessage,
 			list<rstring> utteranceAlternatives, 
 			list<list<rstring>> wordAlternatives,
 			list<list<float64>> wordAlternativesConfidences,
@@ -142,7 +142,9 @@ public composite AudioFileWatsonSTT {
 			float64 utteranceEndTime,
 			list<int32> utteranceWordsSpeakers,
 			list<float64> utteranceWordsSpeakersConfidences,
-			map<rstring, list<map<rstring, float64>>> keywordsSpottingResults;
+			map<rstring, list<map<rstring, float64>>> keywordsSpottingResults,
+			boolean transcriptionCompleted,
+			int32 sequence;
 
 	graph
 		// IMPORTANT: IBM STT service on public cloud requires
@@ -162,6 +164,9 @@ public composite AudioFileWatsonSTT {
 				apiKey: $sttApiKey;
 				iamTokenURL: $sttIAMTokenURL;
 				accessToken: $sttOnCP4DAccessToken;
+				// All connection parameter are taken from params.
+				// So if we clean the app config name, we avoid error logs
+				appConfigName: "";
 		}
 
 		// Scan a directory periodically to pick up the audio files and 
@@ -177,7 +182,9 @@ public composite AudioFileWatsonSTT {
 		// In addition to that mandatory input stream attribute, additional
 		// attributes can be sent in the input stream to be auto assigned to
 		// the output stream of the WatsonSTT operator.
-		stream<rstring speech> AudioFileName = DirectoryScan() {
+		stream<rstring speech, int32 sequence> AudioFileName as O = DirectoryScan() {
+			logic state:
+				mutable int32 counter = 0;
 			param
 				directory : $audioDir;
 				pattern : "\\.wav$";
@@ -186,7 +193,8 @@ public composite AudioFileWatsonSTT {
 				// IAM access token and send it to the WatsonSTT operator.
 				initDelay : 15.0;
 				sortBy: name;
-				
+			output O:
+				sequence = counter++;
 			config
 				placement: partitionIsolation;
 		}
@@ -345,7 +353,8 @@ public composite AudioFileWatsonSTT {
 				}
 				
 			config
-				threadedPort: queue(SR, Sys.Wait);
+				//Place this operator into an own PE to separate the final result printouts from all other printouts
+				placement: partitionIsolation;
 		}
 
 	config restartable: false;

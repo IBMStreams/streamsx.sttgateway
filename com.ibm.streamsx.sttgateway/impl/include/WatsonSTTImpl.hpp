@@ -36,6 +36,14 @@
 
 namespace com { namespace ibm { namespace streams { namespace sttgateway {
 
+// Websocket related type definitions.
+typedef websocketpp::client<websocketpp::config::asio_tls_client> client;
+// Pull out the type of messages sent by our config
+typedef websocketpp::config::asio_tls_client::message_type::ptr message_ptr;
+typedef websocketpp::lib::shared_ptr<boost::asio::ssl::context> context_ptr;
+
+enum StatusOfAudioDataTransmission {NO_AUDIO_DATA_SENT_TO_STT, AUDIO_BLOB_FRAGMENTS_BEING_SENT_TO_STT, FULL_AUDIO_DATA_SENT_TO_STT};
+
 /*
  * Implementation class for operator Watson STT
  * Move almost of the c++ code of the operator into this class to take the advantage of c++ editor support
@@ -86,25 +94,16 @@ protected:
 	void prepareToShutdown();
 
 	// Tuple processing for mutating data port 0
-	template<typename IT, typename DATA_TYPE, DATA_TYPE & (IT::*GETTER)()>
-	void process_0(IT & inputTuple, DATA_TYPE const & dummy);
+	template<typename IT0, typename DATA_TYPE, DATA_TYPE & (IT0::*GETTER)()>
+	void process_0(IT0 & inputTuple);
 
 	// Tuple processing for authentication port 1
-	template<typename IT, const SPL::rstring& (IT::*GETTER)()const>
-	void process_1(IT const & inputTuple);
+	template<typename IT1, const SPL::rstring& (IT1::*GETTER)()const>
+	void process_1(IT1 const & inputTuple);
 
 	// Processing for websocket client threads
 	void process(uint32_t idx);
 
-
-private:
-	// Websocket related type definitions.
-	typedef websocketpp::client<websocketpp::config::asio_tls_client> client;
-	// Pull out the type of messages sent by our config
-	typedef websocketpp::config::asio_tls_client::message_type::ptr message_ptr;
-	typedef websocketpp::lib::shared_ptr<boost::asio::ssl::context> context_ptr;
-
-	enum StatusOfAudioDataTransmission {NO_AUDIO_DATA_SENT_TO_STT, AUDIO_BLOB_FRAGMENTS_BEING_SENT_TO_STT, FULL_AUDIO_DATA_SENT_TO_STT};
 
 private:
 	// All the public methods below used to be static methods with
@@ -511,8 +510,8 @@ void WatsonSTTImpl<OP, OT>::process(uint32_t idx) {
 }
 
 template<typename OP, typename OT>
-template<typename IT, const SPL::rstring& (IT::*GETTER)()const>
-void WatsonSTTImpl<OP, OT>::process_1(IT const & inputTuple) {
+template<typename IT1, const SPL::rstring& (IT1::*GETTER)()const>
+void WatsonSTTImpl<OP, OT>::process_1(IT1 const & inputTuple) {
 	// There are multiple methods (process, audio_blob_sender and on_message) that
 	// regularly access (read, write and delete) the vector member variables.
 	// All those methods work in parallel inside their own threads.
@@ -638,9 +637,9 @@ int getSpeechSamples<SPL::rstring>(
 }
 
 template<typename OP, typename OT>
-template<typename IT, typename DATA_TYPE, DATA_TYPE & (IT::*GETTER)()>
-void WatsonSTTImpl<OP, OT>::process_0(IT & inputTuple, DATA_TYPE const & dummy) {
-	// There are multiple methods (process, audio_blob_sender and on_message) that
+template<typename IT0, typename DATA_TYPE, DATA_TYPE & (IT0::*GETTER)()>
+void WatsonSTTImpl<OP, OT>::process_0(IT0 & inputTuple) {
+	// There are multiple methods (process and on_message) that
 	// regularly access (read, write and delete) the vector member variables.
 	// All those methods work in parallel inside their own threads.
 	// To make that vector access thread safe, we will use this mutex.
@@ -1046,7 +1045,7 @@ void WatsonSTTImpl<OP, OT>::ws_init() {
 // When the Websocket connection to the Watson STT service is made successfully,
 // this callback method will be called from the websocketpp layer.
 template<typename OP, typename OT>
-void WatsonSTTImpl<OP, OT>::on_open(WatsonSTTImpl<OP, OT>::client* c, websocketpp::connection_hdl hdl) {
+void WatsonSTTImpl<OP, OT>::on_open(client* c, websocketpp::connection_hdl hdl) {
 	SPLAPPTRC(L_DEBUG, traceIntro << "-->Reached 6 (on_open)", "on_open");
 	// On Websocket connection open, establish a session with the STT service.
 	// https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-websockets#WSstart
@@ -1192,7 +1191,7 @@ static Tree query(Tree& pt, typename Tree::path_type path) {
 // received from the STT service, this callback method will be called from the websocketpp layer.
 // https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-websockets#WSexample
 template<typename OP, typename OT>
-void WatsonSTTImpl<OP, OT>::on_message(WatsonSTTImpl<OP, OT>::client* c, websocketpp::connection_hdl hdl, message_ptr msg) {
+void WatsonSTTImpl<OP, OT>::on_message(client* c, websocketpp::connection_hdl hdl, message_ptr msg) {
 
 	// Short alias for this namespace
 	namespace pt = boost::property_tree;
@@ -2320,7 +2319,7 @@ void WatsonSTTImpl<OP, OT>::on_message(WatsonSTTImpl<OP, OT>::client* c, websock
 // Whenever our existing Websocket connection to the Watson STT service is closed,
 // this callback method will be called from the websocketpp layer.
 template<typename OP, typename OT>
-void WatsonSTTImpl<OP, OT>::on_close(WatsonSTTImpl<OP, OT>::client* c, websocketpp::connection_hdl hdl) {
+void WatsonSTTImpl<OP, OT>::on_close(client* c, websocketpp::connection_hdl hdl) {
 	// In the lab tests, I noticed that occasionally a Websocket connection can get
 	// closed right after an on_open event without actually receiving the "listening" response
 	// in the on_message event from the Watson STT service. This condition clearly means
@@ -2347,7 +2346,7 @@ void WatsonSTTImpl<OP, OT>::on_close(WatsonSTTImpl<OP, OT>::client* c, websocket
 // When a Websocket connection handshake happens with the Watson STT serice for enabling
 // TLS security, this callback method will be called from the websocketpp layer.
 template<typename OP, typename OT>
-typename WatsonSTTImpl<OP, OT>::context_ptr WatsonSTTImpl<OP, OT>::on_tls_init(WatsonSTTImpl<OP, OT>::client* c, websocketpp::connection_hdl) {
+context_ptr WatsonSTTImpl<OP, OT>::on_tls_init(client* c, websocketpp::connection_hdl) {
 	//m_tls_init = std::chrono::high_resolution_clock::now();
 	//context_ptr ctx = websocketpp::lib::make_shared<boost::asio::ssl::context>(boost::asio::ssl::context::tlsv1);
 	context_ptr ctx =
@@ -2368,7 +2367,7 @@ typename WatsonSTTImpl<OP, OT>::context_ptr WatsonSTTImpl<OP, OT>::on_tls_init(W
 // When a connection attempt to the Watson STT service fails, then this
 // callback method will be called from the websocketpp layer.
 template<typename OP, typename OT>
-void WatsonSTTImpl<OP, OT>::on_fail(WatsonSTTImpl<OP, OT>::client* c, websocketpp::connection_hdl hdl) {
+void WatsonSTTImpl<OP, OT>::on_fail(client* c, websocketpp::connection_hdl hdl) {
 	websocketConnectionErrorOccurred = true;
 	// c->get_alog().write(websocketpp::log::alevel::app, "Websocket connection to the Watson STT service failed.");
 	SPLAPPTRC(L_ERROR, traceIntro << "-->Websocket connection to the Watson STT service failed.", "on_fail");
