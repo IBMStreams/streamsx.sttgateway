@@ -208,7 +208,10 @@ public composite IAMAccessTokenGenerator(output IamAccessTokenStream) {
 							iamTokenURL = prop;
 					}
 					if (iamTokenURL == "") {
-						appTrc(Trace.error, "No iamTokenURL and no accessToken configured, Abort!");
+						tuple<rstring op> _t = { op="IAMAccessTokenGenerator"};
+						rstring msg = loadAndFormatResource("com.ibm.streamsx.sttgateway", "SttGatewayResource", "CDIST3814E", _t);
+						printStringLn(msg);
+						appTrc(Trace.error, msg);
 						abort();
 					}
 					
@@ -222,7 +225,10 @@ public composite IAMAccessTokenGenerator(output IamAccessTokenStream) {
 							defaultExpiresIn = (int64)prop;
 					}
 					if (defaultExpiresIn <= 0l) {
-						appTrc(Trace.error, "Parameter/Property defaultExpiresIn must be greater zero");
+						tuple<rstring op, float64 val, rstring par> _t = { op="IAMAccessTokenGenerator", val=(float64)defaultExpiresIn, par="defaultExpiresIn"};
+						rstring msg = loadAndFormatResource("com.ibm.streamsx.sttgateway", "SttGatewayResource", "CDIST3815E", _t);
+						printStringLn(msg);
+						appTrc(Trace.error, msg);
 						abort();
 					}
 					
@@ -234,7 +240,10 @@ public composite IAMAccessTokenGenerator(output IamAccessTokenStream) {
 							guardTime = (int64)prop;
 					}
 					if (guardTime < 0l) {
-						appTrc(Trace.error, "Parameter/Property guardTime must be greater or equal zero");
+						tuple<rstring op, float64 val, rstring par> _t = { op="IAMAccessTokenGenerator", val=(float64)guardTime, par="guardTime"};
+						rstring msg = loadAndFormatResource("com.ibm.streamsx.sttgateway", "SttGatewayResource", "CDIST3816E", _t);
+						printStringLn(msg);
+						appTrc(Trace.error, msg);
 						abort();
 					}
 					
@@ -247,7 +256,10 @@ public composite IAMAccessTokenGenerator(output IamAccessTokenStream) {
 							maxRetryDelay = (float64)prop;
 					}
 					if (maxRetryDelay <= 0.0) {
-						appTrc(Trace.error, "Parameter/Property maxRetryDelay must be greater zero");
+						tuple<rstring op, float64 val, rstring par> _t = { op="IAMAccessTokenGenerator", val=maxRetryDelay, par="maxRetryDelay"};
+						rstring msg = loadAndFormatResource("com.ibm.streamsx.sttgateway", "SttGatewayResource", "CDIST3815E", _t);
+						printStringLn(msg);
+						appTrc(Trace.error, msg);
 						abort();
 					}
 					
@@ -259,7 +271,10 @@ public composite IAMAccessTokenGenerator(output IamAccessTokenStream) {
 							failureRetryDelay = (float64)prop;
 					}
 					if (failureRetryDelay <= 0.0) {
-						appTrc(Trace.error, "Parameter/Property failureRetryDelay must be greater zero");
+						tuple<rstring op, float64 val, rstring par> _t = { op="IAMAccessTokenGenerator", val=failureRetryDelay, par="failureRetryDelay"};
+						rstring msg = loadAndFormatResource("com.ibm.streamsx.sttgateway", "SttGatewayResource", "CDIST3815E", _t);
+						printStringLn(msg);
+						appTrc(Trace.error, msg);
 						abort();
 					}
 

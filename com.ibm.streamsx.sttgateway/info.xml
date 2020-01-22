@@ -1,19 +1,28 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<info:toolkitInfoModel xmlns:common="http://www.ibm.com/xmlns/prod/streams/spl/common" xmlns:info="http://www.ibm.com/xmlns/prod/streams/spl/toolkitInfo">
-  <info:identity>
-    <info:name>com.ibm.streamsx.sttgateway</info:name>
-    <info:description></info:description>
-    <info:version>1.0.6</info:version>
-    <info:requiredProductVersion>4.2.1.6</info:requiredProductVersion>
-  </info:identity>
-  <info:dependencies>
-    <info:toolkit>
+<toolkitInfoModel
+    xmlns="http://www.ibm.com/xmlns/prod/streams/spl/toolkitInfo"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:common="http://www.ibm.com/xmlns/prod/streams/spl/common"
+    xsi:schemaLocation="http://www.ibm.com/xmlns/prod/streams/spl/toolkitInfo toolkitInfoModel.xsd">
+  <identity>
+    <name>com.ibm.streamsx.sttgateway</name>
+    <description></description>
+    <version>1.0.6</version>
+    <requiredProductVersion>4.2.1.6</requiredProductVersion>
+  </identity>
+  <dependencies>
+    <toolkit>
       <common:name>com.ibm.streamsx.json</common:name>
       <common:version>1.4.6</common:version>
-    </info:toolkit>
-    <info:toolkit>
+    </toolkit>
+    <toolkit>
       <common:name>com.ibm.streamsx.inet</common:name>
       <common:version>2.3.6</common:version>
-    </info:toolkit>
-  </info:dependencies>
-</info:toolkitInfoModel>
+    </toolkit>
+  </dependencies>
+  <resources>
+    <messageSet name="SttGatewayResource">
+      <lang default="true">en_US/SttGatewayResource.xml</lang>
+    </messageSet>
+  </resources>
+</toolkitInfoModel>
