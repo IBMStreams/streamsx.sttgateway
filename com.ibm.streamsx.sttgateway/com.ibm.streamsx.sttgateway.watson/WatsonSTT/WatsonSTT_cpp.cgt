@@ -26,6 +26,14 @@ https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-websocke
 
 // Verify the input tuple attribute name and then read the operator parameters.
 <%
+	require SttGatewayResource;
+
+	my $ccContext = $model->getContext()->getOptionalContext("ConsistentRegion");
+	if (defined $ccContext) {
+		SPL::CodeGen::exitln(SttGatewayResource::STTGW_CONSISTENT_CHECK("WatsonSTT"),
+				$model->getContext()->getSourceLocation());
+	}
+
 	# Check the input port 0 i.e. the first input port. 
 	my $inputPort = $model->getInputPortAt(0);
 	my $inputTupleName = $inputPort->getCppTupleName();
@@ -57,11 +65,13 @@ https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-websocke
 	print "// audioInputAsBlob=$audioInputAsBlob speechAttributeType=$speechAttributeType\n";
 	
 	if ($speechAttributeFound == 0 ) {
-		SPL::CodeGen::exitln("WatsonSTT_cpp.cgt: The required input tuple attribute 'speech' is missing in the first input port.");
+		SPL::CodeGen::exitln(SttGatewayResource::STTGW_INP_ATTRIBUTE_CHECK1("WatsonSTT", "speech"),
+				$model->getContext()->getSourceLocation());
 	}
 	
 	if (!(defined($audioInputAsBlob))) {
-		SPL::CodeGen::exitln("WatsonSTT_cpp.cgt: The required input tuple attribute 'speech' is not of type 'rstring' or 'blob' in the first input port.");
+		SPL::CodeGen::exitln(SttGatewayResource::STTGW_INP_ATTRIBUTE_TYPE_CHECK1("WatsonSTT", "speech", "rstring", "blob"),
+				$model->getContext()->getSourceLocation());
 	} else {
 		print "//code generated for case \$audioInputAsBlob = $audioInputAsBlob\n";
 	}
@@ -88,11 +98,13 @@ https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-websocke
 	}
 	
 	if ($accessTokenAttributeFound == 0 ) {
-		SPL::CodeGen::exitln("WatsonSTT_cpp.cgt: The required input tuple attribute 'accessToken' is missing in the second input port.");
+		SPL::CodeGen::exitln(SttGatewayResource::STTGW_INP_ATTRIBUTE_TYPE_CHECK2("WatsonSTT", "accessToken"),
+				$model->getContext()->getSourceLocation());
 	}
 	
 	if (!(defined($accessTokenAsString))) {
-		SPL::CodeGen::exitln("WatsonSTT_cpp.cgt: The required input tuple attribute 'accessToken' is not of type 'rstring' in the second input port.");
+		SPL::CodeGen::exitln(SttGatewayResource::STTGW_INP_ATTRIBUTE_TYPE_CHECK2("WatsonSTT", "accessToken", "rstring"),
+				$model->getContext()->getSourceLocation());
 	}
 	
 	# Following are the operator parameters.

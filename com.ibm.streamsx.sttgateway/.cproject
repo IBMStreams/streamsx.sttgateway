@@ -33,6 +33,7 @@
 									<listOptionValue builtIn="false" value="&quot;${STREAMS_INSTALL}/ext/include/decNumber&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/com.ibm.streamsx.sttgateway/include/boost}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/com.ibm.streamsx.sttgateway/include/websocketpp}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/com.ibm.streamsx.sttgateway/impl/nl/include}&quot;"/>
 								</option>
 								<inputType id="cdt.managedbuild.tool.gnu.cpp.compiler.input.1571868322" superClass="cdt.managedbuild.tool.gnu.cpp.compiler.input"/>
 							</tool>
@@ -46,6 +47,7 @@
 									<listOptionValue builtIn="false" value="&quot;${STREAMS_INSTALL}/ext/include/decNumber&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/com.ibm.streamsx.sttgateway/include/boost}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/com.ibm.streamsx.sttgateway/include/websocketpp}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/com.ibm.streamsx.sttgateway/impl/nl/include}&quot;"/>
 								</option>
 								<inputType id="cdt.managedbuild.tool.gnu.c.compiler.input.125347971" superClass="cdt.managedbuild.tool.gnu.c.compiler.input"/>
 							</tool>
@@ -64,6 +66,7 @@
 									<listOptionValue builtIn="false" value="&quot;${STREAMS_INSTALL}/ext/include/decNumber&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/com.ibm.streamsx.sttgateway/include/boost}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/com.ibm.streamsx.sttgateway/include/websocketpp}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/com.ibm.streamsx.sttgateway/impl/nl/include}&quot;"/>
 								</option>
 								<inputType id="cdt.managedbuild.tool.gnu.assembler.input.681373161" superClass="cdt.managedbuild.tool.gnu.assembler.input"/>
 							</tool>
@@ -99,10 +102,10 @@
 	</storageModule>
 	<storageModule moduleId="org.eclipse.cdt.core.LanguageSettingsProviders"/>
 	<storageModule moduleId="refreshScope" versionNumber="2">
-		<configuration configurationName="Debug">
+		<configuration configurationName="Release">
 			<resource resourceType="PROJECT" workspacePath="/com.ibm.streamsx.sttgateway"/>
 		</configuration>
-		<configuration configurationName="Release">
+		<configuration configurationName="Debug">
 			<resource resourceType="PROJECT" workspacePath="/com.ibm.streamsx.sttgateway"/>
 		</configuration>
 	</storageModule>

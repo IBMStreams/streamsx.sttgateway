@@ -34,6 +34,8 @@
 #include <SPL/Runtime/Common/Metric.h>
 #include <SPL/Runtime/Utility/Mutex.h>
 
+#include <SttGatewayResource.h>
+
 namespace com { namespace ibm { namespace streams { namespace sttgateway {
 
 // Websocket related type definitions.
@@ -358,31 +360,19 @@ WatsonSTTImpl<OP, OT>::WatsonSTTImpl(
 	}
 
 	if (sttResultMode < 1 || sttResultMode > 3) {
-		throw std::runtime_error(
-			"WatsonSTT_cpp.cgt: Invalid value of " +
-			boost::to_string(sttResultMode) + " is given for the sttResultMode parameter." +
-			" Valid value must be either 1 or 2 or 3.");
+		throw std::runtime_error(STTGW_INVALID_PARAM_VALUE_1("WatsonSTT", sttResultMode));
 	}
 
 	if (maxUtteranceAlternatives <= 0) {
-		throw std::runtime_error(
-			"WatsonSTT_cpp.cgt: Invalid value of " +
-			boost::to_string(maxUtteranceAlternatives) + " is given for the maxUtteranceAlternatives parameter." +
-			" Valid value must be greater than 0.");
+		throw std::runtime_error(STTGW_INVALID_PARAM_VALUE_2("WatsonSTT", maxUtteranceAlternatives));
 	}
 
 	if (wordAlternativesThreshold < 0.0 || wordAlternativesThreshold >= 1.0) {
-		throw std::runtime_error(
-			"WatsonSTT_cpp.cgt: Invalid value of " +
-			boost::to_string(wordAlternativesThreshold) + " is given for the wordAlternativesThreshold parameter." +
-			" Valid value must be greater than or equal to 0.0 and less than 1.0.");
+		throw std::runtime_error(STTGW_INVALID_PARAM_VALUE_3("WatsonSTT", wordAlternativesThreshold, "wordAlternativesThreshold"));
 	}
 
 	if (keywordsSpottingThreshold < 0.0 || keywordsSpottingThreshold >= 1.0) {
-		throw std::runtime_error(
-			"WatsonSTT_cpp.cgt: Invalid value of " +
-			boost::to_string(keywordsSpottingThreshold) + " is given for the keywordsSpottingThreshold parameter." +
-			" Valid value must be greater than or equal to 0.0 and less than 1.0.");
+		throw std::runtime_error(STTGW_INVALID_PARAM_VALUE_3("WatsonSTT", keywordsSpottingThreshold, "keywordsSpottingThreshold"));
 	}
 
 	// If the keywords to be spotted list is empty, then disable keywords_spotting.
@@ -391,24 +381,15 @@ WatsonSTTImpl<OP, OT>::WatsonSTTImpl(
 	}
 
 	if (cpuYieldTimeInAudioSenderThread < 0.0) {
-		throw std::runtime_error(
-			"WatsonSTT_cpp.cgt: Invalid value of " +
-			boost::to_string(cpuYieldTimeInAudioSenderThread) + " is given for the cpuYieldTimeInAudioSenderThread parameter." +
-			" Valid value must be greater than or equal to 0.0.");
+		throw std::runtime_error(STTGW_INVALID_PARAM_VALUE_4("WatsonSTT", cpuYieldTimeInAudioSenderThread, "cpuYieldTimeInAudioSenderThread", "0.0"));
 	}
 
 	if (waitTimeBeforeSTTServiceConnectionRetry < 1.0) {
-		throw std::runtime_error(
-			"WatsonSTT_cpp.cgt: Invalid value of " +
-			boost::to_string(waitTimeBeforeSTTServiceConnectionRetry) + " is given for the waitTimeBeforeSTTServiceConnectionRetry parameter." +
-			" Valid value must be greater than or equal to 1.0.");
+		throw std::runtime_error(STTGW_INVALID_PARAM_VALUE_4("WatsonSTT", waitTimeBeforeSTTServiceConnectionRetry,  "waitTimeBeforeSTTServiceConnectionRetry", "1.0"));
 	}
 
 	if (connectionAttemptsThreshold < 1) {
-		throw std::runtime_error(
-			"WatsonSTT_cpp.cgt: Invalid value of " +
-			boost::to_string(connectionAttemptsThreshold) + " is given for the connectionAttemptsThreshold parameter." +
-			" Valid value must be greater than or equal to 1.");
+		throw std::runtime_error(STTGW_INVALID_PARAM_VALUE_4("WatsonSTT", connectionAttemptsThreshold, "connectionAttemptsThreshold", "1"));
 	}
 
 	// We are not going to support the following utterance based
@@ -535,6 +516,13 @@ void WatsonSTTImpl<OP, OT>::process_1(IT1 const & inputTuple) {
 	const SPL::rstring& at = (inputTuple.*GETTER)();
 	accessToken = at;
 	SPLAPPTRC(L_INFO, traceIntro << "-->Received new/refreshed access token.", "process");
+
+	// This must be the audio data arriving here via port 0 i.e. first input port.
+	// If we have a non-empty IAM access token, process the audio data.
+	// Otherwise, skip it.
+	if (accessToken.empty()) {
+		SPLAPPLOG(L_ERROR, STTGW_EMPTY_IAM_TOKEN("WatsonSTT"), "process");
+	}
 }
 
 //Definition of the template function getSpeechSamples if data type is SPL::blob

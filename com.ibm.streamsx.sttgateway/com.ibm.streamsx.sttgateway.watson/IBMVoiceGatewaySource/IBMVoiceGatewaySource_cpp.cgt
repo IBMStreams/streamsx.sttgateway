@@ -68,6 +68,14 @@ using websocketpp::lib::bind;
 
 // Verify the input tuple attribute name and then read the operator parameters.
 <%
+	require SttGatewayResource;
+
+	my $ccContext = $model->getContext()->getOptionalContext("ConsistentRegion");
+	if (defined $ccContext) {
+	SPL::CodeGen::exitln(SttGatewayResource::STTGW_CONSISTENT_CHECK("IBMVoiceGatewaySource"),
+			$model->getContext()->getSourceLocation());
+}
+
 	# Check the output port 0 i.e. the first output port. 
 	my $outputPort1 = $model->getOutputPortAt(0);
 	my $outputTupleName1 = $outputPort1->getCppTupleName();
@@ -90,11 +98,13 @@ using websocketpp::lib::bind;
 	}
 	
 	if ($speechAttributeFound == 0 ) {
-		SPL::CodeGen::exitln("IBMVoiceGatewaySource_cpp.cgt: The required output tuple attribute 'speech' is missing in the first output port.");
+		SPL::CodeGen::exitln(SttGatewayResource::STTGW_OUT_ATTRIBUTE_CHECK1("IBMVoiceGatewaySource", "speech"),
+				$model->getContext()->getSourceLocation());
 	}
 	
 	if (!(defined($audioOutputAsBlob))) {
-		SPL::CodeGen::exitln("IBMVoiceGatewaySource_cpp.cgt: The required output tuple attribute 'speech' is not of type 'blob' in the first output port.");
+		SPL::CodeGen::exitln(SttGatewayResource::STTGW_OUT_ATTRIBUTE_TYPE_CHECK1("IBMVoiceGatewaySource", "speech", "blob"),
+				$model->getContext()->getSourceLocation());
 	}
 	
 	# Check the output port number 1 i.e. the second output port.
@@ -144,27 +154,33 @@ using websocketpp::lib::bind;
 	}
 	
 	if ($vgwSessionIdAttributeFound == 0 ) {
-		SPL::CodeGen::exitln("IBMVoiceGatewaySource_cpp.cgt: The required output tuple attribute 'vgwSessionId' is missing in the second output port.");
+		SPL::CodeGen::exitln(SttGatewayResource::STTGW_OUT_ATTRIBUTE_CHECK2("IBMVoiceGatewaySource", "vgwSessionId"),
+				$model->getContext()->getSourceLocation());
 	}
 	
 	if (!(defined($vgwSessionIdAsString))) {
-		SPL::CodeGen::exitln("IBMVoiceGatewaySource_cpp.cgt: The required output tuple attribute 'vgwSessionId' is not of type 'rstring' in the second output port.");
+		SPL::CodeGen::exitln(SttGatewayResource::STTGW_OUT_ATTRIBUTE_TYPE_CHECK2("IBMVoiceGatewaySource", "vgwSessionId", "rstring"),
+				$model->getContext()->getSourceLocation());
 	}
 
 	if ($isCustomerSpeechDataAttributeFound == 0 ) {
-		SPL::CodeGen::exitln("IBMVoiceGatewaySource_cpp.cgt: The required output tuple attribute 'isCustomerSpeechData' is missing in the second output port.");
+		SPL::CodeGen::exitln(SttGatewayResource::STTGW_OUT_ATTRIBUTE_CHECK2("IBMVoiceGatewaySource", "isCustomerSpeechData"),
+				$model->getContext()->getSourceLocation());
 	}
 	
 	if (!(defined($isCustomerSpeechDataAsBoolean))) {
-		SPL::CodeGen::exitln("IBMVoiceGatewaySource_cpp.cgt: The required output tuple attribute 'isCustomerSpeechData' is not of type 'boolean' in the second output port.");
+		SPL::CodeGen::exitln(SttGatewayResource::STTGW_OUT_ATTRIBUTE_TYPE_CHECK2("IBMVoiceGatewaySource", "isCustomerSpeechData", "boolean"),
+				$model->getContext()->getSourceLocation());
 	}
 
 	if ($vgwVoiceChannelNumberAttributeFound == 0 ) {
-		SPL::CodeGen::exitln("IBMVoiceGatewaySource_cpp.cgt: The required output tuple attribute 'vgwVoiceChannelNumber' is missing in the second output port.");
+		SPL::CodeGen::exitln(SttGatewayResource::STTGW_OUT_ATTRIBUTE_CHECK2("IBMVoiceGatewaySource", "vgwVoiceChannelNumber"),
+				$model->getContext()->getSourceLocation());
 	}
 	
 	if (!(defined($vgwVoiceChannelNumberAsInt32))) {
-		SPL::CodeGen::exitln("IBMVoiceGatewaySource_cpp.cgt: The required output tuple attribute 'vgwVoiceChannelNumber' is not of type 'int32' in the second output port.");
+		SPL::CodeGen::exitln(SttGatewayResource::STTGW_OUT_ATTRIBUTE_TYPE_CHECK2("IBMVoiceGatewaySource", "vgwVoiceChannelNumber", "int32"),
+				$model->getContext()->getSourceLocation());
 	}
 	
 	# Following are the operator parameters.
