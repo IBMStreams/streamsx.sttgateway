@@ -76,6 +76,16 @@
           </description>
           <kind>Counter</kind>
         </metric>
+
+        <metric>
+          <name>nFullAudioConversationsFailed</name>
+          <description>
+          Number of full audio conversations failures by this operator instance.
+          
+          *NOTE:* This metric is only updated if parameter `sttLiveMetricsUpdateNeeded` is true.
+          </description>
+          <kind>Counter</kind>
+        </metric>
       </metrics>
       
       <customOutputFunctions>

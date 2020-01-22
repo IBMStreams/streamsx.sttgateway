@@ -154,7 +154,7 @@ public composite AudioRawWatsonSTT {
 		STTResult_t = rstring conversationId, int32 utteranceNumber,
 			rstring utteranceText, boolean finalizedUtterance,
 			float32 confidence, rstring fullTranscriptionText,
-			rstring sttErrorMessage, boolean transcriptionCompleted,
+			rstring sttErrorMessage,
 			list<rstring> utteranceAlternatives, 
 			list<list<rstring>> wordAlternatives,
 			list<list<float64>> wordAlternativesConfidences,
@@ -168,7 +168,9 @@ public composite AudioRawWatsonSTT {
 			float64 utteranceEndTime,
 			list<int32> utteranceWordsSpeakers,
 			list<float64> utteranceWordsSpeakersConfidences,
-			map<rstring, list<map<rstring, float64>>> keywordsSpottingResults;
+			map<rstring, list<map<rstring, float64>>> keywordsSpottingResults,
+			boolean transcriptionCompleted,
+			int32 sequence;
 
 	graph
 		// IMPORTANT: IBM STT service on public cloud requires
@@ -188,6 +190,9 @@ public composite AudioRawWatsonSTT {
 				apiKey: $sttApiKey;
 				iamTokenURL: $sttIAMTokenURL;
 				accessToken: $sttOnCP4DAccessToken;
+				// All connection parameter are taken from params.
+				// So if we clean the app config name, we avoid error logs
+				appConfigName: "";
 		}
 
 		// Scan a directory periodically to pick up the audio files and 
@@ -229,9 +234,11 @@ public composite AudioRawWatsonSTT {
 		// There is an important step that must be performed after sending the
 		// entire blob content either in full or in partial blob fragments to the
 		// STT operator. Please read the commentary inside this operator completely.
-		stream<rstring conversationId, blob speech> AudioBlobContent as ABC = 
+		stream<rstring conversationId, blob speech, int32 sequence> AudioBlobContent as ABC = 
 			Custom(AudioFileName as AFN) {
 			logic
+				// The counter for the sequece id of the results. Sequence should start with 0
+				state: mutable int32 counter = -1;
 				onTuple AFN: {
 					mutable int64 audioBlobFragmentSize =  $audioBlobFragmentSize;
 					
@@ -310,6 +317,7 @@ public composite AudioRawWatsonSTT {
 					
 					// Stay in a loop to read all the blob fragments and send.
 					while(++loopCnt <= numberOfBlobFragments) {
+						++counter;
 						// Read an audio blob fragment from the audio file.
 						clearM(audioBlob);
 						fread(audioBlob, fh, (uint64)audioBlobFragmentSize, err);
@@ -323,6 +331,7 @@ public composite AudioRawWatsonSTT {
 						
 						// Send this blob data now.
 						oTuple.speech = (blob)audioBlob;
+						oTuple.sequence = counter;
 						submit(oTuple, ABC);
 						atleastOneBlobFragmentWasSent = true;
 					} // End of while(++loopCnt <= numberOfBlobFragments)
@@ -548,6 +557,7 @@ public composite AudioRawWatsonSTT {
 			config
 				//Place this operator into an own PE to separate the final result printouts from all other printouts
 				placement: partitionIsolation;
+				threadedPort: queue(SR, Sys.Wait);
 		}
 
 	config restartable: false;

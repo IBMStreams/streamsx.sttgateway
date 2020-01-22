@@ -13,21 +13,36 @@
 
 #include <string>
 
+// This operator heavily relies on the Websocket++ header only library.
+// https://docs.websocketpp.org/index.html
+// This C++11 library code does the asynchronous full duplex Websocket communication with
+// the Watson STT service via a series of event handlers (a.k.a callback methods).
+// Bulk of the logic in this operator class appears in those event handler methods below.
 #include <websocketpp/config/asio_client.hpp>
 #include <websocketpp/client.hpp>
-
-#include <SPL/Runtime/Type/SPLType.h>
-#include <SPL/Runtime/Function/SPLFunctions.h>
-// Operator metrics related include files.
-#include <SPL/Runtime/Common/Metric.h>
-#include <SPL/Runtime/Utility/Mutex.h>
 
 // A nice read in this URL about using property_tree for JSON parsing:
 // http://zenol.fr/blog/boost-property-tree/en.html
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/json_parser.hpp>
 
+#include <boost/exception/to_string.hpp>
+
+// SPL Operator related includes
+#include <SPL/Runtime/Type/SPLType.h>
+#include <SPL/Runtime/Function/SPLFunctions.h>
+#include <SPL/Runtime/Common/Metric.h>
+#include <SPL/Runtime/Utility/Mutex.h>
+
 namespace com { namespace ibm { namespace streams { namespace sttgateway {
+
+// Websocket related type definitions.
+typedef websocketpp::client<websocketpp::config::asio_tls_client> client;
+// Pull out the type of messages sent by our config
+typedef websocketpp::config::asio_tls_client::message_type::ptr message_ptr;
+typedef websocketpp::lib::shared_ptr<boost::asio::ssl::context> context_ptr;
+
+enum StatusOfAudioDataTransmission {NO_AUDIO_DATA_SENT_TO_STT, AUDIO_BLOB_FRAGMENTS_BEING_SENT_TO_STT, FULL_AUDIO_DATA_SENT_TO_STT};
 
 /*
  * Implementation class for operator Watson STT
@@ -67,11 +82,11 @@ public:
 			SPL::float64 keywordsSpottingThreshold_,
 			const SPL::list<SPL::rstring>& keywordsToBeSpotted_
 );
-	WatsonSTTImpl(WatsonSTTImpl const &) = delete;
+	//WatsonSTTImpl(WatsonSTTImpl const &) = delete;
 
 	//Destructor
 	~WatsonSTTImpl();
-
+protected:
 	// Notify port readiness
 	void allPortsReady();
 
@@ -79,31 +94,18 @@ public:
 	void prepareToShutdown();
 
 	// Tuple processing for mutating data port 0
-	template<typename IT, typename DATA_TYPE, DATA_TYPE & (IT::*GETTER)()>
-	void process_0(IT & inputTuple, DATA_TYPE const & dummy);
+	template<typename IT0, typename DATA_TYPE, DATA_TYPE & (IT0::*GETTER)()>
+	void process_0(IT0 & inputTuple);
 
 	// Tuple processing for authentication port 1
-	template<typename IT, const SPL::rstring& (IT::*GETTER)()const>
-	void process_1(IT const & inputTuple);
+	template<typename IT1, const SPL::rstring& (IT1::*GETTER)()const>
+	void process_1(IT1 const & inputTuple);
 
 	// Processing for websocket client threads
 	void process(uint32_t idx);
 
 
-public:
-	// Websocket related type definitions.
-	typedef websocketpp::client<websocketpp::config::asio_tls_client> client;
-	// Pull out the type of messages sent by our config
-	typedef websocketpp::config::asio_tls_client::message_type::ptr message_ptr;
-	typedef websocketpp::lib::shared_ptr<boost::asio::ssl::context> context_ptr;
-
-	enum StatusOfAudioDataTransmission {NO_AUDIO_DATA_SENT_TO_STT, AUDIO_BLOB_FRAGMENTS_BEING_SENT_TO_STT, FULL_AUDIO_DATA_SENT_TO_STT};
-
-public:
-	// All the public methods below used to be static methods with
-	// a static keyword at the beginning of every prototype
-	// declaration. On Aug/28/2018, I removed the need for them to be static.
-	//
+private:
 	// Websocket connection open event handler
 	void on_open(client* c, websocketpp::connection_hdl hdl);
 
@@ -128,7 +130,7 @@ public:
 private:
 	OP & splOperator;
 
-public:
+protected:
 	// Operator related member variables
 	// We build our own intro for trace outputs
 	const std::string operatorPhysicalName;
@@ -139,6 +141,8 @@ public:
 	bool wsConnectionEstablished;
 	bool makeNewWebsocketConnection;
 	bool websocketConnectionErrorOccurred;
+	bool transcriptionErrorOccurred;
+
 	SPL::int64 numberOfWebsocketConnectionAttempts;
 	client *wsClient;
 	websocketpp::connection_hdl wsHandle;
@@ -149,27 +153,26 @@ public:
 	int numberOfAudioBlobFragmentsReceivedInCurrentConversation;
 	std::vector<OT *> oTupleList;
 
+	std::string accessToken;
+
 	//Internal state
 	SPL::Mutex sttMutex1;
 
 	SPL::int64 numberOfFullAudioConversationsReceived;
 	SPL::int64 numberOfFullAudioConversationsTranscribed;
+	SPL::int64 numberOfFullAudioConversationsFailed;
 	StatusOfAudioDataTransmission statusOfAudioDataTransmissionToSTT;
 	std::string transcriptionResult;
-	bool transcriptionErrorOccurred;
 	bool sttResultTupleWaitingToBeSent;
+
 	SPL::list<SPL::int32> utteranceWordsSpeakers;
 	SPL::list<SPL::float64> utteranceWordsSpeakersConfidences;
 	SPL::list<SPL::float64> utteranceWordsStartTimes;
-
-	std::string accessToken;
 
 	//Configuration values
 	const bool websocketLoggingNeeded;
 	const SPL::float64 cpuYieldTimeInAudioSenderThread;
 	const SPL::float64 waitTimeBeforeSTTServiceConnectionRetry;
-	//This time becomes effective, when the connectionAttemptsThreshold limit is exceeded
-	static const SPL::float64 waitTimeBeforeSTTServiceConnectionRetryLong;
 	const SPL::int32 connectionAttemptsThreshold;
 	const bool sttLiveMetricsUpdateNeeded;
 	const std::string uri;
@@ -196,9 +199,11 @@ public:
 	SPL::Metric * const nWebsocketConnectionAttemptsMetric;
 	SPL::Metric * const nFullAudioConversationsReceivedMetric;
 	SPL::Metric * const nFullAudioConversationsTranscribedMetric;
+	SPL::Metric * const nFullAudioConversationsFailedMetric;
 	SPL::Metric * const nSTTResultModeMetric;
 
 	// These are the output attribute assignment functions
+protected:
 	/*SPL::int32 getUtteranceNumber(int32_t const & utteranceNumber) { return(utteranceNumber); }
 	SPL::rstring getUtteranceText(std::string const & utteranceText) { return(utteranceText); }
 	SPL::boolean isFinalizedUtterance(bool const & finalizedUtterance) { return(finalizedUtterance); }
@@ -212,31 +217,48 @@ public:
 	SPL::list<SPL::float64> getWordAlternativesEndTimes(SPL::list<SPL::float64> const & wordAlternativesEndTimes) { return(wordAlternativesEndTimes); }
 	SPL::list<SPL::rstring> getUtteranceWords(SPL::list<SPL::rstring> const & utteranceWords) { return(utteranceWords); }
 	SPL::list<SPL::float64> getUtteranceWordsConfidences(SPL::list<SPL::float64> const & utteranceWordsConfidences) { return(utteranceWordsConfidences); }*/
-	//SPL::list<SPL::float64> getUtteranceWordsStartTimes() { return(utteranceWordsStartTimes); }
+	inline SPL::list<SPL::float64> getUtteranceWordsStartTimes() { return(utteranceWordsStartTimes); }
 	/*SPL::list<SPL::float64> getUtteranceWordsEndTimes(SPL::list<SPL::float64> const & utteranceWordsEndTimes) { return(utteranceWordsEndTimes); }
 	SPL::float64 getUtteranceStartTime(SPL::float64 const & utteranceStartTime) { return(utteranceStartTime); }
 	SPL::float64 getUtteranceEndTime(SPL::float64 const & utteranceEndTime) { return(utteranceEndTime); }*/
-	//SPL::list<SPL::int32> getUtteranceWordsSpeakers() { return(utteranceWordsSpeakers); }
-	//SPL::list<SPL::float64> getUtteranceWordsSpeakersConfidences() { return(utteranceWordsSpeakersConfidences); }
+	inline SPL::list<SPL::int32> getUtteranceWordsSpeakers() { return(utteranceWordsSpeakers); }
+	inline SPL::list<SPL::float64> getUtteranceWordsSpeakersConfidences() { return(utteranceWordsSpeakersConfidences); }
 	/*SPL::map<SPL::rstring, SPL::list<SPL::map<SPL::rstring, SPL::float64>>>
 		getKeywordsSpottingResults(SPL::map<SPL::rstring,
 		SPL::list<SPL::map<SPL::rstring, SPL::float64>>> const & keywordsSpottingResults) { return(keywordsSpottingResults); }*/
+
+	// Helper functions
+	void incrementNumberOfFullAudioConversationsReceived();
+	void incrementNumberOfFullAudioConversationsTranscribed();
+	void incrementNumberOfFullAudioConversationsFailed();
+
+	// Some definitions
+	//This time becomes effective, when the connectionAttemptsThreshold limit is exceeded
+	static constexpr SPL::float64 waitTimeBeforeSTTServiceConnectionRetryLong = 60.0;
+	static constexpr size_t maxVectorSize = 100000;
+};
+
+// Enum to define the results of the getSpeechSamples operation
+enum class GetSpeechSamplesResult {
+	sucess,
+	sucessAndMediaEnd,
+	errorAndMediaEnd
+	//errorIntermediate
 };
 
 // The extraction function to extract the blob or the blob from filename into the blob list and size list
-// Returns 0 if success; 1 if tuple has to be ignored (repeated empty blob); 2 file read error
+// Returns success; success and media end; of error and media end (which is a file read error)
+// The function transfers the ownership of the audioBytes buffer to the caller if not null
+// The primary template is never used so it is not defined
 template<typename DATA_TYPE>
-int getSpeechSamples(
+GetSpeechSamplesResult getSpeechSamples(
 			DATA_TYPE & input,
-			std::string const & traceIntro,
-			std::vector<unsigned char *>& audioBytes,
-			std::vector<uint64_t>& audioSize,
-			int& numberOfAudioBlobFragmentsReceivedInCurrentConversation,
-			SPL::int64& numberOfFullAudioConversationsReceived,
-			std::string audioErrorFileName);
+			unsigned char * & audioBytes,
+			uint64_t & audioSize,
+			std::string & currentFileName);
 
-template<typename OP, typename OT>
-const SPL::float64 WatsonSTTImpl<OP, OT>::waitTimeBeforeSTTServiceConnectionRetryLong = 60.0;
+/*template<typename OP, typename OT>
+const SPL::float64 WatsonSTTImpl<OP, OT>::waitTimeBeforeSTTServiceConnectionRetryLong = 60.0;*/
 
 template<typename OP, typename OT>
 WatsonSTTImpl<OP, OT>::WatsonSTTImpl(
@@ -274,30 +296,26 @@ WatsonSTTImpl<OP, OT>::WatsonSTTImpl(
 		wsConnectionEstablished{false},
 		makeNewWebsocketConnection{false},
 		websocketConnectionErrorOccurred{false},
+		transcriptionErrorOccurred{false},
 		numberOfWebsocketConnectionAttempts{0},
 		wsClient{},
 		wsHandle{},
 
-		audioBytes{},
-		audioSize{},
 		numberOfAudioBlobFragmentsReceivedInCurrentConversation{0},
-		oTupleList{},
-
-		sttMutex1{},
+		accessToken{},
+		sttMutex1(),
 
 		numberOfFullAudioConversationsReceived{0},
 		numberOfFullAudioConversationsTranscribed{0},
+		numberOfFullAudioConversationsFailed{0},
 		// 0 = NO_AUDIO_DATA_SENT_TO_STT, 1 = PARITAL_BLOB_FRAGMENTS_BEING_SENT_TO_STT,
 		// 2 = FULL_AUDIO_DATA_SENT_TO_STT
 		statusOfAudioDataTransmissionToSTT{NO_AUDIO_DATA_SENT_TO_STT},
 		transcriptionResult{},
-		transcriptionErrorOccurred{false},
 		sttResultTupleWaitingToBeSent{false},
 		utteranceWordsSpeakers{},
 		utteranceWordsSpeakersConfidences{},
 		utteranceWordsStartTimes{},
-
-		accessToken{},
 
 		websocketLoggingNeeded{websocketLoggingNeeded_},
 		cpuYieldTimeInAudioSenderThread{cpuYieldTimeInAudioSenderThread_},
@@ -330,6 +348,7 @@ WatsonSTTImpl<OP, OT>::WatsonSTTImpl(
 		nWebsocketConnectionAttemptsMetric{ & splOperator.getContext().getMetrics().getCustomMetricByName("nWebsocketConnectionAttempts")},
 		nFullAudioConversationsReceivedMetric{ & splOperator.getContext().getMetrics().getCustomMetricByName("nFullAudioConversationsReceived")},
 		nFullAudioConversationsTranscribedMetric{ & splOperator.getContext().getMetrics().getCustomMetricByName("nFullAudioConversationsTranscribed")},
+		nFullAudioConversationsFailedMetric{ & splOperator.getContext().getMetrics().getCustomMetricByName("nFullAudioConversationsFailed")},
 		nSTTResultModeMetric{ & splOperator.getContext().getMetrics().getCustomMetricByName("nSTTResultMode")}
 {
 	if (customizationId == "") {
@@ -459,6 +478,7 @@ WatsonSTTImpl<OP, OT>::~WatsonSTTImpl() {
 
 template<typename OP, typename OT>
 void WatsonSTTImpl<OP, OT>::allPortsReady() {
+	// create the operator receiver thread
 	uint32_t userThreadIndex = splOperator.createThreads(2);
 	if (userThreadIndex != 0) {
 		throw std::invalid_argument(traceIntro +" WatsonSTTImpl invalid userThreadIndex");
@@ -502,88 +522,51 @@ void WatsonSTTImpl<OP, OT>::process(uint32_t idx) {
 }
 
 template<typename OP, typename OT>
-template<typename IT, const SPL::rstring& (IT::*GETTER)()const>
-void WatsonSTTImpl<OP, OT>::process_1(IT const & inputTuple) {
-	// There are multiple methods (process, audio_blob_sender and on_message) that
-	// regularly access (read, write and delete) the vector member variables.
-	// All those methods work in parallel inside their own threads.
-	// To make that vector access thread safe, we will use this mutex.
+template<typename IT1, const SPL::rstring& (IT1::*GETTER)()const>
+void WatsonSTTImpl<OP, OT>::process_1(IT1 const & inputTuple) {
+
+	// The access token is written here and is read in method ws_init (in context of the operator receiver thread)
+	// But the lock with portMutex is sufficient, because ws_init reads access token
+	// when wsConnectionEstablished is false and makeNewWebsocketConnection is true
+	// and during this time the portMutex is acquired from process_0
 	SPL::AutoMutex autoMutex(sttMutex1);
 
 	// Save the access token for subsequent use within this operator.
 	const SPL::rstring& at = (inputTuple.*GETTER)();
 	accessToken = at;
 	SPLAPPTRC(L_INFO, traceIntro << "-->Received new/refreshed access token.", "process");
-	// This must be the audio data arriving here via port 0 i.e. first input port.
-	// If we have a non-empty IAM access token, process the audio data.
-	// Otherwise, skip it.
-	if (accessToken.empty()) {
-		SPLAPPTRC(L_ERROR, traceIntro <<
-			"-->Ignoring the received audio data at this time due "
-			"to an empty IAM access token. User must first provide "
-			" the IAM access token before sending any audio data to this operator.",
-			"process");
-	}
-
-	return;
 }
 
 //Definition of the template function getSpeechSamples if data type is SPL::blob
 template<>
-int getSpeechSamples<SPL::blob>(
+GetSpeechSamplesResult getSpeechSamples<SPL::blob>(
 		SPL::blob & input,
-		std::string const & traceIntro,
-		std::vector<unsigned char *>& audioBytes,
-		std::vector<uint64_t>& audioSize,
-		int& numberOfAudioBlobFragmentsReceivedInCurrentConversation,
-		SPL::int64& numberOfFullAudioConversationsReceived,
-		std::string audioErrorFileName)
+		unsigned char * & audioBytes,
+		uint64_t & audioSize,
+		std::string & currentFileName)
 {
 	uint64_t sizeOfBlob = SPL::Functions::Collections::blobSize(input);
 
-	// We can allow an end of audio indicator (i.e. an empty blob) only
-	// if we are already in the process of receiving one or more
-	// blob fragments for an ongoing speech conversation.
-	// If an empty blob arrives from the caller of this operator
-	// (i.e. SPL code) abruptly when there is no ongoing speech conversation,
-	// ignore that one without adding it to the vector.
-	if (sizeOfBlob == 0 &&
-		numberOfAudioBlobFragmentsReceivedInCurrentConversation == 0) {
-		// This is not allowed. Ignore this empty blob.
-		SPLAPPTRC(L_ERROR, traceIntro <<
-			"-->Received audio data is an empty blob in an empty conversation. This tuple is ignored!",
-			"process");
-		return 1;
-	}
-
-	if (sizeOfBlob > 0) {
-		audioBytes.push_back(input.releaseData(sizeOfBlob));
-		numberOfAudioBlobFragmentsReceivedInCurrentConversation++;
+	audioSize = sizeOfBlob;
+	if (sizeOfBlob == 0) {
+		audioBytes = nullptr;
 	} else {
-		// Append a NULL pointer to indicate the end of blob data for a given audio.
-		audioBytes.push_back(nullptr);
-		// All blob fragments for the current audio conversation have been received.
-		numberOfAudioBlobFragmentsReceivedInCurrentConversation = 0;
-		numberOfFullAudioConversationsReceived++;
+		audioBytes = input.releaseData(sizeOfBlob);
 	}
-	audioSize.push_back(sizeOfBlob);
-	return 0;
+	// Data bluffer assigned or null
+	return GetSpeechSamplesResult::sucess;
 }
 
 //Definition of the template function getSpeechSamples if data type is rstring -> read file
 template<>
-int getSpeechSamples<SPL::rstring>(
+GetSpeechSamplesResult getSpeechSamples<SPL::rstring>(
 		SPL::rstring & input,
-		std::string const & traceIntro,
-		std::vector<unsigned char *>& audioBytes,
-		std::vector<uint64_t>& audioSize,
-		int& numberOfAudioBlobFragmentsReceivedInCurrentConversation,
-		SPL::int64& numberOfFullAudioConversationsReceived,
-		std::string audioErrorFileName)
+		unsigned char * & audioBytes,
+		uint64_t & audioSize,
+		std::string & currentFileName)
 {
-	SPLAPPTRC(L_DEBUG, traceIntro << "-->Sending file " << input, "ws_audio_blob_sender");
-
-	numberOfFullAudioConversationsReceived++;
+	SPLAPPTRC(L_DEBUG, "-->Sending file " << input, "getSpeechSamples");
+	currentFileName = input;
 
 	// Check for the file existence before attempting to read the audio data.
 	// In C++, this is a very fast way to check file existence.
@@ -593,102 +576,209 @@ int getSpeechSamples<SPL::rstring>(
 	// int32_t fileSize = fileStat.st_size;
 
 	if (fileStatReturnCode != 0) {
+
 		// File doesn't exist.
 		// Log this information and remove this audio data from the vector.
-		std::string errorMsg = traceIntro +
-			"-->Audio file not found. Skipping STT task for this file: " + input;
-		SPLAPPTRC(L_ERROR, errorMsg, "ws_audio_blob_sender");
+		SPLAPPTRC(L_ERROR, "-->Audio file not found. Skipping STT task for this file: " << input, "getSpeechSamples");
+		//No output buffer assigned
+		return GetSpeechSamplesResult::sucessAndMediaEnd;
 
-
-		return 2;
 	} else {
 		// Audio file exists. Read binary file into buffer
 		std::ifstream inputStream(input.c_str(), std::ios::binary);
 		//std::vector<char> buffer((std::istreambuf_iterator<char>(inputStream)), (std::istreambuf_iterator<char>()));
 		uint64_t fsize = fileStat.st_size;
-		SPLAPPTRC(L_DEBUG, traceIntro << "-->Sending file size" << fsize, "ws_audio_blob_sender");
+		SPLAPPTRC(L_DEBUG, "-->Sending file size" << fsize, "getSpeechSamples");
 
-		unsigned char * const data = new unsigned char[fsize];
-		unsigned char * datax = data;
-		std::istreambuf_iterator<char> it(inputStream);
-		std::istreambuf_iterator<char> it_end;
-		while (not it.equal(it_end)) {
-			*datax = *it;
-			++datax;
-			++it;
+		if (fsize == 0) {
+			audioBytes = nullptr;
+			audioSize = 0;
+		} else {
+			unsigned char * const data = new unsigned char[fsize];
+			unsigned char * datax = data;
+			std::istreambuf_iterator<char> it(inputStream);
+			std::istreambuf_iterator<char> it_end;
+			while (not it.equal(it_end)) {
+				*datax = *it;
+				++datax;
+				++it;
+			}
+			//TODO: error handling during read
+			// Data buffer is assigned
+			audioBytes = data;
+			audioSize = fsize;
 		}
 
-		audioBytes.push_back(data);
-		audioSize.push_back(fsize);
-		// Push a null blob to trigger the 'end of conversation' procedure
-		audioBytes.push_back(nullptr);
-		audioSize.push_back(0u);
-
-		numberOfAudioBlobFragmentsReceivedInCurrentConversation = 1;
-		return 0;
-
+		return GetSpeechSamplesResult::sucessAndMediaEnd;
 	} // End of if (stat(audioFileName.c_str(), &buffer) != 0)
 }
 
 template<typename OP, typename OT>
-template<typename IT, typename DATA_TYPE, DATA_TYPE & (IT::*GETTER)()>
-void WatsonSTTImpl<OP, OT>::process_0(IT & inputTuple, DATA_TYPE const & dummy) {
-	// There are multiple methods (process, audio_blob_sender and on_message) that
-	// regularly access (read, write and delete) the vector member variables.
-	// All those methods work in parallel inside their own threads.
-	// To make that vector access thread safe, we will use this mutex.
+template<typename IT0, typename DATA_TYPE, DATA_TYPE & (IT0::*GETTER)()>
+void WatsonSTTImpl<OP, OT>::process_0(IT0 & inputTuple) {
+
+	// serialize this method and protect from issues when multiple threads send
+	// to this port
 	SPL::AutoMutex autoMutex(sttMutex1);
 
-	//get input
-	DATA_TYPE & data = (inputTuple.*GETTER)();
-
-	std::string audioFileName;
-	int result = getSpeechSamples(data, traceIntro, audioBytes, audioSize, numberOfAudioBlobFragmentsReceivedInCurrentConversation, numberOfFullAudioConversationsReceived, audioFileName);
-
-	if (result == 1) {
-		SPLAPPTRC(L_ERROR, traceIntro <<
-			"-->Received audio data is an empty blob in an empty conversation. This tuple is ignored!",
-			"process");
+	// This must be the audio data arriving here via port 0 i.e. first input port.
+	// If we have a non-empty IAM access token, process the audio data.
+	// Otherwise, skip it.
+	if (accessToken.empty()) {
+		SPLAPPTRC(L_ERROR, traceIntro << "-->Ignoring the received audio data at this time due to an empty IAM access "
+				"token. User must first provide the IAM access token before sending any audio data to this operator.",
+				"process_0");
 		return;
+	}
 
-	} else if ( result == 2) {
-		std::string errorMsg = traceIntro +
-			"-->Audio file not found. Skipping STT task for this file: " + audioFileName;
-		SPLAPPTRC(L_ERROR, errorMsg, "ws_audio_blob_sender");
+	//get input
+	DATA_TYPE & data_ = (inputTuple.*GETTER)();
+
+	std::string currentFileName_;
+	unsigned char * audioBytes_ = nullptr;
+	uint64_t audioSize_ = 0ul;
+	GetSpeechSamplesResult result = getSpeechSamples(data_, audioBytes_, audioSize_, currentFileName_);
+
+	bool audioSamplesFound_ = false;
+	bool mediaEndFound_ = false;
+
+	if (result == GetSpeechSamplesResult::errorAndMediaEnd) {
+
+		// File read error: do not push samples into audio vector
+		// Send error tuple directly
+		incrementNumberOfFullAudioConversationsReceived();
+		numberOfAudioBlobFragmentsReceivedInCurrentConversation = 0;
+
+		std::string errorMsg = traceIntro + "-->Audio file not found. Skipping STT task for this file: " + currentFileName_;
+		SPLAPPTRC(L_ERROR, errorMsg, "process_0");
 
 		// Create an output tuple, auto assign from current input tuple
 		OT * oTuple = splOperator.createOutTupleAndAutoAssign(inputTuple);
 		// Assign error message and send the tuple
 		splOperator.setErrorAttribute(oTuple, errorMsg);
 		splOperator.submit(*oTuple, 0);
+		incrementNumberOfFullAudioConversationsFailed();
 
-		// Update the operator metric only if the user asked for a live update.
-		if (sttLiveMetricsUpdateNeeded == true) {
-			nFullAudioConversationsReceivedMetric->setValueNoLock(numberOfFullAudioConversationsReceived);
-		}
-
+		delete oTuple;
+		if (audioBytes_)
+			delete audioBytes_;
 		return;
+
+	} else if (result == GetSpeechSamplesResult::sucessAndMediaEnd) {
+
+		incrementNumberOfFullAudioConversationsReceived();
+
+		if (audioSize_ == 0) {
+			numberOfAudioBlobFragmentsReceivedInCurrentConversation = 0;
+			// File read success: but file is empty: Send error tuple directly
+			std::string errorMsg = traceIntro + "-->Audio file is empty. Skipping STT task for this file: " + currentFileName_;
+			SPLAPPTRC(L_WARN, errorMsg, "process_0");
+
+			// Create an output tuple, auto assign from current input tuple
+			OT * oTuple = splOperator.createOutTupleAndAutoAssign(inputTuple);
+			// Assign error message and send the tuple
+			splOperator.setErrorAttribute(oTuple, errorMsg);
+			splOperator.submit(*oTuple, 0);
+			incrementNumberOfFullAudioConversationsFailed();
+
+			delete oTuple;
+			if (audioBytes_)
+				delete audioBytes_;
+			return;
+
+		} else {
+			// File read success
+			numberOfAudioBlobFragmentsReceivedInCurrentConversation = 1;
+			audioSamplesFound_ = true;
+			mediaEndFound_ = true;
+		}
+	} else { // GetSpeechSamplesResult::sucess
+
+		if (numberOfAudioBlobFragmentsReceivedInCurrentConversation == 0) {
+
+			// A new transcription must be started
+			incrementNumberOfFullAudioConversationsReceived();
+
+			if (audioSize_ == 0) {
+
+				std::string errorMsg = "-->Received audio data is an empty blob in an empty conversation";
+				SPLAPPTRC(L_WARN, traceIntro << errorMsg, "process_0");
+				// Create an output tuple, auto assign from current input tuple
+				OT * oTuple = splOperator.createOutTupleAndAutoAssign(inputTuple);
+				// Assign error message and send the tuple
+				splOperator.setErrorAttribute(oTuple, errorMsg);
+				splOperator.submit(*oTuple, 0);
+				incrementNumberOfFullAudioConversationsFailed();
+
+				delete oTuple;
+				if (audioBytes_)
+					delete audioBytes_;
+				return;
+
+			} else {
+
+				++numberOfAudioBlobFragmentsReceivedInCurrentConversation;
+				audioSamplesFound_ = true;
+				mediaEndFound_ = false;
+			}
+
+		} else {
+
+			// A subsequent blob is received
+			if (audioSize_ == 0) {
+				// End of current conversation
+				numberOfAudioBlobFragmentsReceivedInCurrentConversation = 0;
+				audioSamplesFound_ = false;
+				mediaEndFound_ = true;
+			} else {
+				++numberOfAudioBlobFragmentsReceivedInCurrentConversation;
+				audioSamplesFound_ = true;
+				mediaEndFound_ = false;
+			}
+		}
 	}
 
-	//Successful operation
-	// Update the operator metric only if the user asked for a live update.
-	if (sttLiveMetricsUpdateNeeded == true) {
-		nFullAudioConversationsReceivedMetric->setValueNoLock(numberOfFullAudioConversationsReceived);
-	}
+	if (audioSize.size() < maxVectorSize) {
+		// Push data values to vector
+		// An entry with audioSize == 0 is a flag for the end of conversation
+		if (audioSamplesFound_) {
+			audioBytes.push_back(audioBytes_);
+			audioSize.push_back(audioSize_);
+		} else {
+			if (audioBytes_)
+				delete audioBytes_;
+		}
+		if (mediaEndFound_) {
+			audioBytes.push_back(nullptr);
+			audioSize.push_back(0);
+		}
+		// Let us do all the auto output tuple attribute assignments and store it in a
+		// list to be used in the on_message event handler method below at the time of
+		// either full or partial transcription gets completed for a given audio data.
+		// We will create a dynamic oTuple object via the new C++ construct so that
+		// the object pointer can be stored in the oTupleList below.
+		// For every new audio (either a new audio filename or the very first
+		// audio blob fragment sent here, we will create a new oTuple object.
+		const bool newAudioSegment = numberOfAudioBlobFragmentsReceivedInCurrentConversation == 1;
+		if (newAudioSegment) {
+			OT * oTuple = splOperator.createOutTupleAndAutoAssign(inputTuple);
+			// Push this partially filled oTuple object's pointer to the
+			// vector so that we can get it back when the transcription result arrives.
+			oTupleList.push_back(oTuple);
+		}
+	} else {
+		std::string errorMsg = traceIntro + "Max vector size reached! All audio is ignored!";
+		SPLAPPTRC(L_ERROR, errorMsg, "process_0");
 
-	// Let us do all the auto output tuple attribute assignments and store it in a
-	// list to be used in the on_message event handler method below at the time of
-	// either full or partial transcription gets completed for a given audio data.
-	// We will create a dynamic oTuple object via the new C++ construct so that
-	// the object pointer can be stored in the oTupleList below.
-	// For every new audio (either a new audio filename or the very first
-	// audio blob fragment sent here, we will create a new oTuple object.
-	const bool newAudioSegment = numberOfAudioBlobFragmentsReceivedInCurrentConversation == 1;
-	if (newAudioSegment) {
+		// Create an output tuple, auto assign from current input tuple
 		OT * oTuple = splOperator.createOutTupleAndAutoAssign(inputTuple);
-		// Push this partially filled oTuple object's pointer to the
-		// vector so that we can get it back when the transcription result arrives.
-		oTupleList.push_back(oTuple);
+		// Assign error message and send the tuple
+		splOperator.setErrorAttribute(oTuple, errorMsg);
+		splOperator.submit(*oTuple, 0);
+		incrementNumberOfFullAudioConversationsFailed();
+		delete oTuple;
+		if (audioBytes_)
+			delete audioBytes_;
 	}
 } // End: WatsonSTTImpl<OP, OT>::process_0
 
@@ -915,6 +1005,10 @@ void WatsonSTTImpl<OP, OT>::ws_audio_blob_sender() {
 template<typename OP, typename OT>
 void WatsonSTTImpl<OP, OT>::ws_init() {
 
+	using websocketpp::lib::placeholders::_1;
+	using websocketpp::lib::placeholders::_2;
+	using websocketpp::lib::bind;
+
 	while (not splOperator.getPE().getShutdownRequested()) {
 		if (not makeNewWebsocketConnection) {
 			// Keep waiting in this while loop until
@@ -1034,8 +1128,9 @@ void WatsonSTTImpl<OP, OT>::ws_init() {
 
 // When the Websocket connection to the Watson STT service is made successfully,
 // this callback method will be called from the websocketpp layer.
+// Either open or fail will be called for each connection. Never both.
 template<typename OP, typename OT>
-void WatsonSTTImpl<OP, OT>::on_open(WatsonSTTImpl<OP, OT>::client* c, websocketpp::connection_hdl hdl) {
+void WatsonSTTImpl<OP, OT>::on_open(client* c, websocketpp::connection_hdl hdl) {
 	SPLAPPTRC(L_DEBUG, traceIntro << "-->Reached 6 (on_open)", "on_open");
 	// On Websocket connection open, establish a session with the STT service.
 	// https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-websockets#WSstart
@@ -1181,7 +1276,7 @@ static Tree query(Tree& pt, typename Tree::path_type path) {
 // received from the STT service, this callback method will be called from the websocketpp layer.
 // https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-websockets#WSexample
 template<typename OP, typename OT>
-void WatsonSTTImpl<OP, OT>::on_message(WatsonSTTImpl<OP, OT>::client* c, websocketpp::connection_hdl hdl, message_ptr msg) {
+void WatsonSTTImpl<OP, OT>::on_message(client* c, websocketpp::connection_hdl hdl, message_ptr msg) {
 	// Short alias for this namespace
 	namespace pt = boost::property_tree;
 
@@ -2281,10 +2376,6 @@ void WatsonSTTImpl<OP, OT>::on_message(WatsonSTTImpl<OP, OT>::client* c, websock
 					}
 				} // End of while(audioBytes.size() > 0)
 
-				// If there are no more audio fragments left in the vector, reset the fragment count to 0.
-				if(audioBytes.size() <= 0) {
-					numberOfAudioBlobFragmentsReceivedInCurrentConversation = 0;
-				}
 			} // End of if (sttErrorFound_ &&
 		} // End of if (wsConnectionEstablished && oTupleList.size() > 0)
 
@@ -2307,8 +2398,9 @@ void WatsonSTTImpl<OP, OT>::on_message(WatsonSTTImpl<OP, OT>::client* c, websock
 
 // Whenever our existing Websocket connection to the Watson STT service is closed,
 // this callback method will be called from the websocketpp layer.
+// Close will be called exactly once for every connection that open was called for. Close is not called for failed connections.
 template<typename OP, typename OT>
-void WatsonSTTImpl<OP, OT>::on_close(WatsonSTTImpl<OP, OT>::client* c, websocketpp::connection_hdl hdl) {
+void WatsonSTTImpl<OP, OT>::on_close(client* c, websocketpp::connection_hdl hdl) {
 	// In the lab tests, I noticed that occasionally a Websocket connection can get
 	// closed right after an on_open event without actually receiving the "listening" response
 	// in the on_message event from the Watson STT service. This condition clearly means
@@ -2335,7 +2427,7 @@ void WatsonSTTImpl<OP, OT>::on_close(WatsonSTTImpl<OP, OT>::client* c, websocket
 // When a Websocket connection handshake happens with the Watson STT serice for enabling
 // TLS security, this callback method will be called from the websocketpp layer.
 template<typename OP, typename OT>
-typename WatsonSTTImpl<OP, OT>::context_ptr WatsonSTTImpl<OP, OT>::on_tls_init(WatsonSTTImpl<OP, OT>::client* c, websocketpp::connection_hdl) {
+context_ptr WatsonSTTImpl<OP, OT>::on_tls_init(client* c, websocketpp::connection_hdl) {
 	//m_tls_init = std::chrono::high_resolution_clock::now();
 	//context_ptr ctx = websocketpp::lib::make_shared<boost::asio::ssl::context>(boost::asio::ssl::context::tlsv1);
 	context_ptr ctx =
@@ -2355,11 +2447,39 @@ typename WatsonSTTImpl<OP, OT>::context_ptr WatsonSTTImpl<OP, OT>::on_tls_init(W
 
 // When a connection attempt to the Watson STT service fails, then this
 // callback method will be called from the websocketpp layer.
+// Either open or fail will be called for each connection. Never both.
 template<typename OP, typename OT>
-void WatsonSTTImpl<OP, OT>::on_fail(WatsonSTTImpl<OP, OT>::client* c, websocketpp::connection_hdl hdl) {
+void WatsonSTTImpl<OP, OT>::on_fail(client* c, websocketpp::connection_hdl hdl) {
 	websocketConnectionErrorOccurred = true;
 	// c->get_alog().write(websocketpp::log::alevel::app, "Websocket connection to the Watson STT service failed.");
 	SPLAPPTRC(L_ERROR, traceIntro << "-->Websocket connection to the Watson STT service failed.", "on_fail");
+}
+
+template<typename OP, typename OT>
+void WatsonSTTImpl<OP, OT>::incrementNumberOfFullAudioConversationsReceived() {
+	++numberOfFullAudioConversationsReceived;
+	// Update the operator metric only if the user asked for a live update.
+	if (sttLiveMetricsUpdateNeeded == true) {
+		nFullAudioConversationsReceivedMetric->setValueNoLock(numberOfFullAudioConversationsReceived);
+	}
+}
+
+template<typename OP, typename OT>
+void WatsonSTTImpl<OP, OT>::incrementNumberOfFullAudioConversationsTranscribed() {
+	++numberOfFullAudioConversationsTranscribed;
+	// Update the operator metric only if the user asked for a live update.
+	if (sttLiveMetricsUpdateNeeded == true) {
+		nFullAudioConversationsTranscribedMetric->setValueNoLock(numberOfFullAudioConversationsTranscribed);
+	}
+}
+
+template<typename OP, typename OT>
+void WatsonSTTImpl<OP, OT>::incrementNumberOfFullAudioConversationsFailed() {
+	++numberOfFullAudioConversationsFailed;
+	// Update the operator metric only if the user asked for a live update.
+	if (sttLiveMetricsUpdateNeeded == true) {
+		nFullAudioConversationsFailedMetric->setValueNoLock(numberOfFullAudioConversationsFailed);
+	}
 }
 
 }}}}

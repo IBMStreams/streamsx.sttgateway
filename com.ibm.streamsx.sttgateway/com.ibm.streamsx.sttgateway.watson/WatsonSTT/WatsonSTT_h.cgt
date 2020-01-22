@@ -15,66 +15,30 @@ Last modified on: Jun/11/2019
 /* Additional includes go here */
 #include <WatsonSTTImpl.hpp>
 
-#include <websocketpp/config/asio_client.hpp>
-#include <websocketpp/client.hpp>
-#include <iostream>
-#include <fstream>
-#include <iterator>
-#include <algorithm>
-#include <vector>
-// Operator metrics related include files.
-#include <SPL/Runtime/Common/Metric.h>
-#include <SPL/Runtime/Operator/OperatorMetrics.h>
-
 <%SPL::CodeGen::headerPrologue($model);%>
 
-<%
-# Check the input port 0 i.e. the first input port. 
-my $inputPort = $model->getInputPortAt(0);
-my $inputTupleName = $inputPort->getCppTupleName();
-my $audioInputAsBlob = 0;
-my $inputAttrs = $inputPort->getAttributes();
-
-foreach my $inputAttr (@$inputAttrs) {
-	my $inAttrName = $inputAttr->getName();
-	my $inAttrType = $inputAttr->getSPLType();
-	
-	if ($inAttrName eq "speech") {
-		
-		if ($inAttrType eq "rstring") {
-			# This tuple attribute will carry the name of a file containing the audio data.
-			$audioInputAsBlob = 0;
-		}
-		
-		if ($inAttrType eq "blob") {
-			# This tuple attribute will carry a blob containing either full or partial audio data.
-			$audioInputAsBlob = 1;
-		}
-	}
-}
-%>
-
-class MY_OPERATOR : public MY_BASE_OPERATOR {
-
-	// Websocket related type definitions.
-	//typedef websocketpp::client<websocketpp::config::asio_tls_client> client;
-	// Pull out the type of messages sent by our config
-	//typedef websocketpp::config::asio_tls_client::message_type::ptr message_ptr;
-	//typedef websocketpp::lib::shared_ptr<boost::asio::ssl::context> context_ptr;
-
+/*
+ * Make this operator a composition of the MY_BASE_OPERATOR and the implementation class: WatsonSTTImpl
+ * Make the MY_OPERATOR class as slim as possible to have the most of the implementation in a pure c++ file
+ * So we can take the advantages of c++ editor
+ */
+class MY_OPERATOR : public MY_BASE_OPERATOR, public com::ibm::streams::sttgateway::WatsonSTTImpl<MY_OPERATOR, MY_BASE_OPERATOR::OPort0Type> {
 
 public:
+	// Alias for the type of the implementation class
+	typedef com::ibm::streams::sttgateway::WatsonSTTImpl<MY_OPERATOR, OPort0Type> Impl;
+	
 	// Constructor
 	MY_OPERATOR();
 	
 	// Destructor
-	virtual ~MY_OPERATOR(); 
+	virtual ~MY_OPERATOR();
 	
 	// Notify port readiness
-	void allPortsReady(); 
+	void allPortsReady();
 	
 	// Notify pending shutdown
-	void prepareToShutdown(); 
+	void prepareToShutdown();
 	
 	// Tuple processing for mutating data port 0
 	void process(Tuple & tuple, uint32_t port);
@@ -120,14 +84,6 @@ public:
 	
 	// Assign transcription complete attribute to output tuple
 	void setTranscriptionCompleteAttribute(OPort0Type * tuple);
-private:
-	// All the public methods below used to be static methods with
-	// a static keyword at the beginning of every prototype 
-	// declaration. On Aug/28/2018, I removed the need for them to be static.
-	//
-	
-	
-	com::ibm::streams::sttgateway::WatsonSTTImpl<MY_OPERATOR, OPort0Type> impl; //Implementation
-}; 
+};
 
 <%SPL::CodeGen::headerEpilogue($model);%>
