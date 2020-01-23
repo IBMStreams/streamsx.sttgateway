@@ -22,7 +22,7 @@
   </dependencies>
   <resources>
     <messageSet name="SttGatewayResource">
-      <lang default="true">en_US/SttGatewayResource.xml</lang>
+      <lang default="true">en_US/SttGatewayResource.xlf</lang>
     </messageSet>
   </resources>
 </toolkitInfoModel>
