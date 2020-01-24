@@ -27,6 +27,7 @@ class MY_OPERATOR : public MY_BASE_OPERATOR, public com::ibm::streams::sttgatewa
 public:
 	// Alias for the type of the implementation class
 	typedef com::ibm::streams::sttgateway::WatsonSTTImpl<MY_OPERATOR, OPort0Type> Impl;
+	typedef com::ibm::streams::sttgateway::WatsonSTTConfig Config;
 	
 	// Constructor
 	MY_OPERATOR();

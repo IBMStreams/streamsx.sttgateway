@@ -197,38 +197,42 @@ MY_OPERATOR::MY_OPERATOR()
 		MY_BASE_OPERATOR{},
 		com::ibm::streams::sttgateway::WatsonSTTImpl<MY_OPERATOR, OPort0Type>(
 				*this,
-				<%=$websocketLoggingNeeded%>,
-				<%=$cpuYieldTimeInAudioSenderThread%>,
-				<%=$waitTimeBeforeSTTServiceConnectionRetry%>,
-				<%=$connectionAttemptsThreshold%>,
-				<%=$sttLiveMetricsUpdateNeeded%>,
-				<%=$uri%>,
-				<%=$baseLanguageModel%>,
-				<%=$contentType%>,
-				<%=$sttResultMode%>,
-				<%=$sttRequestLogging%>,
-				<%=$baseModelVersion%>,
-				<%=$customizationId%>,
-				<%=$customizationWeight%>,
-				<%=$acousticCustomizationId%>,
-				<%=$filterProfanity%>,
-				<%=$sttJsonResponseDebugging%>,
-				<%=$maxUtteranceAlternatives%>,
-				<%=$wordAlternativesThreshold%>,
-				<%=$wordConfidenceNeeded%>,
-				<%=$wordTimestampNeeded%>,
-				<%=$identifySpeakers%>,
-				<%=$smartFormattingNeeded%>,
-				<%=$keywordsSpottingThreshold%>,
-				<%=$keywordsToBeSpotted%>
+				Config{
+						getContext().getName(),
+						getContext().getChannel(),
+						"Operator " + getContext().getName() + "-->Channel " + boost::to_string(getContext().getChannel()),
+
+						<%=$websocketLoggingNeeded%>,
+						<%=$cpuYieldTimeInAudioSenderThread%>,
+						<%=$waitTimeBeforeSTTServiceConnectionRetry%>,
+						<%=$connectionAttemptsThreshold%>,
+						<%=$sttLiveMetricsUpdateNeeded%>,
+						<%=$uri%>,
+						<%=$baseLanguageModel%>,
+						<%=$contentType%>,
+						<%=$sttResultMode%>,
+						<%=$sttRequestLogging%>,
+						<%=$baseModelVersion%>,
+						<%=$customizationId%>,
+						<%=$customizationWeight%>,
+						<%=$acousticCustomizationId%>,
+						<%=$filterProfanity%>,
+						<%=$sttJsonResponseDebugging%>,
+						<%=$maxUtteranceAlternatives%>,
+						<%=$wordAlternativesThreshold%>,
+						<%=$wordConfidenceNeeded%>,
+						<%=$wordTimestampNeeded%>,
+						<%=$identifySpeakers%>,
+						<%=$smartFormattingNeeded%>,
+						<%=$keywordsSpottingThreshold%>,
+						<%=$keywordsToBeSpotted%>
+					}
 				)
-{
-}
+{}
 
 // Destructor
 MY_OPERATOR::~MY_OPERATOR() 
-{
-}
+{}
 
 // Notify port readiness
 void MY_OPERATOR::allPortsReady() 
