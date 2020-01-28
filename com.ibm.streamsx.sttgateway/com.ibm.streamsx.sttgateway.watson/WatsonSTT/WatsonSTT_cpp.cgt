@@ -41,8 +41,7 @@ https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-websocke
 	my $inputAttrs = $inputPort->getAttributes();
 	my $speechAttributeFound = 0;
 	my $speechAttributeType = "none";
-	
-	foreach my $inputAttr (@$inputAttrs) {
+		foreach my $inputAttr (@$inputAttrs) {
 		my $inAttrName = $inputAttr->getName();
 		my $inAttrType = $inputAttr->getSPLType();
 		
@@ -63,17 +62,13 @@ https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-websocke
 		}
 	}
 	print "// audioInputAsBlob=$audioInputAsBlob speechAttributeType=$speechAttributeType\n";
-	
 	if ($speechAttributeFound == 0 ) {
 		SPL::CodeGen::exitln(SttGatewayResource::STTGW_INP_ATTRIBUTE_CHECK1("WatsonSTT", "speech"),
 				$model->getContext()->getSourceLocation());
 	}
-	
 	if (!(defined($audioInputAsBlob))) {
 		SPL::CodeGen::exitln(SttGatewayResource::STTGW_INP_ATTRIBUTE_TYPE_CHECK1("WatsonSTT", "speech", "rstring", "blob"),
 				$model->getContext()->getSourceLocation());
-	} else {
-		print "//code generated for case \$audioInputAsBlob = $audioInputAsBlob\n";
 	}
 	
 	# Check the input port number 1 i.e. the second input port.
@@ -82,8 +77,7 @@ https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-websocke
 	my $accessTokenAsString = undef;	
 	my $inputAttrs2 = $inputPort2->getAttributes();
 	my $accessTokenAttributeFound = 0;
-	
-	foreach my $inputAttr2 (@$inputAttrs2) {
+		foreach my $inputAttr2 (@$inputAttrs2) {
 		my $inAttrName2 = $inputAttr2->getName();
 		my $inAttrType2 = $inputAttr2->getSPLType();
 		
@@ -96,17 +90,39 @@ https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-websocke
 			}
 		}
 	}
-	
 	if ($accessTokenAttributeFound == 0 ) {
 		SPL::CodeGen::exitln(SttGatewayResource::STTGW_INP_ATTRIBUTE_TYPE_CHECK2("WatsonSTT", "accessToken"),
 				$model->getContext()->getSourceLocation());
 	}
-	
 	if (!(defined($accessTokenAsString))) {
 		SPL::CodeGen::exitln(SttGatewayResource::STTGW_INP_ATTRIBUTE_TYPE_CHECK2("WatsonSTT", "accessToken", "rstring"),
 				$model->getContext()->getSourceLocation());
 	}
 	
+	# determine the requirements from output functions
+	my $wordTimestampNeeded = 0;
+	my $wordConfidenceNeeded = 0;
+	my $identifySpeakers = 0;
+	my $oport = $model->getOutputPortAt(0); 
+	foreach my $attribute (@{$oport->getAttributes()}) {
+		my $name = $attribute->getName(); 
+		my $paramValues = $attribute->getAssignmentOutputFunctionParameterValues();
+		my $operation = $attribute->getAssignmentOutputFunctionName(); 
+
+		if ($operation eq "getUtteranceWordsConfidences") {
+			$wordConfidenceNeeded = 1;
+		} elsif ($operation eq "getUtteranceWordsStartTimes") {
+			$wordTimestampNeeded = 1;
+		} elsif ($operation eq "getUtteranceWordsEndTimes") {
+			$wordTimestampNeeded = 1;
+		} elsif ($operation eq "getUtteranceWordsSpeakers") {
+			$identifySpeakers = 1;
+		} elsif ($operation eq "getUtteranceWordsSpeakersConfidences") {
+			$identifySpeakers
+		}
+	}
+	print "// wordConfidenceNeeded=$wordConfidenceNeeded wordTimestampNeeded=$wordTimestampNeeded identifySpeakers=$identifySpeakers\n";
+
 	# Following are the operator parameters.
 	my $uri = $model->getParameterByName("uri");
 	$uri = $uri->getValueAt(0)->getCppExpression();
@@ -150,15 +166,6 @@ https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-websocke
 	my $wordAlternativesThreshold = $model->getParameterByName("wordAlternativesThreshold");
 	# Default: 0.0 to distable the wordAlternatives feature (a.k.a Confusion Networks).
 	$wordAlternativesThreshold = $wordAlternativesThreshold ? $wordAlternativesThreshold->getValueAt(0)->getCppExpression() : 0.0;
-
-	my $wordConfidenceNeeded = $model->getParameterByName("wordConfidenceNeeded");
-	$wordConfidenceNeeded = $wordConfidenceNeeded ? $wordConfidenceNeeded->getValueAt(0)->getCppExpression() : 0;
-	
-	my $wordTimestampNeeded = $model->getParameterByName("wordTimestampNeeded");
-	$wordTimestampNeeded = $wordTimestampNeeded ? $wordTimestampNeeded->getValueAt(0)->getCppExpression() : 0;
-
-	my $identifySpeakers = $model->getParameterByName("identifySpeakers");
-	$identifySpeakers = $identifySpeakers ? $identifySpeakers->getValueAt(0)->getCppExpression() : 0;
 
 	my $smartFormattingNeeded = $model->getParameterByName("smartFormattingNeeded");
 	$smartFormattingNeeded = $smartFormattingNeeded ? $smartFormattingNeeded->getValueAt(0)->getCppExpression() : 0;

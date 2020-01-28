@@ -90,12 +90,6 @@ public composite AudioFileWatsonSTT {
 			(boolean)getSubmissionTimeValue("sttJsonResponseDebugging", "false");
 		expression<float64> $wordAlternativesThreshold : 
 			(float64)getSubmissionTimeValue("wordAlternativesThreshold", "0.0");
-		expression<boolean> $wordConfidenceNeeded : 
-			(boolean)getSubmissionTimeValue("wordConfidenceNeeded", "false");
-		expression<boolean> $wordTimestampNeeded : 
-			(boolean)getSubmissionTimeValue("wordTimestampNeeded", "false");
-		expression<boolean> $identifySpeakers : 
-			(boolean)getSubmissionTimeValue("identifySpeakers", "false");
 		expression<boolean> $smartFormattingNeeded : 
 			(boolean)getSubmissionTimeValue("smartFormattingNeeded", "false");
 		expression<float64> $keywordsSpottingThreshold : 
@@ -231,9 +225,6 @@ public composite AudioFileWatsonSTT {
 				sttJsonResponseDebugging: $sttJsonResponseDebugging;
 				maxUtteranceAlternatives: $maxUtteranceAlternatives;
 				wordAlternativesThreshold: $wordAlternativesThreshold;
-				wordConfidenceNeeded: $wordConfidenceNeeded;
-				wordTimestampNeeded: $wordTimestampNeeded;
-				identifySpeakers: $identifySpeakers;
 				smartFormattingNeeded: $smartFormattingNeeded;
 				keywordsSpottingThreshold: $keywordsSpottingThreshold;
 				keywordsToBeSpotted: $keywordsToBeSpotted;

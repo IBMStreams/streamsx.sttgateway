@@ -179,15 +179,27 @@
               <prototype><![CDATA[list<rstring> getUtteranceWords()]]></prototype>
           </function>
           <function>
-              <description>Returns a list of confidences of the words in an utterance result.</description>
+              <description>
+              Returns a list of confidences of the words in an utterance result.
+              
+              **Note:** This function deliver an empt result if `sttResultMode` equals 3.
+              </description>
               <prototype><![CDATA[list<float64> getUtteranceWordsConfidences()]]></prototype>
           </function>
           <function>
-              <description>Returns a list of start times of the words in an utterance result relative to the start of the audio.</description>
+              <description>
+              Returns a list of start times of the words in an utterance result relative to the start of the audio.
+              
+              **Note:** This function deliver an empt result if `sttResultMode` equals 3.
+              </description>
               <prototype><![CDATA[list<float64> getUtteranceWordsStartTimes()]]></prototype>
           </function>          
           <function>
-              <description>Returns a list of end times of the words in an utterance result relative to the start of the audio.</description>
+              <description>
+              Returns a list of end times of the words in an utterance result relative to the start of the audio.
+              
+              **Note:** This function deliver an empt result if `sttResultMode` equals 3.
+              </description>
               <prototype><![CDATA[list<float64> getUtteranceWordsEndTimes()]]></prototype>
           </function>          
           <function>
@@ -199,11 +211,19 @@
               <prototype><![CDATA[float64 getUtteranceEndTime()]]></prototype>
           </function>          
           <function>
-              <description>Returns a list of speaker ids for the individual words in an utterance result.</description>
+              <description>
+              Returns a list of speaker ids for the individual words in an utterance result.
+              
+              **Note:** This function deliver an empt result if `sttResultMode` equals 3.
+              </description>
               <prototype><![CDATA[list<int32> getUtteranceWordsSpeakers()]]></prototype>
           </function>
           <function>
-              <description>Returns a list of confidences in identifying the speakers of the individual words in an utterance result.</description>
+              <description>
+              Returns a list of confidences in identifying the speakers of the individual words in an utterance result.
+              
+              **Note:** This function deliver an empt result if `sttResultMode` equals 3.
+              </description>
               <prototype><![CDATA[list<float64> getUtteranceWordsSpeakersConfidences()]]></prototype>
           </function>
           <function>
@@ -394,51 +414,6 @@
         <rewriteAllowed>true</rewriteAllowed>
         <expressionMode>AttributeFree</expressionMode>
         <type>float64</type>
-        <cardinality>1</cardinality>
-      </parameter>
-
-      <parameter>
-        <name>wordConfidenceNeeded</name>
-        <description>
-        This parameter indicates whether the transcription result should include individual words and their confidences 
-        or not. (Default is false)
-        
-        **Note:** This parameter is forced to false if `sttResultMode` equals 3.
-        </description>
-        <optional>true</optional>
-        <rewriteAllowed>true</rewriteAllowed>
-        <expressionMode>AttributeFree</expressionMode>
-        <type>boolean</type>
-        <cardinality>1</cardinality>
-      </parameter>
-
-      <parameter>
-        <name>wordTimestampNeeded</name>
-        <description>
-        This parameter indicates whether the transcription result should include individual words and their timestamps 
-        or not. (Default is false)
-        
-        **Note:** This parameter is forced to false if `sttResultMode` equals 3.
-        </description>
-        <optional>true</optional>
-        <rewriteAllowed>true</rewriteAllowed>
-        <expressionMode>AttributeFree</expressionMode>
-        <type>boolean</type>
-        <cardinality>1</cardinality>
-      </parameter>
-
-      <parameter>
-        <name>identifySpeakers</name>
-        <description>
-        This parameter indicates whether the speakers of the individual words in an utterance result should be identified. 
-        (Default is false)
-        
-        **Note:** This parameter is forced to false if `sttResultMode` equals 3.
-        </description>
-        <optional>true</optional>
-        <rewriteAllowed>true</rewriteAllowed>
-        <expressionMode>AttributeFree</expressionMode>
-        <type>boolean</type>
         <cardinality>1</cardinality>
       </parameter>
 
