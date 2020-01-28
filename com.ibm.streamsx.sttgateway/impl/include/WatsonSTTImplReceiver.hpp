@@ -141,6 +141,9 @@ protected:
 	// the value is copied from the sender thrad before makeNewWebsocketConnection has been flagged
 	std::string accessToken;
 
+	// The name of the current file if any (used for logging purposes only)
+	std::string currentFile;
+
 private:
 	std::atomic<SPL::int64> nWebsocketConnectionAttemptsCurrent;
 	std::atomic<SPL::int64> nFullAudioConversationsReceived;
@@ -197,6 +200,7 @@ WatsonSTTImplReceiver<OP, OT>::WatsonSTTImplReceiver(OP & splOperator_,Config co
 		oTupleUsedForSubmission{},
 
 		accessToken{},
+		currentFile{},
 
 		nWebsocketConnectionAttemptsCurrent{0},
 		nFullAudioConversationsReceived{0},
@@ -213,7 +217,7 @@ WatsonSTTImplReceiver<OP, OT>::WatsonSTTImplReceiver(OP & splOperator_,Config co
 		// Simply get the custom metrics already defined for this operator.
 		// The update of metrics nFullAudioConversationsReceived and nFullAudioConversationsTranscribed depends on parameter sttLiveMetricsUpdateNeeded
 		nWebsocketConnectionAttemptsCurrentMetric{ & splOperator.getContext().getMetrics().getCustomMetricByName("nWebsocketConnectionAttemptsCurrent")},
-		nFullAudioConversationsReceivedMetric{ & splOperator.getContext().getMetrics().getCustomMetricByName("nFullAudioConversationsReceivedMetric")},
+		nFullAudioConversationsReceivedMetric{ & splOperator.getContext().getMetrics().getCustomMetricByName("nFullAudioConversationsReceived")},
 		nFullAudioConversationsTranscribedMetric{ & splOperator.getContext().getMetrics().getCustomMetricByName("nFullAudioConversationsTranscribed")},
 		nFullAudioConversationsFailedMetric{ & splOperator.getContext().getMetrics().getCustomMetricByName("nFullAudioConversationsFailed")},
 		wsConnectionStateMetric{ & splOperator.getContext().getMetrics().getCustomMetricByName("wsConnectionState")}
@@ -1632,10 +1636,14 @@ void WatsonSTTImplReceiver<OP, OT>::on_message(client* c, websocketpp::connectio
 				throw std::runtime_error("on_message oTupleUsedForSubmission is null II");
 			}
 
-			if (not sttErrorFound_)
+			// Count conversations
+			if (not sttErrorFound_) {
 				incrementNFullAudioConversationsTranscribed();
-			else
+				SPLAPPTRC(L_INFO, "Successful transcription; currentFilename: " << currentFile, "STT_Result_Processing");
+			} else {
 				incrementNFullAudioConversationsFailed();
+				SPLAPPTRC(L_ERROR, "Error transcription; currentFilename: " << currentFile, "STT_Result_Processing");
+			}
 
 			if (sttJsonResponseDebugging == true) {
 				std::string tempString = "transcription completion.";

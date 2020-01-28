@@ -97,6 +97,8 @@ private:
 	std::vector<OT *> oTupleWastebasket;
 
 	std::string accessToken;
+	// The name of the current file if any (used for logging purposes only)
+	std::string currentFile;
 
 	// Port Mutex
 	SPL::Mutex portMutex;
@@ -145,6 +147,7 @@ WatsonSTTImpl<OP, OT>::WatsonSTTImpl(OP & splOperator_,Conf config_)
 		oTupleWastebasket(),
 
 		accessToken{},
+		currentFile{},
 
 		portMutex{},
 		nWebsocketConnectionAttempts(0),
@@ -407,6 +410,9 @@ void WatsonSTTImpl<OP, OT>::process_0(IT0 const & inputTuple) {
 		for (OT* x : oTupleWastebasket)
 			delete x;
 		oTupleWastebasket.clear();
+
+		// Prepare new conversation
+		Rec::currentFile = currentFile;
 	}
 
 	// This must be the audio data arriving here via port 0 i.e. first input port.
@@ -422,11 +428,10 @@ void WatsonSTTImpl<OP, OT>::process_0(IT0 const & inputTuple) {
 	//get input
 	DATA_TYPE const & mySpeechAttribute = (inputTuple.*GETTER)();
 
-	std::string myCurrentFileName;
 	unsigned char const * audioBytes_ = nullptr;
 	uint64_t myAudioSize = 0ul;
 	std::vector<unsigned char> * buffer_ = nullptr;
-	GetSpeechSamplesResult result = getSpeechSamples(mySpeechAttribute, audioBytes_, myAudioSize, buffer_, myCurrentFileName);
+	GetSpeechSamplesResult result = getSpeechSamples(mySpeechAttribute, audioBytes_, myAudioSize, buffer_, currentFile);
 	// ensure release of resource with unique_ptr
 	std::unique_ptr<std::vector<unsigned char> > myBuffer(buffer_);
 
@@ -440,7 +445,7 @@ void WatsonSTTImpl<OP, OT>::process_0(IT0 const & inputTuple) {
 		Rec::incrementNFullAudioConversationsReceived();
 		numberOfAudioBlobFragmentsReceivedInCurrentConversation = 0;
 
-		std::string errorMsg = Conf::traceIntro + "-->Audio file not found. Skipping STT task for this file: " + myCurrentFileName;
+		std::string errorMsg = Conf::traceIntro + "-->Audio file not found. Skipping STT task for this file: " + currentFile;
 		SPLAPPTRC(L_ERROR, errorMsg, "ws_sender");
 
 		// Create an output tuple, auto assign from current input tuple
@@ -459,7 +464,7 @@ void WatsonSTTImpl<OP, OT>::process_0(IT0 const & inputTuple) {
 		if (myAudioSize == 0) {
 			numberOfAudioBlobFragmentsReceivedInCurrentConversation = 0;
 			// File read success: but file is empty: Send error tuple directly
-			std::string errorMsg = Conf::traceIntro + "-->Audio file is empty. Skipping STT task for this file: " + myCurrentFileName;
+			std::string errorMsg = Conf::traceIntro + "-->Audio file is empty. Skipping STT task for this file: " + currentFile;
 			SPLAPPTRC(L_WARN, errorMsg, "ws_sender");
 
 			// Create an output tuple, auto assign from current input tuple
@@ -582,6 +587,7 @@ void WatsonSTTImpl<OP, OT>::connectAndSendDataToSTT
 
 				// The receiver thread is in an inactive state: Now store the access token to receiver thread variable
 				Rec::accessToken = accessToken;
+
 				// make the connection attempt
 				Rec::setWsState(WsState::start);
 			}
