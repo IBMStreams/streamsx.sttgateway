@@ -177,14 +177,10 @@ https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-websocke
 	# Default: 0.001 second i.e. 1 millisecond of CPU yield time inside a tight loop.
 	$cpuYieldTimeInAudioSenderThread = $cpuYieldTimeInAudioSenderThread ? $cpuYieldTimeInAudioSenderThread->getValueAt(0)->getCppExpression() : 0.001;
 
-	my $waitTimeBeforeSTTServiceConnectionRetry = $model->getParameterByName("waitTimeBeforeSTTServiceConnectionRetry");
-	# Default: 3.0 seconds.
-	$waitTimeBeforeSTTServiceConnectionRetry = $waitTimeBeforeSTTServiceConnectionRetry ? $waitTimeBeforeSTTServiceConnectionRetry->getValueAt(0)->getCppExpression() : 3.0;
+	my $maxConnectionRetryDelay = $model->getParameterByName("maxConnectionRetryDelay");
+	# Default: 60.0 seconds.
+	$maxConnectionRetryDelay = $maxConnectionRetryDelay ? $maxConnectionRetryDelay->getValueAt(0)->getCppExpression() : 60.0;
 
-	my $connectionAttemptsThreshold = $model->getParameterByName("connectionAttemptsThreshold");
-	# Default: 10 attempts
-	$connectionAttemptsThreshold = $connectionAttemptsThreshold ? $connectionAttemptsThreshold->getValueAt(0)->getCppExpression() : 10;
-	
 	my $sttLiveMetricsUpdateNeeded = $model->getParameterByName("sttLiveMetricsUpdateNeeded");
 	$sttLiveMetricsUpdateNeeded = $sttLiveMetricsUpdateNeeded ? $sttLiveMetricsUpdateNeeded->getValueAt(0)->getCppExpression() : 1;
 %>
@@ -197,38 +193,41 @@ MY_OPERATOR::MY_OPERATOR()
 		MY_BASE_OPERATOR{},
 		com::ibm::streams::sttgateway::WatsonSTTImpl<MY_OPERATOR, OPort0Type>(
 				*this,
-				<%=$websocketLoggingNeeded%>,
-				<%=$cpuYieldTimeInAudioSenderThread%>,
-				<%=$waitTimeBeforeSTTServiceConnectionRetry%>,
-				<%=$connectionAttemptsThreshold%>,
-				<%=$sttLiveMetricsUpdateNeeded%>,
-				<%=$uri%>,
-				<%=$baseLanguageModel%>,
-				<%=$contentType%>,
-				<%=$sttResultMode%>,
-				<%=$sttRequestLogging%>,
-				<%=$baseModelVersion%>,
-				<%=$customizationId%>,
-				<%=$customizationWeight%>,
-				<%=$acousticCustomizationId%>,
-				<%=$filterProfanity%>,
-				<%=$sttJsonResponseDebugging%>,
-				<%=$maxUtteranceAlternatives%>,
-				<%=$wordAlternativesThreshold%>,
-				<%=$wordConfidenceNeeded%>,
-				<%=$wordTimestampNeeded%>,
-				<%=$identifySpeakers%>,
-				<%=$smartFormattingNeeded%>,
-				<%=$keywordsSpottingThreshold%>,
-				<%=$keywordsToBeSpotted%>
+				Config{
+						getContext().getName(),
+						getContext().getChannel(),
+						"Operator " + getContext().getName() + "-->Channel " + boost::to_string(getContext().getChannel()),
+
+						<%=$websocketLoggingNeeded%>,
+						<%=$cpuYieldTimeInAudioSenderThread%>,
+						<%=$maxConnectionRetryDelay%>,
+						<%=$sttLiveMetricsUpdateNeeded%>,
+						<%=$uri%>,
+						<%=$baseLanguageModel%>,
+						<%=$contentType%>,
+						<%=$sttResultMode%>,
+						<%=$sttRequestLogging%>,
+						<%=$baseModelVersion%>,
+						<%=$customizationId%>,
+						<%=$customizationWeight%>,
+						<%=$acousticCustomizationId%>,
+						<%=$filterProfanity%>,
+						<%=$sttJsonResponseDebugging%>,
+						<%=$maxUtteranceAlternatives%>,
+						<%=$wordAlternativesThreshold%>,
+						<%=$wordConfidenceNeeded%>,
+						<%=$wordTimestampNeeded%>,
+						<%=$identifySpeakers%>,
+						<%=$smartFormattingNeeded%>,
+						<%=$keywordsSpottingThreshold%>,
+						<%=$keywordsToBeSpotted%>
+					}
 				)
-{
-}
+{}
 
 // Destructor
 MY_OPERATOR::~MY_OPERATOR() 
-{
-}
+{}
 
 // Notify port readiness
 void MY_OPERATOR::allPortsReady() 
@@ -247,19 +246,29 @@ void MY_OPERATOR::prepareToShutdown()
 }
 
 // This operator has two input ports.
-// Port 0: Audio data (a file name or a blob) arrives on this port. (mutating)
+// Port 0: Audio data (a file name or a blob) arrives on this port. (non mutating)
 // Port 1: It is a control port where the IAM access token is
 //         sent into this operator for connecting to the
 //         STT service in a secure manner. (non mutating)
 
-//Non mutating port 1
+//Non mutating ports 0 and 1
 void MY_OPERATOR::process(Tuple const & tuple, uint32_t port) {
-	// Let is first process if the IAM access token is sent via port 1 i.e. second input port.
-	if (port != 1)
-		throw std::invalid_argument("Port number is not 1");
-
-	IPort1Type const & inputTuple = static_cast<IPort1Type const &>(tuple);
-	Impl::process_1<IPort1Type, &IPort1Type::get_access_token>(inputTuple);
+	
+	switch (port) {
+	case 1: {
+		// Let is first process if the IAM access token is sent via port 1 i.e. second input port.
+		IPort1Type const & inputTuple = static_cast<IPort1Type const &>(tuple);
+		Impl::process_1<IPort1Type, &IPort1Type::get_access_token>(inputTuple);
+		break;
+	}
+	case 0: {
+		IPort0Type const & <%=$inputTupleName%> = static_cast<IPort0Type const &>(tuple);
+		Impl::process_0<IPort0Type, <%=$speechAttributeType%>, &IPort0Type::get_speech>(<%=$inputTupleName%>);
+		break;
+	}
+	default:
+		throw std::invalid_argument("Invalid port number!");
+	}
 }
 
 // With the WebSocket interface, audio data is always streamed to the 
@@ -279,16 +288,6 @@ void MY_OPERATOR::process(Tuple const & tuple, uint32_t port) {
 // very involved in terms of the logic. So, read the code completely to 
 // understand what is going on inside all these threads.
 
-//Mutating port 0
-void MY_OPERATOR::process(Tuple & tuple, uint32_t port)
-{
-	if (port != 0)
-		throw std::invalid_argument("Port number is not 0");
-
-	IPort0Type & <%=$inputTupleName%> = static_cast<IPort0Type &>(tuple);
-	Impl::process_0<IPort0Type, <%=$speechAttributeType%>, &IPort0Type::get_speech>(<%=$inputTupleName%>);
-}
-
 // Punctuation processing
 void MY_OPERATOR::process(Punctuation const & punct, uint32_t port) {
 	// Forward the punctuation markers on our first output port.
@@ -299,7 +298,6 @@ void MY_OPERATOR::process(Punctuation const & punct, uint32_t port) {
 		}
 	}
 }
-
 
 //Create a output tuple and auto assign values from an input tuple
 MY_OPERATOR::OPort0Type* MY_OPERATOR::createOutTupleAndAutoAssign(MY_OPERATOR::IPort0Type const& <%=$inputTupleName%>) {
