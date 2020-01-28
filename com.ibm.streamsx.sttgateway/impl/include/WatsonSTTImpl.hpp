@@ -14,6 +14,7 @@
 #include <string>
 #include <atomic>
 #include <memory>
+#include <cmath>
 
 // This operator heavily relies on the Websocket++ header only library.
 // https://docs.websocketpp.org/index.html
@@ -69,18 +70,18 @@ public:
 
 protected:
 	// Tuple processing for mutating data port 0
-	template<typename IT0, typename DATA_TYPE, DATA_TYPE & (IT0::*GETTER)()>
-	void process_0(IT0 & inputTuple);
+	template<typename IT0, typename DATA_TYPE, DATA_TYPE const & (IT0::*GETTER)() const>
+	void process_0(IT0 const & inputTuple);
 
 	// Tuple processing for authentication port 1
-	template<typename IT1, const SPL::rstring& (IT1::*GETTER)()const>
+	template<typename IT1, SPL::rstring const & (IT1::*GETTER)()const>
 	void process_1(IT1 const & inputTuple);
 
 private:
 	// check connection state and connect if necessary and send the data
 	// does not take the ownership of audioBytes
 	// takes the ownership of nextOTuple
-	void connectAndSendDataToSTT(std::unique_ptr<unsigned char> audioBytes, uint64_t audioSize, bool sendEndOfText, OT * nextOTuple);
+	void connectAndSendDataToSTT(unsigned char const * audioBytes, uint64_t audioSize, bool sendEndOfText, OT * nextOTuple);
 
 private:
 	// Websocket operations related member variables.
@@ -91,8 +92,6 @@ private:
 	int numberOfAudioBlobFragmentsReceivedInCurrentConversation;
 	bool mediaEndReached;
 
-	// If recentOTuple is not null, a conversation is ongoing
-	std::atomic<OT *> recentOTuple;
 	// When a new oTuple is to be set the previous otuple is put into the oTupleWastebasket
 	// The wastebasked is emptied after transcription was finalizes and before a new conversation starts
 	std::vector<OT *> oTupleWastebasket;
@@ -102,15 +101,13 @@ private:
 	// Port Mutex
 	SPL::Mutex portMutex;
 
-	SPL::int64 numberOfFullAudioConversationsReceived;
+	SPL::int64 nWebsocketConnectionAttempts;
+	SPL::int64 nWebsocketConnectionAttemptsFailed;
 
 	// Custom metrics for this operator.
-	SPL::Metric * const nFullAudioConversationsReceivedMetric;
-	SPL::Metric * const nSTTResultModeMetric;
-
-protected:
-	// Helper functions
-	void incrementNumberOfFullAudioConversationsReceived();
+	SPL::Metric * const sttResultModeMetric;
+	SPL::Metric * const nWebsocketConnectionAttemptsMetric;
+	SPL::Metric * const nWebsocketConnectionAttemptsFailedMetric;
 };
 
 // Enum to define the results of the getSpeechSamples operation
@@ -121,15 +118,18 @@ enum class GetSpeechSamplesResult {
 	//errorIntermediate
 };
 
-// The extraction function to extract the blob or the blob from filename into the blob list and size list
-// Returns success; success and media end; of error and media end (which is a file read error)
-// The function transfers the ownership of the audioBytes buffer to the caller if not null
+// The extraction function to extract the blob or the blob from filename
+// Returns success; success and media end; or error and media end (which is a file read error)
+// The audioBytes and audioSize are always the pointer/size to the extracted data
+// If a resource is allocated (the file read case) it is assigned to resource parameter
+// Otherwise the resource pointer is null
 // The primary template is never used so it is not defined
 template<typename DATA_TYPE>
 GetSpeechSamplesResult getSpeechSamples(
-			DATA_TYPE & input,
-			unsigned char * & audioBytes,
+			DATA_TYPE const & input,
+			unsigned char const * & audioBytes,
 			uint64_t & audioSize,
+			std::vector<unsigned char> * & resource,
 			std::string & currentFileName);
 
 /*template<typename OP, typename OT>
@@ -142,21 +142,21 @@ WatsonSTTImpl<OP, OT>::WatsonSTTImpl(OP & splOperator_,Conf config_)
 
 		numberOfAudioBlobFragmentsReceivedInCurrentConversation(0),
 		mediaEndReached(true),
-		recentOTuple{},
 		oTupleWastebasket(),
 
 		accessToken{},
 
 		portMutex{},
-
-		numberOfFullAudioConversationsReceived{0},
+		nWebsocketConnectionAttempts(0),
+		nWebsocketConnectionAttemptsFailed(0),
 
 		// Custom metrics for this operator are already defined in the operator model XML file.
 		// Hence, there is no need to explicitly create them here.
 		// Simply get the custom metrics already defined for this operator.
 		// The update of metrics nFullAudioConversationsReceived and nFullAudioConversationsTranscribed depends on parameter sttLiveMetricsUpdateNeeded
-		nFullAudioConversationsReceivedMetric{ & Rec::splOperator.getContext().getMetrics().getCustomMetricByName("nFullAudioConversationsReceived")},
-		nSTTResultModeMetric{ & Rec::splOperator.getContext().getMetrics().getCustomMetricByName("nSTTResultMode")}
+		sttResultModeMetric{ & Rec::splOperator.getContext().getMetrics().getCustomMetricByName("sttResultMode")},
+		nWebsocketConnectionAttemptsMetric{ & Rec::splOperator.getContext().getMetrics().getCustomMetricByName("nWebsocketConnectionAttempts")},
+		nWebsocketConnectionAttemptsFailedMetric{& Rec::splOperator.getContext().getMetrics().getCustomMetricByName("nWebsocketConnectionAttemptsFailed")}
 {
 	if (Conf::customizationId == "") {
 		// No customization id configured. Hence, set the customization weight to
@@ -189,12 +189,8 @@ WatsonSTTImpl<OP, OT>::WatsonSTTImpl(OP & splOperator_,Conf config_)
 		throw std::runtime_error(STTGW_INVALID_PARAM_VALUE_4("WatsonSTT", Conf::cpuYieldTimeInAudioSenderThread, "cpuYieldTimeInAudioSenderThread", "0.0"));
 	}
 
-	if (Conf::waitTimeBeforeSTTServiceConnectionRetry < 1.0) {
-		throw std::runtime_error(STTGW_INVALID_PARAM_VALUE_4("WatsonSTT", Conf::waitTimeBeforeSTTServiceConnectionRetry,  "waitTimeBeforeSTTServiceConnectionRetry", "1.0"));
-	}
-
-	if (Conf::connectionAttemptsThreshold < 1) {
-		throw std::runtime_error(STTGW_INVALID_PARAM_VALUE_4("WatsonSTT", Conf::connectionAttemptsThreshold, "connectionAttemptsThreshold", "1"));
+	if (Conf::maxConnectionRetryDelay < 1.0) {
+		throw std::runtime_error(STTGW_INVALID_PARAM_VALUE_4("WatsonSTT", Conf::maxConnectionRetryDelay,  "maxConnectionRetryDelay", "1.0"));
 	}
 
 	// We are not going to support the following utterance based
@@ -222,17 +218,16 @@ WatsonSTTImpl<OP, OT>::WatsonSTTImpl(OP & splOperator_,Conf config_)
 	}
 
 	// Update the operator metric.
-	nSTTResultModeMetric->setValueNoLock(Conf::sttResultMode);
+	sttResultModeMetric->setValueNoLock(Conf::sttResultMode);
 
 	//print the configuration
 	std::cout << "WatsonSTT configuration:"
 	<< "\nOperatorName                            = " << Rec::splOperator.getContext().getName()
 	<< "\ncpuYieldTimeInAudioSenderThread         = " << Conf::cpuYieldTimeInAudioSenderThread
-	<< "\nwaitTimeBeforeSTTServiceConnectionRetry = " << Conf::waitTimeBeforeSTTServiceConnectionRetry
-	<< "\nwaitTimeBeforeSTTServiceConnectionRetryLong=" << Conf::waitTimeBeforeSTTServiceConnectionRetryLong
-	<< "\nwaitTimeWhenIdle                        = " << Conf::waitTimeWhenIdle
-	<< "\nwaitTimeBeforePreviousTranscriptionFinalizes=" << Conf::waitTimeBeforePreviousTranscriptionFinalizes
-	<< "\nconnectionAttemptsThreshold             = " << Conf::connectionAttemptsThreshold
+	<< "\nmaxConnectionRetryDelay                 = " << Conf::maxConnectionRetryDelay
+	<< "\nreceiverWaitTimeWhenIdle                = " << Conf::receiverWaitTimeWhenIdle
+	<< "\nsenderWaitTimeForTranscriptionFinalization=" << Conf::senderWaitTimeForTranscriptionFinalization
+	<< "\nsenderWaitTimeForFinalReceiverState     = " << Conf::senderWaitTimeForFinalReceiverState
 	<< "\nsttLiveMetricsUpdateNeeded              = " << Conf::sttLiveMetricsUpdateNeeded
 	<< "\nuri                                     = " << Conf::uri
 	<< "\nbaseLanguageModel                       = " << Conf::baseLanguageModel
@@ -255,7 +250,6 @@ WatsonSTTImpl<OP, OT>::WatsonSTTImpl(OP & splOperator_,Conf config_)
 	<< "\nkeywordsToBeSpotted                     = " << Conf::keywordsToBeSpotted
 	<< "\nconnectionState.wsState.is_lock_free()  = " << Rec::wsState.is_lock_free()
 	<< "\nrecentOTuple.is_lock_free()             = " << Rec::recentOTuple.is_lock_free()
-	<< "\nnumberOfFullAudioConversationsTranscribed.is_lock_free()= " << Rec::numberOfFullAudioConversationsTranscribed.is_lock_free()
 	<< "\n----------------------------------------------------------------" << std::endl;
 }
 
@@ -278,31 +272,34 @@ void WatsonSTTImpl<OP, OT>::process_1(IT1 const & inputTuple) {
 	// Save the access token for subsequent use within this operator.
 	const SPL::rstring& at = (inputTuple.*GETTER)();
 	accessToken = at;
-	SPLAPPTRC(L_INFO, Conf::traceIntro << "-->Received new/refreshed access token.", "process");
+	SPLAPPTRC(L_INFO, Conf::traceIntro << "-->Received new/refreshed access token.", "process_1");
 
 	// This must be the audio data arriving here via port 0 i.e. first input port.
 	// If we have a non-empty IAM access token, process the audio data.
 	// Otherwise, skip it.
 	if (accessToken.empty()) {
-		SPLAPPLOG(L_ERROR, STTGW_EMPTY_IAM_TOKEN("WatsonSTT"), "process");
+		SPLAPPLOG(L_ERROR, STTGW_EMPTY_IAM_TOKEN("WatsonSTT"), "process_1");
 	}
 }
 
 //Definition of the template function getSpeechSamples if data type is SPL::blob
 template<>
 GetSpeechSamplesResult getSpeechSamples<SPL::blob>(
-		SPL::blob & input,
-		unsigned char * & audioBytes,
+		SPL::blob const & input,
+		unsigned char const * & audioBytes,
 		uint64_t & audioSize,
+		std::vector<unsigned char> * & resource,
 		std::string & currentFileName)
 {
 	uint64_t sizeOfBlob = SPL::Functions::Collections::blobSize(input);
 
+	resource = nullptr;
 	audioSize = sizeOfBlob;
 	if (sizeOfBlob == 0) {
 		audioBytes = nullptr;
 	} else {
-		audioBytes = input.releaseData(sizeOfBlob);
+		//audioBytes = input.releaseData(sizeOfBlob);
+		audioBytes = input.getData();
 	}
 	// Data bluffer assigned or null
 	return GetSpeechSamplesResult::sucess;
@@ -311,12 +308,13 @@ GetSpeechSamplesResult getSpeechSamples<SPL::blob>(
 //Definition of the template function getSpeechSamples if data type is rstring -> read file
 template<>
 GetSpeechSamplesResult getSpeechSamples<SPL::rstring>(
-		SPL::rstring & input,
-		unsigned char * & audioBytes,
+		SPL::rstring const & input,
+		unsigned char const * & audioBytes,
 		uint64_t & audioSize,
+		std::vector<unsigned char> * & resource,
 		std::string & currentFileName)
 {
-	SPLAPPTRC(L_DEBUG, "-->Sending file " << input, "getSpeechSamples");
+	SPLAPPTRC(L_DEBUG, "-->Sending file " << input, "ws_sender");
 	currentFileName = input;
 
 	// Check for the file existence before attempting to read the audio data.
@@ -330,22 +328,26 @@ GetSpeechSamplesResult getSpeechSamples<SPL::rstring>(
 
 		// File doesn't exist.
 		// Log this information and remove this audio data from the vector.
-		SPLAPPTRC(L_ERROR, "-->Audio file not found. Skipping STT task for this file: " << input, "getSpeechSamples");
+		SPLAPPTRC(L_ERROR, "-->Audio file not found. Skipping STT task for this file: " << input, "ws_sender");
 		//No output buffer assigned
+		resource = nullptr;
+		audioSize = 0; audioBytes = nullptr;
 		return GetSpeechSamplesResult::sucessAndMediaEnd;
 
 	} else {
 		// Audio file exists. Read binary file into buffer
 		std::ifstream inputStream(input.c_str(), std::ios::binary);
-		//std::vector<char> buffer((std::istreambuf_iterator<char>(inputStream)), (std::istreambuf_iterator<char>()));
-		uint64_t fsize = fileStat.st_size;
-		SPLAPPTRC(L_DEBUG, "-->Sending file size" << fsize, "getSpeechSamples");
+		std::vector<unsigned char>* buffer = new std::vector<unsigned char>(
+				std::istreambuf_iterator<char>(inputStream), std::istreambuf_iterator<char>());
+		resource = buffer;
+		size_t fsize = buffer->size();
+		SPLAPPTRC(L_DEBUG, "-->Sending file size" << fsize, "ws_sender");
 
 		if (fsize == 0) {
 			audioBytes = nullptr;
 			audioSize = 0;
 		} else {
-			unsigned char * const data = new unsigned char[fsize];
+			/*unsigned char * const data = new unsigned char[fsize];
 			unsigned char * datax = data;
 			std::istreambuf_iterator<char> it(inputStream);
 			std::istreambuf_iterator<char> it_end;
@@ -353,10 +355,10 @@ GetSpeechSamplesResult getSpeechSamples<SPL::rstring>(
 				*datax = *it;
 				++datax;
 				++it;
-			}
+			}*/
 			//TODO: error handling during read
 			// Data buffer is assigned
-			audioBytes = data;
+			audioBytes = buffer->data();
 			audioSize = fsize;
 		}
 
@@ -365,8 +367,8 @@ GetSpeechSamplesResult getSpeechSamples<SPL::rstring>(
 }
 
 template<typename OP, typename OT>
-template<typename IT0, typename DATA_TYPE, DATA_TYPE & (IT0::*GETTER)()>
-void WatsonSTTImpl<OP, OT>::process_0(IT0 & inputTuple) {
+template<typename IT0, typename DATA_TYPE, DATA_TYPE const & (IT0::*GETTER)() const>
+void WatsonSTTImpl<OP, OT>::process_0(IT0 const & inputTuple) {
 
 	// serialize this method and protect from issues when multiple threads send
 	// to this port
@@ -374,26 +376,24 @@ void WatsonSTTImpl<OP, OT>::process_0(IT0 & inputTuple) {
 
 	// If the media end of the previous translation was reached, we wait until the translation is finalized.
 	// A finalized transcription is signed through Rec::transcriptionFinalized
-	// Transcription finalized must be set in all error cases too!
 	// The oTuple is not longer needed when the transcription is finalized
 	// An error cleans oTuple too
 	// The is no need to acquire the state mutex here because we make no changes, we just wait for the transition
 	// to null. There are no other write operations to recentOTuple due to port mutex
 	if (mediaEndReached) {
 		WsState myWsState = Rec::wsState.load();
-		bool receiverHasStopped = (myWsState == WsState::closed) || (myWsState == WsState::failed) || (myWsState == WsState::crashed);
-		while (not Rec::transcriptionFinalized && not receiverHasStopped) {
+		while (not Rec::transcriptionFinalized && not receiverHasStopped(myWsState)) {
 			SPLAPPTRC(L_TRACE, Conf::traceIntro <<
-					"-->Sender 1 We have something to send but the previous transcription is not finalized, "
+					"-->PR 1 We have something to send but the previous transcription is not finalized, "
 					" wsState=" << wsStateToString(myWsState) << " block for " <<
-					Conf::waitTimeBeforePreviousTranscriptionFinalizes << " second",
-					"process_0");
-			SPL::Functions::Utility::block(Conf::waitTimeBeforePreviousTranscriptionFinalizes);
-			receiverHasStopped = (myWsState == WsState::closed) || (myWsState == WsState::failed) || (myWsState == WsState::crashed);
+					Conf::senderWaitTimeForTranscriptionFinalization << " second",
+					"ws_sender");
+			SPL::Functions::Utility::block(Conf::senderWaitTimeForTranscriptionFinalization);
+			myWsState = Rec::wsState.load();
 			if (Rec::splOperator.getPE().getShutdownRequested())
 				return;
 		}
-		// Here is the receicvr either dead or a transcription has finalized
+		// Here is the receiver either dead or a transcription has finalized
 		// A new transcription ha not yet been started, hence no race condition can occure
 		Rec::transcriptionFinalized = false;
 		mediaEndReached = false;
@@ -413,20 +413,22 @@ void WatsonSTTImpl<OP, OT>::process_0(IT0 & inputTuple) {
 	// If we have a non-empty IAM access token, process the audio data.
 	// Otherwise, skip it.
 	if (accessToken.empty()) {
-		SPLAPPTRC(L_ERROR, Conf::traceIntro << "-->Ignoring the received audio data at this time due to an empty IAM access "
+		SPLAPPTRC(L_ERROR, Conf::traceIntro << "-->PR9 Ignoring the received audio data at this time due to an empty IAM access "
 				"token. User must first provide the IAM access token before sending any audio data to this operator.",
-				"process_0");
+				"ws_sender");
 		return;
 	}
 
 	//get input
-	DATA_TYPE & mySpeechAttribute = (inputTuple.*GETTER)();
+	DATA_TYPE const & mySpeechAttribute = (inputTuple.*GETTER)();
 
 	std::string myCurrentFileName;
-	unsigned char * audioBytes_ = nullptr;
+	unsigned char const * audioBytes_ = nullptr;
 	uint64_t myAudioSize = 0ul;
-	GetSpeechSamplesResult result = getSpeechSamples(mySpeechAttribute, audioBytes_, myAudioSize, myCurrentFileName);
-	std::unique_ptr<unsigned char> myAudioBytes(audioBytes_);
+	std::vector<unsigned char> * buffer_ = nullptr;
+	GetSpeechSamplesResult result = getSpeechSamples(mySpeechAttribute, audioBytes_, myAudioSize, buffer_, myCurrentFileName);
+	// ensure release of resource with unique_ptr
+	std::unique_ptr<std::vector<unsigned char> > myBuffer(buffer_);
 
 	bool myAudioSamplesFound = false;
 	bool myMediaEndFound = false;
@@ -435,38 +437,37 @@ void WatsonSTTImpl<OP, OT>::process_0(IT0 & inputTuple) {
 
 		// File read error: do not push samples into audio vector
 		// Send error tuple directly
-		incrementNumberOfFullAudioConversationsReceived();
+		Rec::incrementNFullAudioConversationsReceived();
 		numberOfAudioBlobFragmentsReceivedInCurrentConversation = 0;
 
 		std::string errorMsg = Conf::traceIntro + "-->Audio file not found. Skipping STT task for this file: " + myCurrentFileName;
-		SPLAPPTRC(L_ERROR, errorMsg, "process_0");
+		SPLAPPTRC(L_ERROR, errorMsg, "ws_sender");
 
 		// Create an output tuple, auto assign from current input tuple
 		OT * myOTuple = Rec::splOperator.createOutTupleAndAutoAssign(inputTuple);
 		// Assign error message and send the tuple
 		Rec::splOperator.setErrorAttribute(myOTuple, errorMsg);
 		Rec::splOperator.submit(*myOTuple, 0);
-		Rec::incrementNumberOfFullAudioConversationsFailed();
+		Rec::incrementNFullAudioConversationsFailed();
 
 		delete myOTuple;
 		return;
 
 	} else if (result == GetSpeechSamplesResult::sucessAndMediaEnd) {
 
-		incrementNumberOfFullAudioConversationsReceived();
-
+		Rec::incrementNFullAudioConversationsReceived();
 		if (myAudioSize == 0) {
 			numberOfAudioBlobFragmentsReceivedInCurrentConversation = 0;
 			// File read success: but file is empty: Send error tuple directly
 			std::string errorMsg = Conf::traceIntro + "-->Audio file is empty. Skipping STT task for this file: " + myCurrentFileName;
-			SPLAPPTRC(L_WARN, errorMsg, "process_0");
+			SPLAPPTRC(L_WARN, errorMsg, "ws_sender");
 
 			// Create an output tuple, auto assign from current input tuple
 			OT * myOTuple = Rec::splOperator.createOutTupleAndAutoAssign(inputTuple);
 			// Assign error message and send the tuple
 			Rec::splOperator.setErrorAttribute(myOTuple, errorMsg);
 			Rec::splOperator.submit(*myOTuple, 0);
-			Rec::incrementNumberOfFullAudioConversationsFailed();
+			Rec::incrementNFullAudioConversationsFailed();
 
 			delete myOTuple;
 			return;
@@ -482,18 +483,18 @@ void WatsonSTTImpl<OP, OT>::process_0(IT0 & inputTuple) {
 		if (numberOfAudioBlobFragmentsReceivedInCurrentConversation == 0) {
 
 			// A new transcription must be started
-			incrementNumberOfFullAudioConversationsReceived();
+			Rec::incrementNFullAudioConversationsReceived();
 
 			if (myAudioSize == 0) {
 
 				std::string errorMsg = "-->Received audio data is an empty blob in an empty conversation";
-				SPLAPPTRC(L_WARN, Conf::traceIntro << errorMsg, "process_0");
+				SPLAPPTRC(L_WARN, Conf::traceIntro << errorMsg, "ws_sender");
 				// Create an output tuple, auto assign from current input tuple
 				OT * myOTuple = Rec::splOperator.createOutTupleAndAutoAssign(inputTuple);
 				// Assign error message and send the tuple
 				Rec::splOperator.setErrorAttribute(myOTuple, errorMsg);
 				Rec::splOperator.submit(*myOTuple, 0);
-				Rec::incrementNumberOfFullAudioConversationsFailed();
+				Rec::incrementNFullAudioConversationsFailed();
 
 				delete myOTuple;
 				return;
@@ -523,36 +524,23 @@ void WatsonSTTImpl<OP, OT>::process_0(IT0 & inputTuple) {
 
 	// store the media end condition
 	mediaEndReached = myMediaEndFound;
+
 	OT * nextOTuple = Rec::splOperator.createOutTupleAndAutoAssign(inputTuple);
-	connectAndSendDataToSTT(std::unique_ptr<unsigned char>(myAudioBytes.release()), myAudioSize, myMediaEndFound, nextOTuple);
+	connectAndSendDataToSTT(audioBytes_, myAudioSize, myMediaEndFound, nextOTuple);
 
 	return;
-
-	// Let us do all the auto output tuple attribute assignments and store it in a
-	// list to be used in the on_message event handler method below at the time of
-	// either full or partial transcription gets completed for a given audio data.
-	// We will create a dynamic oTuple object via the new C++ construct so that
-	// the object pointer can be stored in the oTupleList below.
-	// For every new audio (either a new audio filename or the very first
-	// audio blob fragment sent here, we will create a new oTuple object.
-	//const bool newAudioSegment = numberOfAudioBlobFragmentsReceivedInCurrentConversation == 1;
-	//if (newAudioSegment) {
-	//	OT * oTuple = splOperator.createOutTupleAndAutoAssign(inputTuple);
-		// Push this partially filled oTuple object's pointer to the
-		// vector so that we can get it back when the transcription result arrives.
-	//	oTupleList.push_back(oTuple);
 } // End: WatsonSTTImpl<OP, OT>::process_0
 
 // check connection state and connect if necessary and send the data
 template<typename OP, typename OT>
-void WatsonSTTImpl<OP, OT>::connectAndSendDataToSTT(std::unique_ptr<unsigned char> audioBytes, uint64_t audioSize, bool sendEndOfText, OT * nextOTuple) {
+void WatsonSTTImpl<OP, OT>::connectAndSendDataToSTT
+		(unsigned char const * audioBytes, uint64_t audioSize, bool sendEndOfText, OT * nextOTuple) {
 
-	SPLAPPTRC(L_DEBUG, Conf::traceIntro << "connectAndSendDataToSTT(audioBytes=" <<
-			audioBytes.get() << ", audioSize=" << audioSize << ", sendEndOfText=" << sendEndOfText << ")",
-			"connectAndSendDataToSTT");
+	SPLAPPTRC(L_DEBUG, Conf::traceIntro << "-->CS0 connectAndSendDataToSTT(audioBytes=" <<
+			static_cast<const void*>(audioBytes) << ", audioSize=" << audioSize << ", sendEndOfText=" << sendEndOfText <<
+			", nextOTuple=" << static_cast<void*>(nextOTuple) << ")", "ws_sender");
 
 	// We make a new connection or use a existing connection if data are to send
-	websocketpp::lib::error_code ec1{};
 	if (audioSize > 0) {
 		WsState myWsState = Rec::wsState.load();
 		while (myWsState != WsState::listening) {
@@ -560,42 +548,42 @@ void WatsonSTTImpl<OP, OT>::connectAndSendDataToSTT(std::unique_ptr<unsigned cha
 			if (myWsState == WsState::start || myWsState == WsState::connecting || myWsState == WsState::open) {
 				// Connection was already triggered
 				SPLAPPTRC(L_TRACE, Conf::traceIntro <<
-						"A connection is about to enter listening state but not listening wsState=" << wsStateToString(myWsState) <<
-						" wait 0.5",
-						"connectAndSendDataToSTT");
-				SPL::Functions::Utility::block(0.500);
-
+						"-->CS3 Something to sent but receiver is in transient state " <<
+						wsStateToString(myWsState) << " wait " << Conf::senderWaitTimeForFinalReceiverState, "ws_sender");
+				SPL::Functions::Utility::block(Conf::senderWaitTimeForFinalReceiverState);
 			} else if (myWsState == WsState::error){
-				SPLAPPTRC(L_TRACE, Conf::traceIntro <<
-						"A connection has received and error  wsState=" << wsStateToString(myWsState) <<
-						" wait 0.5",
-						"connectAndSendDataToSTT");
-				SPL::Functions::Utility::block(0.500);
+				SPLAPPTRC(L_ERROR, Conf::traceIntro <<
+						"-->>CS4 Something to sent but receiver is in transient state error "
+						" wait " << Conf::senderWaitTimeForFinalReceiverState, "ws_sender");
+				SPL::Functions::Utility::block(Conf::senderWaitTimeForFinalReceiverState);
 			} else {
 				// Make a new connection attempt
 				// The receiver thread must have reached a final state
-				// Here the state must not start, not connecting, not open, not listening, not error
-				++Rec::numberOfWebsocketConnectionAttempts;
-				Rec::nWebsocketConnectionAttemptsMetric->setValueNoLock(Rec::numberOfWebsocketConnectionAttempts);
-				if (Rec::numberOfWebsocketConnectionAttempts == 1) {
-					SPLAPPTRC(L_INFO, "Make a connection attempt number 1 from wsState=" << wsStateToString(myWsState), "connectAndSendDataToSTT");
-				} else {
+				// Here the state must not be: start, connecting, open, listening, error
+				SPL::float64 nConnectAtempts = Rec::getNWebsocketConnectionAttemptsCurrent();
+				if (nConnectAtempts > 0) {
 					// Delay repeated connection requests
-					SPL::float64 waitTime = Conf::waitTimeBeforeSTTServiceConnectionRetry;
-					if (Rec::numberOfWebsocketConnectionAttempts >= Conf::connectionAttemptsThreshold)
-						waitTime = Conf::waitTimeBeforeSTTServiceConnectionRetryLong;
-					SPLAPPTRC(L_WARN, Conf::traceIntro <<
-							"Delay repeated connection requests number " << Rec::numberOfWebsocketConnectionAttempts <<
-							" wsState=" << static_cast<int>(myWsState) << " wait " << waitTime, "connectAndSendDataToSTT");
+					SPL::float64 waitTime = pow(2.0, nConnectAtempts);
+					if (waitTime > Conf::maxConnectionRetryDelay)
+						waitTime = Conf::maxConnectionRetryDelay;
+					SPLAPPTRC(L_WARN, Conf::traceIntro << "-->CS2 Delay repeated connection requests wait " << waitTime, "ws_sender");
 					SPL::Functions::Utility::block(waitTime);
-					SPLAPPTRC(L_INFO, "Make a connection attempt number " <<  Rec::numberOfWebsocketConnectionAttempts <<
-							" from wsState=" << wsStateToString(myWsState), "connectAndSendDataToSTT");
 				}
+				++nWebsocketConnectionAttempts;
+				nWebsocketConnectionAttemptsMetric->setValueNoLock(nWebsocketConnectionAttempts);
+				if (nConnectAtempts > 0) {
+					++nWebsocketConnectionAttemptsFailed;
+					nWebsocketConnectionAttemptsFailedMetric->setValueNoLock(nWebsocketConnectionAttemptsFailed);
+				}
+				Rec::incrementNWebsocketConnectionAttemptsCurrent();
+				SPLAPPTRC(L_INFO, Conf::traceIntro << "-->CS5 Make a connection attempt number " <<
+						Rec::getNWebsocketConnectionAttemptsCurrent() << " from wsState=" << wsStateToString(myWsState),
+						"ws_sender");
 
 				// The receiver thread is in an inactive state: Now store the access token to receiver thread variable
 				Rec::accessToken = accessToken;
 				// make the connection attempt
-				Rec::wsState.store(WsState::start);
+				Rec::setWsState(WsState::start);
 			}
 			if (Rec::splOperator.getPE().getShutdownRequested()) {
 				if (nextOTuple)
@@ -611,7 +599,7 @@ void WatsonSTTImpl<OP, OT>::connectAndSendDataToSTT(std::unique_ptr<unsigned cha
 			// if nextOTuple is null, the old recentOTuple is kept
 			if (nextOTuple) {
 				oTupleWastebasket.push_back(nextOTuple);
-				recentOTuple.store(nextOTuple);
+				Rec::recentOTuple.store(nextOTuple);
 				nextOTuple = nullptr;
 			}
 
@@ -619,9 +607,9 @@ void WatsonSTTImpl<OP, OT>::connectAndSendDataToSTT(std::unique_ptr<unsigned cha
 				// Audio data available for processing. Yield the CPU briefly and get to work soon.
 				// Even a tiny value of 1 millisecond (0.001 second) will yield the
 				// CPU and will not show 0% idle in the Linux top command.
-				SPLAPPTRC(L_TRACE, Conf::traceIntro << "-->Going to send data , "
+				SPLAPPTRC(L_TRACE, Conf::traceIntro << "-->CS1 Going to send data , "
 						"block for cpuYieldTimeInAudioSenderThread=" << Conf::cpuYieldTimeInAudioSenderThread,
-						"connectAndSendDataToSTT");
+						"ws_sender");
 				SPL::Functions::Utility::block(Conf::cpuYieldTimeInAudioSenderThread);
 			}
 
@@ -630,10 +618,10 @@ void WatsonSTTImpl<OP, OT>::connectAndSendDataToSTT(std::unique_ptr<unsigned cha
 			// https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-websockets#WSaudio
 			// c->get_alog().write(websocketpp::log::alevel::app, "Sent binary Message: " + boost::to_string(buffer.size()));
 			websocketpp::lib::error_code ec;
-			Rec::wsClient->send(Rec::wsHandle, audioBytes.get(), audioSize, websocketpp::frame::opcode::binary, ec);
-			Rec::statusOfAudioDataTransmissionToSTT = AUDIO_BLOB_FRAGMENTS_BEING_SENT_TO_STT;
+			Rec::wsClient->send(Rec::wsHandle, audioBytes, audioSize, websocketpp::frame::opcode::binary, ec);
+			//Rec::statusOfAudioDataTransmissionToSTT = AUDIO_BLOB_FRAGMENTS_BEING_SENT_TO_STT;
 			if (ec) {
-				SPLAPPTRC(L_ERROR, "Error when send sendEndOfText ec=" << ec, "connectAndSendDataToSTT");
+				SPLAPPTRC(L_ERROR, Conf::traceIntro << "CS9 -->Error when send sendEndOfText ec=" << ec, "ws_sender");
 			}
 		}
 	} // END: if (audioSize > 0)
@@ -647,11 +635,11 @@ void WatsonSTTImpl<OP, OT>::connectAndSendDataToSTT(std::unique_ptr<unsigned cha
 			// if nextOTuple is null, the old recentOTuple is kept
 			if (nextOTuple) {
 				oTupleWastebasket.push_back(nextOTuple);
-				recentOTuple.store(nextOTuple);
+				Rec::recentOTuple.store(nextOTuple);
 				nextOTuple = nullptr;
 			}
 
-			SPLAPPTRC(L_DEBUG, "Send \"action\" : \"stop\"", "connectAndSendDataToSTT");
+			SPLAPPTRC(L_DEBUG, Conf::traceIntro << "-->CS6 Send \"action\" : \"stop\"", "ws_sender");
 			// We reached the end of the blob data as sent/streamed from the SPL application.
 			// Signal end of the audio data.
 			// https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-websockets#WSstop
@@ -659,12 +647,14 @@ void WatsonSTTImpl<OP, OT>::connectAndSendDataToSTT(std::unique_ptr<unsigned cha
 			Rec::wsClient->send(Rec::wsHandle, "{\"action\" : \"stop\"}" , websocketpp::frame::opcode::text, ec);
 			// In a blob based audio data, the entire blob has been sent to the STT service at this time.
 			// So set this flag to indicate that.
-			Rec::statusOfAudioDataTransmissionToSTT = FULL_AUDIO_DATA_SENT_TO_STT;
+			//Rec::statusOfAudioDataTransmissionToSTT = FULL_AUDIO_DATA_SENT_TO_STT;
 			if (ec) {
-				SPLAPPTRC(L_ERROR, "Error when send sendEndOfText ec=" << ec, "connectAndSendDataToSTT");
+				SPLAPPTRC(L_ERROR, Conf::traceIntro << "-->CS10 Error when send sendEndOfText ec=" << ec, "ws_sender");
 			}
 		} else {
-			SPLAPPTRC(L_ERROR, "Connection state myWsState != WsState::listening but sendEndOfText requested. Ignoring", "connectAndSendDataToSTT");
+			SPLAPPTRC(L_ERROR, Conf::traceIntro <<
+					"-->CS11 Connection state myWsState != WsState::listening but sendEndOfText requested. Ignoring",
+					"ws_sender");
 		}
 	}
 
@@ -672,17 +662,6 @@ void WatsonSTTImpl<OP, OT>::connectAndSendDataToSTT(std::unique_ptr<unsigned cha
 		delete nextOTuple;
 	return;
 } // End: WatsonSTTImpl<OP, OT>::connectAndSendDataToSTT
-
-
-template<typename OP, typename OT>
-void WatsonSTTImpl<OP, OT>::incrementNumberOfFullAudioConversationsReceived() {
-	++numberOfFullAudioConversationsReceived;
-	// Update the operator metric only if the user asked for a live update.
-	if (Conf::sttLiveMetricsUpdateNeeded == true) {
-		nFullAudioConversationsReceivedMetric->setValueNoLock(numberOfFullAudioConversationsReceived);
-	}
-}
-
 }}}}
 
 #endif /* COM_IBM_STREAMS_STTGATEWAY_WATSONSTTIMPL_HPP_ */

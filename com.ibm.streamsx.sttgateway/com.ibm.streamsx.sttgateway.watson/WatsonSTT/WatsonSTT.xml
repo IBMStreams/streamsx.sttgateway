@@ -46,21 +46,34 @@
 
       <metrics>
         <metric>
-          <name>nSTTResultMode</name>
+          <name>sttResultMode</name>
           <description>STT result mode currently in effect for a given operator instance.</description>
           <kind>Gauge</kind>
         </metric>
         
         <metric>
           <name>nWebsocketConnectionAttempts</name>
-          <description>Number of STT service Websocket connection attempts made by this operator instance. The value is reset to zero when a connection attempt succeeds.</description>
+          <description>The cumulative number of STT service Websocket connection attempts made by this operator instance.</description>
+          <kind>Counter</kind>
+        </metric>
+
+        <metric>
+          <name>nWebsocketConnectionAttemptsFailed</name>
+          <description>The cumulative number of failed STT service Websocket connection attempts made by this operator instance.</description>
+          <kind>Counter</kind>
+        </metric>
+
+        <metric>
+          <name>nWebsocketConnectionAttemptsCurrent</name>
+          <description>Number of STT service Websocket connection attempts made by this operator instance for the current connection. The value is reset to zero when a connection attempt succeeds.</description>
           <kind>Gauge</kind>
         </metric>
         
         <metric>
           <name>nFullAudioConversationsReceived</name>
           <description>
-          Number of full audio conversations received for transcription by this operator instance.
+          Number of full audio conversations received for transcription by this operator instance. Empty files or empty 
+          conversations are not counted.
           
           *NOTE:* This metric is only updated if parameter `sttLiveMetricsUpdateNeeded` is true.
           </description>
@@ -85,6 +98,24 @@
           *NOTE:* This metric is only updated if parameter `sttLiveMetricsUpdateNeeded` is true.
           </description>
           <kind>Counter</kind>
+        </metric>
+
+        <metric>
+          <name>wsConnectionState</name>
+          <description>
+          The state of the websocket connection:
+          
+          0=idle: initial idle state
+          1=start: start a new connection
+          2=connecting: trying to connect to stt
+          3=open: connection is opened
+          4=listening: listening received
+          5=error: error received during transcription
+          6=closed: connection has closed
+          7=failed: connection has failed
+          8=crashed: Error was caught in ws_init tread
+          </description>
+          <kind>Gauge</kind>
         </metric>
       </metrics>
       
@@ -467,30 +498,16 @@
       </parameter>
       
       <parameter>
-        <name>waitTimeBeforeSTTServiceConnectionRetry</name>
+        <name>maxConnectionRetryDelay</name>
         <description>
-        This parameter specifies the time (in seconds) to wait before retrying a connection attempt to the Watson STT service. 
-        This parameter is effective until connectionAttemptsThreshold is reached. When connectionAttemptsThreshold is reached 
-        the operator retries a connection after 60 seconds. the It must be greater 1.0 and below 60.0 (Default is 3.0)
+        The maximum wait time in seconds before a connection re-try is made. The re-try 
+        delay of connection to the STT service increases exponentially starting from 2 seconds but not exceeding 
+        'maxConnectionRetryDelay'. It must be greater 1.0 (Default is 60.0)
         </description>
         <optional>true</optional>
         <rewriteAllowed>true</rewriteAllowed>
         <expressionMode>AttributeFree</expressionMode>
         <type>float64</type>
-        <cardinality>1</cardinality>
-      </parameter>
-
-      <parameter>
-        <name>connectionAttemptsThreshold</name>
-        <description>
-        This parameter specifies the threshold of the number of connection attempts to slow down the 
-        frequency of reconnection attempts to the STT service. see parameter `waitTimeBeforeSTTServiceConnectionRetry` 
-        It must be >= 1 (Default is 10)
-        </description>
-        <optional>true</optional>
-        <rewriteAllowed>true</rewriteAllowed>
-        <expressionMode>AttributeFree</expressionMode>
-        <type>int32</type>
         <cardinality>1</cardinality>
       </parameter>
 
@@ -516,7 +533,7 @@
         
         All the extra input attributes will be forwarded if matching output attributes are found.
         </description>
-        <tupleMutationAllowed>true</tupleMutationAllowed>
+        <tupleMutationAllowed>false</tupleMutationAllowed>
         <windowingMode>NonWindowed</windowingMode>
         <windowPunctuationInputMode>Oblivious</windowPunctuationInputMode>
         <cardinality>1</cardinality>

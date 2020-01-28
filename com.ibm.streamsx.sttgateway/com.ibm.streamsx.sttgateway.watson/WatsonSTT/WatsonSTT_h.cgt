@@ -41,10 +41,7 @@ public:
 	// Notify pending shutdown
 	void prepareToShutdown();
 	
-	// Tuple processing for mutating data port 0
-	void process(Tuple & tuple, uint32_t port);
-	
-	// Tuple processing for non-mutating authentication port 1
+	// Tuple processing for non-mutating ports 0 and 1
 	void process(Tuple const & tuple, uint32_t port);
 	
 	// Punctuation processing

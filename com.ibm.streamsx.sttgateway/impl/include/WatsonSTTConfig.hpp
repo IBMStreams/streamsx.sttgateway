@@ -21,8 +21,7 @@ struct WatsonSTTConfig {
 	//Configuration values
 	const bool websocketLoggingNeeded;
 	const SPL::float64 cpuYieldTimeInAudioSenderThread;
-	const SPL::float64 waitTimeBeforeSTTServiceConnectionRetry;
-	const SPL::int32 connectionAttemptsThreshold;
+	const SPL::float64 maxConnectionRetryDelay;
 	const bool sttLiveMetricsUpdateNeeded;
 	const std::string uri;
 	const std::string baseLanguageModel;
@@ -46,9 +45,9 @@ struct WatsonSTTConfig {
 
 	// Some definitions
 	//This time becomes effective, when the connectionAttemptsThreshold limit is exceeded
-	static constexpr SPL::float64 waitTimeBeforeSTTServiceConnectionRetryLong = 60.0;
-	static constexpr SPL::float64 waitTimeWhenIdle = 0.2;
-	static constexpr SPL::float64 waitTimeBeforePreviousTranscriptionFinalizes = 1.0;
+	static constexpr SPL::float64 receiverWaitTimeWhenIdle = 0.2;
+	static constexpr SPL::float64 senderWaitTimeForTranscriptionFinalization = 1.0;
+	static constexpr SPL::float64 senderWaitTimeForFinalReceiverState = 0.5;
 };
 
 }}}}
