@@ -141,12 +141,8 @@ protected:
 	// the value is copied from the sender thrad before makeNewWebsocketConnection has been flagged
 	std::string accessToken;
 
-	// The name of the current file if any (used for logging purposes only)
-	std::string currentFile;
-
 private:
 	std::atomic<SPL::int64> nWebsocketConnectionAttemptsCurrent;
-	std::atomic<SPL::int64> nFullAudioConversationsReceived;
 	std::atomic<SPL::int64> nFullAudioConversationsTranscribed;
 	std::atomic<SPL::int64> nFullAudioConversationsFailed;
 
@@ -164,7 +160,6 @@ private:
 private:
 	// Custom metrics for this operator.
 	SPL::Metric * const nWebsocketConnectionAttemptsCurrentMetric;
-	SPL::Metric * const nFullAudioConversationsReceivedMetric;
 	SPL::Metric * const nFullAudioConversationsTranscribedMetric;
 	SPL::Metric * const nFullAudioConversationsFailedMetric;
 	SPL::Metric * const wsConnectionStateMetric;
@@ -180,7 +175,6 @@ protected:
 	// Helper functions
 	void setWsState(WsState ws);
 	inline void incrementNWebsocketConnectionAttemptsCurrent();
-	inline void incrementNFullAudioConversationsReceived();
 	inline void incrementNFullAudioConversationsTranscribed();
 	inline void incrementNFullAudioConversationsFailed();
 	inline SPL::float64 getNWebsocketConnectionAttemptsCurrent() { return nWebsocketConnectionAttemptsCurrent.load(); };
@@ -200,10 +194,8 @@ WatsonSTTImplReceiver<OP, OT>::WatsonSTTImplReceiver(OP & splOperator_,Config co
 		oTupleUsedForSubmission{},
 
 		accessToken{},
-		currentFile{},
 
 		nWebsocketConnectionAttemptsCurrent{0},
-		nFullAudioConversationsReceived{0},
 		nFullAudioConversationsTranscribed{0},
 		nFullAudioConversationsFailed{0},
 		transcriptionResult{},
@@ -217,7 +209,6 @@ WatsonSTTImplReceiver<OP, OT>::WatsonSTTImplReceiver(OP & splOperator_,Config co
 		// Simply get the custom metrics already defined for this operator.
 		// The update of metrics nFullAudioConversationsReceived and nFullAudioConversationsTranscribed depends on parameter sttLiveMetricsUpdateNeeded
 		nWebsocketConnectionAttemptsCurrentMetric{ & splOperator.getContext().getMetrics().getCustomMetricByName("nWebsocketConnectionAttemptsCurrent")},
-		nFullAudioConversationsReceivedMetric{ & splOperator.getContext().getMetrics().getCustomMetricByName("nFullAudioConversationsReceived")},
 		nFullAudioConversationsTranscribedMetric{ & splOperator.getContext().getMetrics().getCustomMetricByName("nFullAudioConversationsTranscribed")},
 		nFullAudioConversationsFailedMetric{ & splOperator.getContext().getMetrics().getCustomMetricByName("nFullAudioConversationsFailed")},
 		wsConnectionStateMetric{ & splOperator.getContext().getMetrics().getCustomMetricByName("wsConnectionState")}
@@ -227,7 +218,6 @@ WatsonSTTImplReceiver<OP, OT>::WatsonSTTImplReceiver(OP & splOperator_,Config co
 
 template<typename OP, typename OT>
 WatsonSTTImplReceiver<OP, OT>::~WatsonSTTImplReceiver() {
-	std::cout << "~WatsonSTTImplReceiver()" << std::endl;
 	if (wsClient) {
 		delete wsClient;
 	}
@@ -271,7 +261,7 @@ void WatsonSTTImplReceiver<OP, OT>::prepareToShutdown() {
 
 template<typename OP, typename OT>
 void WatsonSTTImplReceiver<OP, OT>::process(uint32_t idx) {
-	SPLAPPTRC(L_INFO, traceIntro << "-->Run thread idx=" << idx, "process");
+	SPLAPPTRC(L_INFO, traceIntro << "-->Run thread idx=" << idx, "ws_receiver");
 	// run the operator receiver thread
 	ws_init();
 }
@@ -287,15 +277,15 @@ void WatsonSTTImplReceiver<OP, OT>::ws_init() {
 		if (wsState.load() != WsState::start) {
 			// Keep waiting in this while loop until
 			// a need arises to make a new Websocket connection.
-			// 1 second wait.
-			SPLAPPTRC(L_TRACE, traceIntro << "-->Receiver 0: wsState=" << wsStateToString(wsState.load()) <<
-					" No connection request in thread ws_init, block for " <<
-					receiverWaitTimeWhenIdle << " second", "ws_receiver");
+			//SPLAPPTRC(L_TRACE, traceIntro << "-->Receiver 0: wsState=" << wsStateToString(wsState.load()) <<
+			//		" No connection request in thread ws_init, block for " <<
+			//		receiverWaitTimeWhenIdle << " second", "ws_receiver");
 			SPL::Functions::Utility::block(receiverWaitTimeWhenIdle);
 			continue;
 		}
 		// here we are in state WsState::start
 		setWsState(WsState::connecting);
+		oTupleUsedForSubmission = nullptr;
 
 		// https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-websockets#WSopen
 		std::string uri = this->uri;
@@ -399,6 +389,8 @@ void WatsonSTTImplReceiver<OP, OT>::ws_init() {
 			setWsState(WsState::error);
 			//SPL::Functions::Utility::abort(__FILE__, __LINE__);
 		}
+		// finally delete recentOTuple
+		recentOTuple.store(nullptr);
 	} // End of while loop.
 	SPLAPPTRC(L_INFO, traceIntro <<
 			"-->End of loop ws_init: getShutdownRequested()=" << splOperator.getPE().getShutdownRequested(),
@@ -413,7 +405,7 @@ void WatsonSTTImplReceiver<OP, OT>::on_open(client* c, websocketpp::connection_h
 
 	setWsState(WsState::open);
 
-	SPLAPPTRC(L_DEBUG, traceIntro << "-->Receiver 6 (on_open)", "on_open");
+	SPLAPPTRC(L_DEBUG, traceIntro << "-->Receiver 6 (on_open)", "ws_receiver");
 	// On Websocket connection open, establish a session with the STT service.
 	// https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-websockets#WSstart
 	// We have to form a proper JSON message structure for the
@@ -516,8 +508,8 @@ void WatsonSTTImplReceiver<OP, OT>::on_open(client* c, websocketpp::connection_h
 	wsHandle = hdl;
 	// c->get_alog().write(websocketpp::log::alevel::app, "Sent Message: "+msg);
 	SPLAPPTRC(L_INFO, traceIntro <<
-			"-->Receiver 7 A recognition request start message was sent to the Watson STT service:" <<
-			msg, "on_open");
+			"-->X53 A recognition request start message was sent to the Watson STT service:" <<
+			msg, "ws_receiver");
 } //End: WatsonSTTImpl<OP, OT>::on_open
 
 // This recursive templatized function with c++11 syntax is from the
@@ -580,7 +572,7 @@ void WatsonSTTImplReceiver<OP, OT>::on_message(client* c, websocketpp::connectio
 
 	// Entry state check
 	WsState entryState = wsState.load();
-	SPLAPPTRC(L_DEBUG, traceIntro << "-->Receiver 8 (on_message) entyState: " << wsStateToString(entryState), "ws_receiver");
+	SPLAPPTRC(L_DEBUG, traceIntro << "-->on_message entyState: " << wsStateToString(entryState), "ws_receiver");
 	if ((entryState != WsState::open) && (entryState != WsState::listening))
 		throw std::runtime_error("Unexpected entryState in ws on_message; state: " + std::string(wsStateToString(entryState)));
 
@@ -590,6 +582,7 @@ void WatsonSTTImplReceiver<OP, OT>::on_message(client* c, websocketpp::connectio
 	bool wsConnectionEstablished_ = entryState == WsState::listening;
 
 	const std::string & payload_ = msg->get_payload();
+	SPLAPPTRC(L_TRACE, traceIntro << "-->on_message payload_: " << payload_, "ws_receiver");
 	const bool stateListeningFound_ = payload_.find("\"state\": \"listening\"") != std::string::npos;
 	// STT error will have the following message format.
 	// {"error": "unable to transcode data stream audio/wav -> audio/x-float-array "}
@@ -626,11 +619,11 @@ void WatsonSTTImplReceiver<OP, OT>::on_message(client* c, websocketpp::connectio
 				}
 
 				SPLAPPTRC(L_DEBUG, traceIntro <<
-					"-->Receiver 9 state listening reached. Websocket connection established with the Watson STT service.",
+					"-->X0 state listening reached. Websocket connection established with the Watson STT service.",
 					"ws_receiver");
 				return;
 			} else {
-				SPLAPPTRC(L_ERROR, traceIntro << "-->Receiver X Unexpected on_message not in state listening and not "
+				SPLAPPTRC(L_ERROR, traceIntro << "-->Unexpected on_message not in state listening and not "
 						"listening found! Ignore message" << payload_, "ws_receiver");
 				//TODO: return??
 			}
@@ -645,7 +638,7 @@ void WatsonSTTImplReceiver<OP, OT>::on_message(client* c, websocketpp::connectio
 				}
 
 				SPLAPPTRC(L_DEBUG, traceIntro <<
-						"-->Receiver 10 Websocket connection established - no listening state.", "ws_receiver");
+						"-->X1 Websocket connection established - no listening state.", "ws_receiver");
 
 				if (sttResultMode == 1 || sttResultMode == 2) {
 					// We can parse this partial or completed
@@ -668,7 +661,7 @@ void WatsonSTTImplReceiver<OP, OT>::on_message(client* c, websocketpp::connectio
 				}
 
 				SPLAPPTRC(L_DEBUG, traceIntro <<
-					"-->Receiver 11 Websocket connection established - transcription completion.", "ws_receiver");
+					"-->X2 Websocket connection established - transcription completion.", "ws_receiver");
 
 				if (sttResultMode == 3) {
 					// Neither partial nor completed utterance results were parsed earlier.
@@ -744,7 +737,7 @@ void WatsonSTTImplReceiver<OP, OT>::on_message(client* c, websocketpp::connectio
 			// Set the STT error message attribute via the corresponding output function.
 			if (not oTupleUsedForSubmission)
 				oTupleUsedForSubmission = myRecentOTuple;
-			splOperator.setErrorAttribute(oTupleUsedForSubmission, sttErrorMsg_);
+			splOperator.appendErrorAttribute(oTupleUsedForSubmission, sttErrorMsg_);
 
 			// This prepared tuple with the assigned STT message will be
 			// sent in the very last if segment in this method below.
@@ -1639,10 +1632,10 @@ void WatsonSTTImplReceiver<OP, OT>::on_message(client* c, websocketpp::connectio
 			// Count conversations
 			if (not sttErrorFound_) {
 				incrementNFullAudioConversationsTranscribed();
-				SPLAPPTRC(L_INFO, "Successful transcription; currentFilename: " << currentFile, "STT_Result_Processing");
+				SPLAPPTRC(L_INFO, "Successful transcription", "STT_Result_Processing");
 			} else {
 				incrementNFullAudioConversationsFailed();
-				SPLAPPTRC(L_ERROR, "Error transcription; currentFilename: " << currentFile, "STT_Result_Processing");
+				SPLAPPTRC(L_ERROR, "Error transcription", "STT_Result_Processing");
 			}
 
 			if (sttJsonResponseDebugging == true) {
@@ -1654,9 +1647,7 @@ void WatsonSTTImplReceiver<OP, OT>::on_message(client* c, websocketpp::connectio
 
 				std::cout << traceIntro <<
 					"-->X52b At the tuple submission point for reporting " <<
-					tempString << " Total audio conversation received=" <<
-					nFullAudioConversationsReceived <<
-					", Total audio conversations transcribed=" <<
+					tempString << ", Total audio conversations transcribed=" <<
 					nFullAudioConversationsTranscribed << std::endl;
 			}
 
@@ -1676,7 +1667,10 @@ void WatsonSTTImplReceiver<OP, OT>::on_message(client* c, websocketpp::connectio
 		// i.e. no active transcription in progress now.
 		//statusOfAudioDataTransmissionToSTT = NO_AUDIO_DATA_SENT_TO_STT;
 		// end criterion
-		transcriptionFinalized = fullTranscriptionCompleted_;
+		if (fullTranscriptionCompleted_) {
+				recentOTuple.store(nullptr);
+				transcriptionFinalized = true;
+		}
 	} // End of if (fullTranscriptionCompleted_ || sttErrorFound_)
 } // End of the on_message method.
 
@@ -1691,6 +1685,7 @@ void WatsonSTTImplReceiver<OP, OT>::on_close(client* c, websocketpp::connection_
 	// that this is not a normal connection closure. Instead, the connection attempt has failed.
 	// We must flag this as a connection error so that a connection retry attempt
 	// can be triggered inside the ws_audio_blob_sender method.
+	recentOTuple.store(nullptr);
 	WsState st = wsState.load();
 	if ((st != WsState::listening) && (st != WsState::error)) {
 		// This connection was not fully established before.
@@ -1734,6 +1729,7 @@ context_ptr WatsonSTTImplReceiver<OP, OT>::on_tls_init(client* c, websocketpp::c
 // Either open or fail will be called for each connection. Never both.
 template<typename OP, typename OT>
 void WatsonSTTImplReceiver<OP, OT>::on_fail(client* c, websocketpp::connection_hdl hdl) {
+	recentOTuple.store(nullptr);
 	setWsState(WsState::failed);
 	// c->get_alog().write(websocketpp::log::alevel::app, "Websocket connection to the Watson STT service failed.");
 	SPLAPPTRC(L_ERROR, traceIntro << "-->Websocket connection to the Watson STT service failed.", "ws_receiver");
@@ -1749,15 +1745,6 @@ template<typename OP, typename OT>
 void WatsonSTTImplReceiver<OP, OT>::incrementNWebsocketConnectionAttemptsCurrent() {
 	++nWebsocketConnectionAttemptsCurrent;
 	nWebsocketConnectionAttemptsCurrentMetric->setValueNoLock(nWebsocketConnectionAttemptsCurrent);
-}
-
-template<typename OP, typename OT>
-void WatsonSTTImplReceiver<OP, OT>::incrementNFullAudioConversationsReceived() {
-	++nFullAudioConversationsReceived;
-	// Update the operator metric only if the user asked for a live update.
-	if (sttLiveMetricsUpdateNeeded) {
-		nFullAudioConversationsReceivedMetric->setValueNoLock(nFullAudioConversationsReceived);
-	}
 }
 
 template<typename OP, typename OT>

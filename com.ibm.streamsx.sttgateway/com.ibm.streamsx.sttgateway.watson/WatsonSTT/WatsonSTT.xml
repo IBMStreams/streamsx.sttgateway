@@ -72,8 +72,7 @@
         <metric>
           <name>nFullAudioConversationsReceived</name>
           <description>
-          Number of full audio conversations received for transcription by this operator instance. Empty files or empty 
-          conversations are not counted.
+          Number of full audio conversations received for transcription by this operator instance.
           
           *NOTE:* This metric is only updated if parameter `sttLiveMetricsUpdateNeeded` is true.
           </description>
@@ -116,6 +115,16 @@
           8=crashed: Error was caught in ws_init tread
           </description>
           <kind>Gauge</kind>
+        </metric>
+
+        <metric>
+          <name>nAudioBytesSend</name>
+          <description>
+          The amount of audio samples sent to the stt service in bytes.
+          
+          *NOTE:* This metric is only updated if parameter `sttLiveMetricsUpdateNeeded` is true.
+          </description>
+          <kind>Counter</kind>
         </metric>
       </metrics>
       
@@ -504,13 +513,14 @@
         
         Attributes on this input port:
         * **speech** (required, rstring/blob) - In the case of file based input (.wav, .mp3 etc. for batch workload), the expected value will be an absolute path of a file as an rstring. In the case of RAW audio data (received from a network switch for real-time workload), the expected input is of type blob.
-        * **conversationId** (optional, rstring) - An rstring conversationId field for identifying the origin of the audio data that is being sent for transcription (either an audio filename or a call center specific call identifier).
         
+        A window punctuation marker is used to mark the end of an conversation. When the end of conversation is encountered,
+        the STT engine delivers all results of the current conversation and flushes all buffers.
         All the extra input attributes will be forwarded if matching output attributes are found.
         </description>
         <tupleMutationAllowed>false</tupleMutationAllowed>
         <windowingMode>NonWindowed</windowingMode>
-        <windowPunctuationInputMode>Oblivious</windowPunctuationInputMode>
+        <windowPunctuationInputMode>Expecting</windowPunctuationInputMode>
         <cardinality>1</cardinality>
         <optional>false</optional>
       </inputPortSet>

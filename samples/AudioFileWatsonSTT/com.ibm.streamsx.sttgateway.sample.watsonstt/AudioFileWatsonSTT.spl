@@ -189,6 +189,14 @@ public composite AudioFileWatsonSTT {
 				placement: partitionIsolation;
 		}
 		
+		// The WatsonSTT Operator required that each conversation end is flagged with
+		// Window Punctuation.
+		stream<I> AudioFileNameFlagged as O = Punctor(AudioFileName as I) {
+			param
+				punctuate: true;
+				position: after;
+		}
+		
 		// Invoke one or more instances of the WatsonSTT operator.
 		// Avoid feeding audio data coming from more than one data source into this 
 		// parallel region which may cause erroneous transcription results.
@@ -199,7 +207,7 @@ public composite AudioFileWatsonSTT {
 		// Second input stream into this operator is your STT service instance's IAM access token.
 		@parallel(width = $numberOfSTTEngines, broadcast=[AT])
 		stream<STTResult_t> STTResult = 
-			WatsonSTT(AudioFileName as AFN; IamAccessToken as AT) {
+			WatsonSTT(AudioFileNameFlagged as AFN; IamAccessToken as AT) {
 			logic
 				state: {
 					mutable int32 _conversationCnt = 0;

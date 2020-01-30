@@ -200,7 +200,7 @@ MY_OPERATOR::MY_OPERATOR()
 		MY_BASE_OPERATOR{},
 		com::ibm::streams::sttgateway::WatsonSTTImpl<MY_OPERATOR, OPort0Type>(
 				*this,
-				Config{
+				Conf{
 						getContext().getName(),
 						getContext().getChannel(),
 						"Operator " + getContext().getName() + "-->Channel " + boost::to_string(getContext().getChannel()),
@@ -288,7 +288,7 @@ void MY_OPERATOR::process(Tuple const & tuple, uint32_t port) {
 // our tuple processing here is going to be different from the way it is 
 // usually done inside the Streams operators. 
 // There will be multiple threads: One for receiving tuples on this 
-// operator's input port, one for sending the audio data to the 
+// operator's input port and for sending the audio data to the 
 // STT service and another for receiving transcription responses from the 
 // STT service as well as to send the output tuples on this operator's 
 // output port. It is somewhat different from the usual stuff and 
@@ -297,11 +297,11 @@ void MY_OPERATOR::process(Tuple const & tuple, uint32_t port) {
 
 // Punctuation processing
 void MY_OPERATOR::process(Punctuation const & punct, uint32_t port) {
-	// Forward the punctuation markers on our first output port.
+	// Forward the punctuation markers on our first input port to the Impl class.
 	// Final markers are handled from streams runtime -> see Operator model finalPunctuationPortScope
 	if (port == 0) {
 		if(punct==Punctuation::WindowMarker) {
-			submit(punct, 0);
+			Impl::processPunct_0();
 		}
 	}
 }
@@ -334,8 +334,8 @@ MY_OPERATOR::OPort0Type* MY_OPERATOR::createOutTupleAndAutoAssign(MY_OPERATOR::I
 	return oTuple;
 }
 
-// Assign the error message to output tuple
-void MY_OPERATOR::setErrorAttribute(OPort0Type * tuple, std::string const & errorMessage) {
+// append to the error message attribute of the output tuple
+void MY_OPERATOR::appendErrorAttribute(OPort0Type * tuple, std::string const & errorMessage) {
 <% 
 	my $oport = $model->getOutputPortAt(0); 
 	foreach my $attribute (@{$oport->getAttributes()}) { 
@@ -345,7 +345,8 @@ void MY_OPERATOR::setErrorAttribute(OPort0Type * tuple, std::string const & erro
 
 		if ($operation eq "getSTTErrorMessage") {
 %>
-			tuple->set_<%=$name%>(SPL::rstring(errorMessage)); 
+			SPL::rstring & ea = tuple->get_<%=$name%>();
+			ea.append(SPL::rstring(errorMessage));
 <%		}
 	}
 %>

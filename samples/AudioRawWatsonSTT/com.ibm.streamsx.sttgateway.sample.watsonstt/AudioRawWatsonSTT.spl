@@ -273,14 +273,6 @@ public composite AudioRawWatsonSTT {
 						return;
 					}
 
-					// If it is a zero length file, ignore this audio file.
-					if (fileSize == 0l) {
-						appTrc(Trace.error, "Audio file is empty. Skipping this file: " + 
-							fileName, "AUDIO_BLOB_READ_ERROR");
-						fclose(fh, err);
-						return;
-					}
-
 					// Rewind to the top of the audio file.
 					fseek(fh, 0l, optSEEK_SET(), err);
 
@@ -330,6 +322,7 @@ public composite AudioRawWatsonSTT {
 					// fit in a full blob in the previous while loop. 
 					// (i.e. less than the configured audo blob fragment size).
 					while (numberOfBytesRemaining > 0 && audioBlobReadError == false) {
+						++counter;
 						// Read the remaining bytes.
 						clearM(audioBlob);
 						fread(audioBlob, fh, (uint64)numberOfBytesRemaining, err);
@@ -342,6 +335,7 @@ public composite AudioRawWatsonSTT {
 
 						// Send this blob data now.
 						oTuple.speech = (blob)audioBlob;
+						oTuple.sequence = counter;
 						submit(oTuple, ABC);
 						atleastOneBlobFragmentWasSent = true;
 						// This must be the very last statement in this while loop.
@@ -349,30 +343,34 @@ public composite AudioRawWatsonSTT {
 						break;
 					}
 
+					// write at least one empty blob for an empty file
+					if (fileSize == 0l) {
+						++counter;
+						clearM(audioBlob);
+						// Send this blob data now.
+						oTuple.speech = (blob)audioBlob;
+						oTuple.sequence = counter;
+						submit(oTuple, ABC);
+						atleastOneBlobFragmentWasSent = true;
+					}
+					
 					fclose(fh, err);
 					
 					// *** IMPORTANT LOGIC *** IMPORTANT LOGIC *** IMPORTANT LOGIC ***
 					//	
 					// If we have sent at least one blob fragment to the
-					// WatsonSTT operator for transcription, then we must send an empty blob to 
+					// WatsonSTT operator for transcription, then we must send window marker to 
 					// indicate the end of the audio conversation. If we don't do this, 
-					// the WatsonSTT operator will not function correctly. That operator
-					// relies on this empty blob to inform the Watson STT service about
-					// the end of an ongoing audio conversation. So, it is very important
-					// for the SPL code here to send ONLY ONE empty blob at the end of transmitting 
-					// all the non-empty blob content (either in full or in partial fragments)
-					// belonging to a given audio conversation.
-					// So, remember to do this whether you are sending the audio blob data 
-					// after reading it from a file or receiving it from a network switch.
+					// the WatsonSTT operator will not function correctly. 
 					//
 					if (atleastOneBlobFragmentWasSent == true) {
 						//this code 
 						//clearM(oTuple.speech);
 						//causes a SIGSEV if this operator is not fused with its downstream operator
-						blob newBlob = [];
-						oTuple.speech = newBlob;
+						//blob newBlob = [];
+						//oTuple.speech = newBlob;
 						// Send an empty blob as the very last one for this audio conversation.
-						submit(oTuple, ABC);
+						submit(Sys.WindowMarker, ABC);
 					}
 					//
 					// *** IMPORTANT LOGIC *** IMPORTANT LOGIC *** IMPORTANT LOGIC ***
