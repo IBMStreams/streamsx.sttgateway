@@ -384,6 +384,7 @@ void WatsonSTTImpl<OP, OT>::process_0(IT0 const & inputTuple) {
 	// to this port
 	SPL::AutoMutex autoMutex(portMutex);
 
+	bool myMediaEndReached = mediaEndReached;
 	if (mediaEndReached) {
 		// this tuple starts a new conversation
 		++nFullAudioConversationsReceived;
@@ -454,13 +455,13 @@ void WatsonSTTImpl<OP, OT>::process_0(IT0 const & inputTuple) {
 	// log the file read error occurred
 	if (not fileReadResult) {
 		std::string errorMsg;
-		if (mediaEndReached) {
+		if (myMediaEndReached) {
 			errorMsg = Conf::traceIntro +
-					"-->Error in the first segment of an conversation. Skipping STT task. File: " + currentFile;
+					"-->Read error in the first segment of an conversation. Skipping STT task. File: " + currentFile;
 			SPLAPPTRC(L_ERROR, errorMsg, "ws_sender");
 		} else {
 			errorMsg = Conf::traceIntro +
-					"-->Error in a subsequent segment of an conversation. Close STT task. File: " + currentFile;
+					"-->Read error in a subsequent segment of an conversation. Close STT task. File: " + currentFile;
 			SPLAPPTRC(L_ERROR, errorMsg, "ws_sender");
 		}
 		connect();
@@ -565,7 +566,7 @@ void WatsonSTTImpl<OP, OT>::connect() {
 // send the data requires the listening state
 template<typename OP, typename OT>
 void WatsonSTTImpl<OP, OT>::sendDataToSTT(unsigned char const * audioBytes, uint64_t audioSize) {
-	SPLAPPTRC(L_DEBUG, Conf::traceIntro << "-->CS0 sndSendDataToSTT(audioBytes=" <<
+	SPLAPPTRC(L_DEBUG, Conf::traceIntro << "-->CS0 sendDataToSTT(audioBytes=" <<
 			static_cast<const void*>(audioBytes) << ", audioSize=" << audioSize, "ws_sender");
 
 	// send bytes but only if size > 0
