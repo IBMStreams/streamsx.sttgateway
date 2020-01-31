@@ -46,6 +46,7 @@
 
 	<property name="samples.dir"        value="samples"/>
 	<property name="samples.doc.dir"    value="samples/${doc.string}/spldoc"/>
+	<property name="demo.dir"           value="demos"/>
 
 	<property name="test.dir"           location="tests/frameworktests"/>
 
@@ -61,7 +62,7 @@
 	<xmlproperty file="${toolkit.dir}/info.xml" prefix="tkinfo" keepRoot="no"/>
 
 	<target name="init">
-		<echo message="Toolkit Version: ${tkinfo.info:identity.info:version} boost.version: ${boost.version} websocket.version: ${websocket.version}"/>
+		<echo message="Toolkit Version: ${tkinfo.identity.version} boost.version: ${boost.version} websocket.version: ${websocket.version}"/>
 		<mkdir dir="${lib.dir}"/>
 		<mkdir dir="${ext.dir}"/>
 	</target>
@@ -200,7 +201,7 @@
 		description="Build all samples">
 		<subant genericantfile="${basedir}/build.xml">
 			<target name="build-sample-target"/>
-			<dirset dir="samples" includes="*" excludes="${doc.string},audio-files,VoiceGatewayToStreamsToWatsonS2T"/>
+			<dirset dir="samples" includes="*" excludes="${doc.string},audio-files"/>
 		</subant>
 	</target>
 	
@@ -289,16 +290,45 @@
 			<arg value="--short" />
 			<arg value="HEAD" />
 		</exec>
-		<echo message="Make releasefile Toolkit Version: ${tkinfo.info:identity.info:version} ${commithash}"/>
-		<property name="releasefilename" value="${release.dir}/${ant.project.name}-${tkinfo.info:identity.info:version}-${commithash}-${DSTAMP}-${TSTAMP}.tgz"/>
-		<tar compression="gzip" longfile="gnu"
+		<echo message="Make releasefile Toolkit Version: ${tkinfo.identity.version} ${commithash}"/>
+		<property name="releasefilename" value="${release.dir}/${ant.project.name}-${tkinfo.identity.version}-${commithash}-${DSTAMP}-${TSTAMP}.tgz"/>
+		<!-- must use the tar command because the tar target makes nonsense with links -->
+		<!-- <tar compression="gzip" longfile="gnu"
 			destfile="${releasefilename}"
 			basedir="${basedir}"
-			includes="${toolkit.dir}/** ${samples.dir}/** ${doc.string}/** README.md LICENSE"
+			includes="${toolkit.dir}/** ${samples.dir}/** ${doc.string}/** README.md LICENSE sttgateway-tech-brief.txt"
 			excludes="**/.toolkitList **/.git* ${toolkit.dir}/.settings/ ${toolkit.dir}/.externalToolBuilders/ ${toolkit.dir}/.project ${toolkit.dir}/.classpath ${toolkit.dir}/build.xml ${toolkit.dir}/pom.xml ${toolkit.dir}/icons/ ${toolkit.dir}/impl/java/"
-		/>
+		/> -->
+		<exec executable="tar" failonerror="true">
+			<arg value="czf"/>
+			<arg value="${releasefilename}"/>
+			<arg value="--exclude=**/.toolkitList"/>
+			<arg value="--exclude=**/.git*"/>
+			<arg value="--exclude=${toolkit.dir}/.settings/"/>
+			<arg value="--exclude=${toolkit.dir}/.externalToolBuilders/"/>
+			<arg value="--exclude=${toolkit.dir}/.project"/>
+			<arg value="--exclude=${toolkit.dir}/.classpath"/>
+			<arg value="--exclude=${toolkit.dir}/build.xml"/>
+			<arg value="--exclude=${toolkit.dir}/pom.xml"/>
+			<arg value="--exclude=${toolkit.dir}/icons/"/>
+			<arg value="--exclude=${toolkit.dir}/impl/java/"/>
+			<arg value="${toolkit.dir}/"/>
+			<arg value="${samples.dir}/"/>
+			<arg value="${doc.string}/"/>
+			<arg value="README.md"/>
+			<arg value="LICENSE"/>
+			<arg value="sttgateway-tech-brief.txt"/>
+		</exec>
 		<checksum file="${releasefilename}"/>
 		<checksum algorithm="sha1" file="${releasefilename}"/>
+		<echo message="Make demo archive"/>
+		<delete file="${release.dir}/${ant.project.name}-${tkinfo.identity.version}-demos.tgz"/>
+		<tar compression="gzip" longfile="gnu"
+			destfile="${release.dir}/${ant.project.name}-${tkinfo.identity.version}-demos.tgz"
+			basedir="${basedir}"
+			includes="${demo.dir}/** README.md LICENSE"
+			excludes="**/.toolkitList **/.git*"
+		/>
 	</target>
 	
 	<!-- Extract the git commit hash and make release info file -->
