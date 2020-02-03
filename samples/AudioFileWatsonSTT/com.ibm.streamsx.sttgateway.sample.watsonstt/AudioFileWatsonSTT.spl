@@ -61,7 +61,7 @@ use com.ibm.streamsx.sttgateway.watson::*;
  * @param	audioDir	directory with the audio files
  * @param	numberOfSTTEngines	the number of stt engines
  * @param	sttUri	the stt service uri; Default wss://stream.watsonplatform.net/speech-to-text/api/v1/recognize
- * @param	sttBaseLanguageModel	base alnguage mdel; Default: en-US_NarrowbandModel
+ * @param	sttBaseLanguageModel	base language model; Default: en-US_NarrowbandModel
  * @param	contentType	content type; Default audio/wav
  * @param	baseModelVersion	base model version
  * @param	customizationId	"customizationId"
@@ -71,7 +71,7 @@ use com.ibm.streamsx.sttgateway.watson::*;
  * @param	sttResultMode	sttResultMode; Default 3
  * @param	maxUtteranceAlternatives	maxUtteranceAlternatives; Default 1
  * @param	sttRequestLogging	sttRequestLogging; Default false
- * @param	filterProfanity	filterProfanity; Defaultfalse
+ * @param	filterProfanity	filterProfanity; Default false
  * @param	sttJsonResponseDebugging	sttJsonResponseDebugging; Default false
  * @param	wordAlternativesThreshold	"wordAlternativesThreshold; Default 0.0
  * @param	smartFormattingNeeded	smartFormattingNeeded; Default false
@@ -208,7 +208,6 @@ public composite AudioFileWatsonSTT {
 				// Give sufficient delay here so that the
 				// previous operator can complete generating the
 				// IAM access token and send it to the WatsonSTT operator.
-				initDelay : 15.0;
 				sortBy: name;
 			output O:
 				sequence = counter++;

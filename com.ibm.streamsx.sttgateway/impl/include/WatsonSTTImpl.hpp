@@ -62,6 +62,7 @@ public:
 	// shorthands
 	typedef WatsonSTTConfig Conf;
 	typedef WatsonSTTImplReceiver<OP, OT> Rec;
+
 	//Constructors
 	WatsonSTTImpl(OP & splOperator_, Conf config_);
 	//WatsonSTTImpl(WatsonSTTImpl const &) = delete;
@@ -83,35 +84,47 @@ protected:
 
 private:
 	// check connection state and connect if necessary
+	// acquires the accessTokenMutex
+	// this function may delay for some time and the aqccessToken may change during this time
+	// this assures that the connection can succeed after an access token becomes invalid and the new token is received
+	// via port 1
 	void connect();
 
 	// send the the audio data to stt if any
 	// does not take the ownership of audioBytes
 	void sendDataToSTT(unsigned char const * audioBytes, uint64_t audioSize);
 
-	// pushes the next O tuple to operator state variables and send the action stop if connection is in listening state
-	// if no listening state delete the otuple
+	// send the action stop if connection is in listening state
 	void sendActionStop();
 
 private:
-	// Websocket operations related member variables.
-	// values set from receiver thread and read from sender side
-	// All values are primitive atomic values, no locking
+	// Access Token mutex this should be a different to portMutex
+	// Concurrent access to the access token from port 0 and port 1 is managed by the accessTokenMutex
+	// The receiver thread gets an own copy of the access token just before the connection attempt is initiated
+	// in function connect.
+	SPL::Mutex accessTokenMutex;
+	std::string accessToken;
 
-	//In - out related variables (set from sender thread
+	// Port0 Mutex to serialize the operations of port 0
+	SPL::Mutex portMutex;
+
+	// Websocket operations related member variables.
+	// All values are primitive atomic values, no locking with receiver thread
+
+	//In - out related variables set from sender thread only controlled by portMutex
 	int numberOfAudioBlobFragmentsReceivedInCurrentConversation;
 	SPL::int64 numberOfAudioSendInCurrentConversation;
 	bool mediaEndReached;
 
-	// When a new oTuple is to be set the previous otuple is put into the oTupleWastebasket
-	// The wastebasked is emptied after transcription was finalizes and before a new conversation starts
+	// The list of all o tuples of an conversation
+	// The wastebasked is emptied after transcription was finalized and before a new conversation starts
+	// The transcription is finalized when, the receiver thread has finished the sending of the last tuple
+	// in a conversation and has receives the next 'listening' event, then the Rec::transcriptionFinalized flag is set
+	// from receiver thread
+	// This ensures that a o tuple is never used concurrently from sender and receiver thread
 	std::vector<OT *> oTupleWastebasket;
 
-	std::string accessToken;
-
-	// Port Mutex
-	SPL::Mutex portMutex;
-
+	// Metrics completely controlled by sender thread
 	SPL::int64 nFullAudioConversationsReceived;
 	SPL::int64 nWebsocketConnectionAttempts;
 	SPL::int64 nWebsocketConnectionAttemptsFailed;
@@ -125,7 +138,8 @@ private:
 	SPL::Metric * const nAudioBytesSendMetric;
 };
 
-// The extraction function to extract the blob or the blob from filename
+// The extraction function to extract the blob or reads the blob from file
+// This function has 2 specializations DATA_TYPE=SPL::rstring and DATA_TYPE=SPL::blob
 // Returns true success, when the file or the blob can be acquired without issues
 // Return false when a file read error occurred
 // The audioBytes and audioSize are always the pointer/size to the extracted data
@@ -145,14 +159,16 @@ WatsonSTTImpl<OP, OT>::WatsonSTTImpl(OP & splOperator_,Conf config_)
 :
 		Rec(splOperator_, config_),
 
+		accessTokenMutex(),
+		accessToken(),
+
+		portMutex(),
+
 		numberOfAudioBlobFragmentsReceivedInCurrentConversation(0),
 		numberOfAudioSendInCurrentConversation(0),
 		mediaEndReached(true),
 		oTupleWastebasket(),
 
-		accessToken{},
-
-		portMutex{},
 		nFullAudioConversationsReceived(0),
 		nWebsocketConnectionAttempts(0),
 		nWebsocketConnectionAttemptsFailed(0),
@@ -161,7 +177,7 @@ WatsonSTTImpl<OP, OT>::WatsonSTTImpl(OP & splOperator_,Conf config_)
 		// Custom metrics for this operator are already defined in the operator model XML file.
 		// Hence, there is no need to explicitly create them here.
 		// Simply get the custom metrics already defined for this operator.
-		// The update of metrics nFullAudioConversationsReceived and nFullAudioConversationsTranscribed depends on parameter sttLiveMetricsUpdateNeeded
+		// The update of metrics nFullAudioConversationsReceived and nAudioBytesSendMetric depends on parameter sttLiveMetricsUpdateNeeded
 		sttResultModeMetric{ & Rec::splOperator.getContext().getMetrics().getCustomMetricByName("sttResultMode")},
 		nFullAudioConversationsReceivedMetric{ & Rec::splOperator.getContext().getMetrics().getCustomMetricByName("nFullAudioConversationsReceived")},
 		nWebsocketConnectionAttemptsMetric{ & Rec::splOperator.getContext().getMetrics().getCustomMetricByName("nWebsocketConnectionAttempts")},
@@ -273,11 +289,9 @@ template<typename OP, typename OT>
 template<typename IT1, const SPL::rstring& (IT1::*GETTER)()const>
 void WatsonSTTImpl<OP, OT>::process_1(IT1 const & inputTuple) {
 
-	// The access token is written here and is read in method ws_init (in context of the operator receiver thread)
-	// But the lock with portMutex is sufficient, because ws_init reads access token
-	// when wsConnectionEstablished is false and makeNewWebsocketConnection is true
-	// and during this time the portMutex is acquired from process_0
-	SPL::AutoMutex autoMutex(portMutex);
+	// The concurrent access from process_1 and process_0 is controlled by accessTokenMutex
+	// The receiver thread gets an own copy of access token while the receiver thread is not active (connect)
+	SPL::AutoMutex autoMutex(accessTokenMutex);
 
 	// Save the access token for subsequent use within this operator.
 	const SPL::rstring& at = (inputTuple.*GETTER)();
@@ -396,10 +410,8 @@ void WatsonSTTImpl<OP, OT>::process_0(IT0 const & inputTuple) {
 
 	// If the media end of the previous translation was reached, we wait until the translation has finalized.
 	// A finalized transcription is signed through Rec::transcriptionFinalized
-	// The recentOTuple is not longer needed when the transcription is finalized
-	// recentOTuple is cleared from the receiver task
 	// The is no need to acquire the state mutex here because we make no changes, we just wait for the transition
-	// to null. There are no other write operations to recentOTuple due to port mutex
+	// of Rec::transcriptionFinalized to false or an inactive receiver state.
 	if (mediaEndReached) {
 		WsState myWsState = Rec::wsState.load();
 		while (not Rec::transcriptionFinalized && not receiverHasStopped(myWsState)) {
@@ -414,14 +426,16 @@ void WatsonSTTImpl<OP, OT>::process_0(IT0 const & inputTuple) {
 				return;
 		}
 		// Here is the receiver either dead or a transcription has finalized
-		// A new transcription has not yet been started, hence no race condition can occure
+		// A new transcription has not yet been started, hence no race condition can occur
 		Rec::transcriptionFinalized = false;
 		mediaEndReached = false;
 		// this is the first blob in a conversation
 		numberOfAudioBlobFragmentsReceivedInCurrentConversation = 0;
 		numberOfAudioSendInCurrentConversation = 0;
 
-		// no current conversation is ongoing -> clear recentOTuple
+		// no current conversation is ongoing -> clear recentOTuple to be on the save side
+		// The recentOTuple is not longer needed when the transcription is finalized
+		// recentOTuple is cleared from the receiver task
 		Rec::recentOTuple.store(nullptr);
 
 		// recycle all oTuples from wastebasket
@@ -444,12 +458,21 @@ void WatsonSTTImpl<OP, OT>::process_0(IT0 const & inputTuple) {
 
 	// This must be the audio data arriving here via port 0 i.e. first input port.
 	// If we have a non-empty IAM access token, process the audio data.
-	// Otherwise, skip it.
-	if (accessToken.empty()) {
-		SPLAPPTRC(L_ERROR, Conf::traceIntro << "-->PR9 Ignoring the received audio data at this time due to an empty IAM access "
-				"token. User must first provide the IAM access token before sending any audio data to this operator.",
-				"ws_sender");
-		return;
+	// Otherwise, wait until an access token is available
+	while(true) {
+		std::string myAccessToken;
+		{
+			SPL::AutoMutex autoMutex(accessTokenMutex);
+			myAccessToken = accessToken;
+		}
+		if (myAccessToken.empty()) {
+			SPLAPPTRC(L_ERROR, Conf::traceIntro << "-->PR9 Wait for access token due to an empty IAM access "
+					"token. User must first provide the IAM access token before sending any audio data to this operator.",
+					"ws_sender");
+			SPL::Functions::Utility::block(Conf::senderWaitTimeEmptyAccessToken);
+		} else {
+			break;
+		}
 	}
 
 	// log the file read error occurred
@@ -551,7 +574,12 @@ void WatsonSTTImpl<OP, OT>::connect() {
 					"ws_sender");
 
 			// The receiver thread is in an inactive state: Now store the access token to receiver thread variable
-			Rec::accessToken = accessToken;
+			std::string myAccessToken;
+			{
+				SPL::AutoMutex autoMutex(accessTokenMutex);
+				myAccessToken = accessToken;
+			}
+			Rec::accessToken = myAccessToken;
 
 			// make the connection attempt
 			Rec::setWsState(WsState::start);

@@ -48,6 +48,7 @@ struct WatsonSTTConfig {
 	static constexpr SPL::float64 receiverWaitTimeWhenIdle = 0.2;
 	static constexpr SPL::float64 senderWaitTimeForTranscriptionFinalization = 1.0;
 	static constexpr SPL::float64 senderWaitTimeForFinalReceiverState = 0.5;
+	static constexpr SPL::float64 senderWaitTimeEmptyAccessToken = 10.0;
 };
 
 }}}}

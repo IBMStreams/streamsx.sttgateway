@@ -131,14 +131,14 @@ protected:
 	// to be used if transcription results or error indications have to be sent
 	// the sender thread guarantees that here is an valid value until transcriptionFinalized is flagged
 	// this otuple may change during a transcription when the input receives new input tuples for the
-	// current transcription
+	// current transcription. The previous value remains valid until transcriptionFinalized is flagged.
 	std::atomic<OT *> recentOTuple;
 	// when the on_message method is about to send something, this member is used to store the
 	// output tuple pointer. The member is reset, after the tuple was submitted
 	OT * oTupleUsedForSubmission;
 
 	// the access token for the sender thread
-	// the value is copied from the sender thrad before makeNewWebsocketConnection has been flagged
+	// the value is copied from the sender thread before makeNewWebsocketConnection has been flagged
 	std::string accessToken;
 
 private:
@@ -207,7 +207,7 @@ WatsonSTTImplReceiver<OP, OT>::WatsonSTTImplReceiver(OP & splOperator_,Config co
 		// Custom metrics for this operator are already defined in the operator model XML file.
 		// Hence, there is no need to explicitly create them here.
 		// Simply get the custom metrics already defined for this operator.
-		// The update of metrics nFullAudioConversationsReceived and nFullAudioConversationsTranscribed depends on parameter sttLiveMetricsUpdateNeeded
+		// The update of metrics nFullAudioConversationsTranscribed and nFullAudioConversationsFailed depends on parameter sttLiveMetricsUpdateNeeded
 		nWebsocketConnectionAttemptsCurrentMetric{ & splOperator.getContext().getMetrics().getCustomMetricByName("nWebsocketConnectionAttemptsCurrent")},
 		nFullAudioConversationsTranscribedMetric{ & splOperator.getContext().getMetrics().getCustomMetricByName("nFullAudioConversationsTranscribed")},
 		nFullAudioConversationsFailedMetric{ & splOperator.getContext().getMetrics().getCustomMetricByName("nFullAudioConversationsFailed")},
