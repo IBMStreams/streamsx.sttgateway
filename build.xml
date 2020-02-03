@@ -292,7 +292,7 @@
 		</exec>
 		<echo message="Make releasefile Toolkit Version: ${tkinfo.identity.version} ${commithash}"/>
 		<property name="releasefilename" value="${release.dir}/${ant.project.name}-${tkinfo.identity.version}-${commithash}-${DSTAMP}-${TSTAMP}.tgz"/>
-		<!-- must use the tar command because the tar target makes nonsense with links -->
+		<!-- must use the tar command because the tar target handles symbolic links incorrect -->
 		<!-- <tar compression="gzip" longfile="gnu"
 			destfile="${releasefilename}"
 			basedir="${basedir}"
