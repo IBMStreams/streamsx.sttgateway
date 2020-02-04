@@ -1,0 +1,111 @@
+use com.ibm.streamsx.sttgateway.watson::IAMAccessTokenGenerator;
+use com.ibm.streamsx.sttgateway.watson::IAMAccessToken;
+use com.ibm.streamsx.sttgateway.watson::WatsonSTT;
+use com.ibm.streamsx.testframe::FileSink1;
+
+composite WatsonSTTFileOutFunct {
+	param
+		expression<rstring> $apiKey :      getSubmissionTimeValue("apiKey", "invalid");
+		expression<rstring> $audioDir:     getSubmissionTimeValue("audioDir");
+		
+		expression<rstring> $sttBaseLanguageModel : getSubmissionTimeValue("sttBaseLanguageModel", "en-US_NarrowbandModel");
+		expression<rstring> $contentType : getSubmissionTimeValue("contentType", "audio/wav");
+		expression<int32> $sttResultMode : (int32)getSubmissionTimeValue("sttResultMode");
+		expression<int32> $maxUtteranceAlternatives : (int32)getSubmissionTimeValue("maxUtteranceAlternatives", "1");	
+		expression<rstring> $iamTokenURL : getSubmissionTimeValue("iamTokenURL", "https://iam.cloud.ibm.com/identity/token");
+		expression<rstring> $uri : getSubmissionTimeValue("uri", "wss://stream.watsonplatform.net/speech-to-text/api/v1/recognize");
+		
+		
+		expression<list<rstring>> $filesList :
+				["01-call-center-10sec.wav", "02-call-center-25sec.wav", "03-call-center-28sec.wav",
+				"04-empty-audio.wav", "05-gettysburg-address-2min.wav", "07-ibm-earnings-2min.wav",
+				"08-ibm-watson-ai-3min.wav", "10-invalid-audio.wav", "12-jfk-speech-12sec.wav"];
+				
+	type
+		STTResult = rstring conversationId, int32 utteranceNumber,
+			rstring utteranceText, boolean finalizedUtterance,
+			float32 confidence, rstring fullTranscriptionText,
+			rstring sttErrorMessage,
+			list<rstring> utteranceAlternatives, 
+			list<list<rstring>> wordAlternatives,
+			list<list<float64>> wordAlternativesConfidences,
+			list<float64> wordAlternativesStartTimes,
+			list<float64> wordAlternativesEndTimes,
+			list<rstring> utteranceWords,
+			list<float64> utteranceWordsConfidences,
+			list<float64> utteranceWordsStartTimes,
+			list<float64> utteranceWordsEndTimes,
+			float64 utteranceStartTime,
+			float64 utteranceEndTime,
+			list<int32> utteranceWordsSpeakers,
+			list<float64> utteranceWordsSpeakersConfidences,
+			map<rstring, list<map<rstring, float64>>> keywordsSpottingResults,
+			boolean transcriptionCompleted,
+			uint64 myseq;
+		
+	graph
+		
+		stream<rstring speech, uint64 myseq> FileNameStream as O = Beacon() {
+			param
+				iterations: size($filesList);
+				//!<tokenDelay>initDelay: 5.0;
+			output O:
+				speech = $audioDir + "/" + $filesList[IterationCount()],
+				myseq = IterationCount();
+		}
+		
+		stream<I> FileNameStreamPunct as O = Punctor(FileNameStream as I) {
+			param
+				punctuate : true;
+				position: after;
+		}
+		
+		stream<IAMAccessToken> IAMAccessTokenStream = IAMAccessTokenGenerator() {
+			param
+				appConfigName: "";
+				apiKey: $apiKey;
+				iamTokenURL: $iamTokenURL;
+				//<tokenDelay>initDelay: 10.0;
+		}
+
+		stream<STTResult> STTResultStream as O = WatsonSTT(FileNameStreamPunct as I; IAMAccessTokenStream) {
+			param
+				uri: $uri;
+				baseLanguageModel: $sttBaseLanguageModel;
+				contentType: $contentType;
+				sttResultMode: $sttResultMode;
+				
+			output O:
+				conversationId = speech, 
+				utteranceNumber = getUtteranceNumber(),
+				utteranceText = getUtteranceText(),
+				finalizedUtterance = isFinalizedUtterance(),
+				confidence = getConfidence(),
+				fullTranscriptionText = getFullTranscriptionText(),
+				sttErrorMessage = getSTTErrorMessage(),
+				transcriptionCompleted = isTranscriptionCompleted(),
+				// n-best utterance alternative hypotheses.
+				utteranceAlternatives = getUtteranceAlternatives(),
+				// Confusion networks (a.k.a. Consensus)
+				wordAlternatives = getWordAlternatives(),
+				wordAlternativesConfidences = getWordAlternativesConfidences(),
+				wordAlternativesStartTimes = getWordAlternativesStartTimes(),
+				wordAlternativesEndTimes = getWordAlternativesEndTimes(),
+				utteranceWords = getUtteranceWords(),
+				utteranceWordsConfidences = getUtteranceWordsConfidences(),
+				utteranceWordsStartTimes = getUtteranceWordsStartTimes(),
+				utteranceWordsEndTimes = getUtteranceWordsEndTimes(),
+				utteranceStartTime = getUtteranceStartTime(),
+				utteranceEndTime = getUtteranceEndTime(),
+				// Speaker label a.k.a. Speaker id
+				utteranceWordsSpeakers = getUtteranceWordsSpeakers(),
+				utteranceWordsSpeakersConfidences = getUtteranceWordsSpeakersConfidences(),
+				// Results from keywords spotting (matching) in an utterance.
+				keywordsSpottingResults = getKeywordsSpottingResults();
+		}
+		
+		() as Sink = FileSink1(STTResultStream) { }
+
+	config
+		restartable: false;
+}
