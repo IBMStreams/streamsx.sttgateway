@@ -115,6 +115,9 @@ private:
 	int numberOfAudioBlobFragmentsReceivedInCurrentConversation;
 	SPL::int64 numberOfAudioSendInCurrentConversation;
 	bool mediaEndReached;
+	// In parallel regions window marker are broadcasted to all chains
+	// so if an window marker is directly followed by a window marker, it will be ignored
+	bool ignoreNextWindowMarker;
 
 	// The list of all o tuples of an conversation
 	// The wastebasked is emptied after transcription was finalized and before a new conversation starts
@@ -167,6 +170,7 @@ WatsonSTTImpl<OP, OT>::WatsonSTTImpl(OP & splOperator_,Conf config_)
 		numberOfAudioBlobFragmentsReceivedInCurrentConversation(0),
 		numberOfAudioSendInCurrentConversation(0),
 		mediaEndReached(true),
+		ignoreNextWindowMarker(true),
 		oTupleWastebasket(),
 
 		nFullAudioConversationsReceived(0),
@@ -398,6 +402,7 @@ void WatsonSTTImpl<OP, OT>::process_0(IT0 const & inputTuple) {
 	// to this port
 	SPL::AutoMutex autoMutex(portMutex);
 
+	ignoreNextWindowMarker = false;
 	bool myMediaEndReached = mediaEndReached;
 	if (mediaEndReached) {
 		// this tuple starts a new conversation
@@ -526,15 +531,20 @@ void WatsonSTTImpl<OP, OT>::processPunct_0(SPL::Punctuation const & punct) {
 	SPL::AutoMutex autoMutex(portMutex);
 
 	if (punct == SPL::Punctuation::WindowMarker) {
-		// Ignore message if not in listening state
-		sendActionStop();
-		mediaEndReached = true;
+		if (not ignoreNextWindowMarker) {
+			// Ignore message if not in listening state
+			sendActionStop();
+			mediaEndReached = true;
+			ignoreNextWindowMarker = true;
+		} else {
+			SPLAPPTRC(L_TRACE, Conf::traceIntro << "PP1 Ignore window marker without data", "ws_sender");
+		}
 	} else if (punct == SPL::Punctuation::FinalMarker) {
 		// final marker wait until the current conversation ends if any
 		WsState myWsState = Rec::wsState.load();
 		while(not Rec::transcriptionFinalized && not receiverHasStopped(myWsState) && not Rec::splOperator.getPE().getShutdownRequested()) {
 			SPLAPPTRC(L_TRACE, Conf::traceIntro <<
-					"-->PP 1 Final punct received wait for transcription end, "
+					"-->PP2 Final punct received wait for transcription end, "
 					" wsState=" << wsStateToString(myWsState) << " block for " <<
 					Conf::senderWaitTimeForTranscriptionFinalization << " second",
 					"ws_sender");
