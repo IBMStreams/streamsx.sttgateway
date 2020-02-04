@@ -2,8 +2,6 @@
 #--             unFusedMode1 unFusedMode2 unFusedMode3 unFusedTokenDelay'
 #--timeout=1200
 
-setCategory 'quick'
-
 TT_mainComposite='WatsonSTTFileOutFunct'
 TT_sabFile="output/WatsonSTTFileOutFunct.sab"
 
