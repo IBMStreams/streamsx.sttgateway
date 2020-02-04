@@ -556,7 +556,8 @@
         Intermediate utterances are sent out on this output port only when the sttResultMode
         operator parameter is set to a value of either 1 or 2. If it is set to 3, then only the
         fully transcribed text for the entire audio data will be sent on this output port after
-        the given audio is completely transcribed. 
+        the given audio is completely transcribed. The port emits a window punctuation marker when a conversation 
+        has finished.
         **There are multiple available output functions**, and output attributes can also be 
         assigned values with any SPL expression that evaluates to the proper type.
         </description>
@@ -568,10 +569,8 @@
             <default>AsIs</default>
             <type>STTGatewayFunctions</type>
         </outputFunctions> 
-        <windowPunctuationOutputMode>Preserving</windowPunctuationOutputMode>
-        <windowPunctuationInputPort>0</windowPunctuationInputPort>
+        <windowPunctuationOutputMode>Generating</windowPunctuationOutputMode>
         <finalPunctuationPortScope>
-          <port>0</port>
         </finalPunctuationPortScope>
         <tupleMutationAllowed>true</tupleMutationAllowed>
         <cardinality>1</cardinality>

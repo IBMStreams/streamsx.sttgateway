@@ -298,11 +298,10 @@ void MY_OPERATOR::process(Tuple const & tuple, uint32_t port) {
 // Punctuation processing
 void MY_OPERATOR::process(Punctuation const & punct, uint32_t port) {
 	// Forward the punctuation markers on our first input port to the Impl class.
-	// Final markers are handled from streams runtime -> see Operator model finalPunctuationPortScope
+	// Puncts from port 1 are ignored
+	// Final markers are not handled from streams runtime -> see Operator model finalPunctuationPortScope
 	if (port == 0) {
-		if(punct==Punctuation::WindowMarker) {
-			Impl::processPunct_0();
-		}
+		Impl::processPunct_0(punct);
 	}
 }
 

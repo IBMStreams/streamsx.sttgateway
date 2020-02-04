@@ -1669,6 +1669,7 @@ void WatsonSTTImplReceiver<OP, OT>::on_message(client* c, websocketpp::connectio
 		// end criterion
 		if (fullTranscriptionCompleted_) {
 				recentOTuple.store(nullptr);
+				splOperator.submit(SPL::Punctuation::WindowMarker, 0);
 				transcriptionFinalized = true;
 		}
 	} // End of if (fullTranscriptionCompleted_ || sttErrorFound_)

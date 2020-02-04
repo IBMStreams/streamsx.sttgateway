@@ -80,7 +80,7 @@ protected:
 	void process_1(IT1 const & inputTuple);
 
 	// Punctuation processing for data port 0 Window Markers
-	void processPunct_0();
+	void processPunct_0(SPL::Punctuation const & punct);
 
 private:
 	// check connection state and connect if necessary
@@ -520,14 +520,29 @@ void WatsonSTTImpl<OP, OT>::process_0(IT0 const & inputTuple) {
 
 // Punctuation processing for data port 0 Window Markers
 template<typename OP, typename OT>
-void WatsonSTTImpl<OP, OT>::processPunct_0() {
+void WatsonSTTImpl<OP, OT>::processPunct_0(SPL::Punctuation const & punct) {
 	// serialize this method and protect from issues when multiple threads send
 	// to this port
 	SPL::AutoMutex autoMutex(portMutex);
 
-	// Ignore message if not in listening state
-	sendActionStop();
-	mediaEndReached = true;
+	if (punct == SPL::Punctuation::WindowMarker) {
+		// Ignore message if not in listening state
+		sendActionStop();
+		mediaEndReached = true;
+	} else if (punct == SPL::Punctuation::FinalMarker) {
+		// final marker wait until the current conversation ends if any
+		WsState myWsState = Rec::wsState.load();
+		while(not Rec::transcriptionFinalized && not receiverHasStopped(myWsState) && not Rec::splOperator.getPE().getShutdownRequested()) {
+			SPLAPPTRC(L_TRACE, Conf::traceIntro <<
+					"-->PP 1 Final punct received wait for transcription end, "
+					" wsState=" << wsStateToString(myWsState) << " block for " <<
+					Conf::senderWaitTimeForTranscriptionFinalization << " second",
+					"ws_sender");
+			SPL::Functions::Utility::block(Conf::senderWaitTimeForTranscriptionFinalization);
+			myWsState = Rec::wsState.load();
+		}
+		Rec::splOperator.submit(punct, 0);
+	}
 }
 
 template<typename OP, typename OT>
