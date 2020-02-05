@@ -85,7 +85,6 @@ use com.ibm.streamsx.sttgateway.watson::*;
  * @param	acousticCustomizationId	acousticCustomizationId
  * @param	customizationWeight	customizationWeight; Default 0.30
  * @param	sttBatchSize	stt batch size
- * @param	sttResultMode	sttResultMode; Default 3
  * @param	maxUtteranceAlternatives	maxUtteranceAlternatives; Default 1
  * @param	sttRequestLogging	sttRequestLogging; Default false
  * @param	filterProfanity	filterProfanity; Default false
@@ -159,7 +158,6 @@ public composite AudioRawWatsonSTT {
 		expression<float64> $customizationWeight : 
 			(float64)getSubmissionTimeValue("customizationWeight", "0.30");
 		expression<int32> $sttBatchSize : (int32)getSubmissionTimeValue("sttBatchSize", "0");
-		expression<int32> $sttResultMode : (int32)getSubmissionTimeValue("sttResultMode", "3");
 		expression<int32> $maxUtteranceAlternatives : 
 			(int32)getSubmissionTimeValue("maxUtteranceAlternatives", "1");	
 		expression<boolean> $sttRequestLogging : 
@@ -196,9 +194,11 @@ public composite AudioRawWatsonSTT {
 		// what features are available, how they work and how different attributes are 
 		// related to those features.
 		STTResult_t = rstring conversationId, int32 utteranceNumber,
-			rstring utteranceText, boolean finalizedUtterance,
-			float32 confidence, rstring fullTranscriptionText,
+			boolean finalizedUtterance,
+			boolean transcriptionCompleted,
 			rstring sttErrorMessage,
+			float32 confidence,
+			rstring utteranceText,
 			list<rstring> utteranceAlternatives, 
 			list<list<rstring>> wordAlternatives,
 			list<list<float64>> wordAlternativesConfidences,
@@ -213,7 +213,6 @@ public composite AudioRawWatsonSTT {
 			list<int32> utteranceWordsSpeakers,
 			list<float64> utteranceWordsSpeakersConfidences,
 			map<rstring, list<map<rstring, float64>>> keywordsSpottingResults,
-			boolean transcriptionCompleted,
 			int32 sequence;
 
 	graph
@@ -469,10 +468,10 @@ public composite AudioRawWatsonSTT {
 			// optional one. In real-life applications, such optional parameters
 			// can be omitted unless you want to change the default behavior of them.
 			param
+				sttResultMode: final;
 				uri: $sttUri;
 				baseLanguageModel: $sttBaseLanguageModel;
 				contentType: $contentType;
-				sttResultMode: $sttResultMode;
 				sttRequestLogging: $sttRequestLogging;
 				filterProfanity: $filterProfanity;
 				sttJsonResponseDebugging: $sttJsonResponseDebugging;
@@ -507,7 +506,7 @@ public composite AudioRawWatsonSTT {
 			// Some of the important output functions that must be used to check
 			// the result of the transcription are:
 			// getSTTErrorMessage --> It tells whether the transcription succeeded or not.
-			// isFinalizedUtterance --> In sttResultMode 1, it tells whether this is a 
+			// isFinalizedUtterance --> In sttResultMode partial, it tells whether this is a 
 			//                          partial utterance or a finalized utterance.
 			// isTranscriptionCompleted --> It tells whether the transcription is 
 			//                              completed for the current audio conversation or not.
@@ -518,7 +517,6 @@ public composite AudioRawWatsonSTT {
 					utteranceText = getUtteranceText(),
 					finalizedUtterance = isFinalizedUtterance(),
 					confidence = getConfidence(),
-					fullTranscriptionText = getFullTranscriptionText(),
 					sttErrorMessage = getSTTErrorMessage(),
 					transcriptionCompleted = isTranscriptionCompleted(),
 					// n-best utterance alternative hypotheses.
@@ -571,7 +569,7 @@ public composite AudioRawWatsonSTT {
 					// This is only useful if someone is interested in doing a 
 					// timing measurement to see how long it takes to transcribe a 
 					// known batch of audio conversations with the sttResultMode operator
-					// parameter to set to a value of 3 (get the full text after the
+					// parameter to set to a value of complete (get the full text after the
 					// entire conversation is transcribed).
 					if ($sttBatchSize > 0) {
 						++_conversationCnt;

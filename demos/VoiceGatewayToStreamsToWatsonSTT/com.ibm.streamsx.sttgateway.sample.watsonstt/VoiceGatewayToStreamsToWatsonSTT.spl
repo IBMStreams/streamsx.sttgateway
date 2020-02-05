@@ -66,7 +66,7 @@ type STTResult_t = rstring vgwSessionId, boolean isCustomerSpeechData,
 	int32 sttEngineId, int32 sttResultProcessorId,
 	int32 utteranceNumber,
 	rstring utteranceText, boolean finalizedUtterance,
-	float32 confidence, rstring fullTranscriptionText,
+	float32 confidence,
 	rstring sttErrorMessage, boolean transcriptionCompleted,
 	list<rstring> utteranceAlternatives, 
 	list<list<rstring>> wordAlternatives,
@@ -179,7 +179,6 @@ public composite VoiceGatewayToStreamsToWatsonSTT {
 			getSubmissionTimeValue("acousticCustomizationId", "");
 		expression<float64> $customizationWeight : 
 			(float64)getSubmissionTimeValue("customizationWeight", "0.30");
-		expression<int32> $sttResultMode : (int32)getSubmissionTimeValue("sttResultMode", "3");
 		expression<int32> $maxUtteranceAlternatives : 
 			(int32)getSubmissionTimeValue("maxUtteranceAlternatives", "1");	
 		expression<boolean> $sttRequestLogging : 
@@ -669,7 +668,6 @@ public composite IBMWatsonSpeechToText(input AudioBlobContent, AccessToken;
 			getSubmissionTimeValue("acousticCustomizationId", "");
 		expression<float64> $customizationWeight : 
 			(float64)getSubmissionTimeValue("customizationWeight", "0.30");
-		expression<int32> $sttResultMode : (int32)getSubmissionTimeValue("sttResultMode", "3");
 		expression<int32> $maxUtteranceAlternatives : 
 			(int32)getSubmissionTimeValue("maxUtteranceAlternatives", "1");	
 		expression<boolean> $sttRequestLogging : 
@@ -720,12 +718,12 @@ public composite IBMWatsonSpeechToText(input AudioBlobContent, AccessToken;
 			// Just to demonstrate, we are using all the operator parameters below.
 			// Except for the first three parameters, every other parameter is an
 			// optional one. In real-life applications, such optional parameters
-			// can be omitted unless you want to change the default behavior of them.				
+			// can be omitted unless you want to change the default behavior of them.
 			param
 				uri: $sttUri;
 				baseLanguageModel: $sttBaseLanguageModel;
 				contentType: $contentType;
-				sttResultMode: $sttResultMode;
+				sttResultMode: final;
 				sttRequestLogging: $sttRequestLogging;
 				filterProfanity: $filterProfanity;
 				sttJsonResponseDebugging: $sttJsonResponseDebugging;
@@ -760,7 +758,7 @@ public composite IBMWatsonSpeechToText(input AudioBlobContent, AccessToken;
 			// Some of the important output functions that must be used to check
 			// the result of the transcription are:
 			// getSTTErrorMessage --> It tells whether the transcription succeeded or not.
-			// isFinalizedUtterance --> In sttResultMode 1, it tells whether this is a 
+			// isFinalizedUtterance --> In sttResultMode partial, it tells whether this is a 
 			//                          partial utterance or a finalized utterance.
 			// isTranscriptionCompleted --> It tells whether the transcription is 
 			//                              completed for the current audio conversation or not.
@@ -771,7 +769,6 @@ public composite IBMWatsonSpeechToText(input AudioBlobContent, AccessToken;
 					utteranceText = getUtteranceText(),
 					finalizedUtterance = isFinalizedUtterance(),
 					confidence = getConfidence(),
-					fullTranscriptionText = getFullTranscriptionText(),
 					sttErrorMessage = getSTTErrorMessage(),
 					transcriptionCompleted = isTranscriptionCompleted(),
 					// n-best utterance alternative hypotheses.

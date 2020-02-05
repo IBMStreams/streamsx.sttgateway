@@ -14,6 +14,7 @@
 namespace com { namespace ibm { namespace streams { namespace sttgateway {
 
 struct WatsonSTTConfig {
+	enum SttResultMode { partial = 1, final, complete };
 	const std::string operatorPhysicalName;
 	const SPL::int32 udpChannelNumber;
 	const std::string traceIntro;
@@ -26,7 +27,7 @@ struct WatsonSTTConfig {
 	const std::string uri;
 	const std::string baseLanguageModel;
 	const std::string contentType;
-	const SPL::int32 sttResultMode;
+	const SttResultMode sttResultMode;
 	const bool sttRequestLogging;
 	const std::string baseModelVersion;
 	const std::string customizationId;

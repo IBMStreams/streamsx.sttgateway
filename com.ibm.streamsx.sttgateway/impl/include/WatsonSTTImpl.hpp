@@ -407,7 +407,7 @@ void WatsonSTTImpl<OP, OT>::process_0(IT0 const & inputTuple) {
 	if (mediaEndReached) {
 		// this tuple starts a new conversation
 		++nFullAudioConversationsReceived;
-		SPLAPPTRC(L_INFO, Conf::traceIntro << "-->PR 0 Start a new conversation number " <<
+		SPLAPPTRC(L_INFO, Conf::traceIntro << "-->PR0 Start a new conversation number " <<
 				nFullAudioConversationsReceived, "ws_sender");
 		if (Conf::sttLiveMetricsUpdateNeeded)
 			nFullAudioConversationsReceivedMetric->setValueNoLock(nFullAudioConversationsReceived);
@@ -421,7 +421,7 @@ void WatsonSTTImpl<OP, OT>::process_0(IT0 const & inputTuple) {
 		WsState myWsState = Rec::wsState.load();
 		while (not Rec::transcriptionFinalized && not receiverHasStopped(myWsState)) {
 			SPLAPPTRC(L_TRACE, Conf::traceIntro <<
-					"-->PR 1 We have something to send but the previous transcription is not finalized, "
+					"-->PR1 We have something to send but the previous transcription is not finalized, "
 					" wsState=" << wsStateToString(myWsState) << " block for " <<
 					Conf::senderWaitTimeForTranscriptionFinalization << " second",
 					"ws_sender");
@@ -475,6 +475,8 @@ void WatsonSTTImpl<OP, OT>::process_0(IT0 const & inputTuple) {
 					"token. User must first provide the IAM access token before sending any audio data to this operator.",
 					"ws_sender");
 			SPL::Functions::Utility::block(Conf::senderWaitTimeEmptyAccessToken);
+			if (Rec::splOperator.getPE().getShutdownRequested())
+				return;
 		} else {
 			break;
 		}

@@ -277,7 +277,7 @@ void WatsonSTTImplReceiver<OP, OT>::ws_init() {
 		if (wsState.load() != WsState::start) {
 			// Keep waiting in this while loop until
 			// a need arises to make a new Websocket connection.
-			//SPLAPPTRC(L_TRACE, traceIntro << "-->Receiver 0: wsState=" << wsStateToString(wsState.load()) <<
+			//SPLAPPTRC(L_TRACE, traceIntro << "-->RE0: wsState=" << wsStateToString(wsState.load()) <<
 			//		" No connection request in thread ws_init, block for " <<
 			//		receiverWaitTimeWhenIdle << " second", "ws_receiver");
 			SPL::Functions::Utility::block(receiverWaitTimeWhenIdle);
@@ -316,13 +316,13 @@ void WatsonSTTImplReceiver<OP, OT>::ws_init() {
 		if (wsClient) {
 			// If we are going to do a reconnection, then free the
 			// previously created Websocket client object.
-			SPLAPPTRC(L_DEBUG, traceIntro << "-->Receiver 1: Delete client " << uri, "ws_receiver");
+			SPLAPPTRC(L_DEBUG, traceIntro << "-->RE1: Delete client " << uri, "ws_receiver");
 			delete wsClient;
 			wsClient = nullptr;
 		}
 
 		try {
-			SPLAPPTRC(L_INFO, traceIntro << "-->Receiver 2: Going to connect to " << uri, "ws_receiver");
+			SPLAPPTRC(L_INFO, traceIntro << "-->RE2: Going to connect to " << uri, "ws_receiver");
 
 			wsClient = new client();
 			if ( ! wsClient)
@@ -360,32 +360,32 @@ void WatsonSTTImplReceiver<OP, OT>::ws_init() {
 
 			// Create a connection to the given URI and queue it for connection once
 			// the event loop starts
-			SPLAPPTRC(L_DEBUG, traceIntro << "-->Receiver 3 (after call back setup)", "ws_receiver");
+			SPLAPPTRC(L_DEBUG, traceIntro << "-->RE3 (after call back setup)", "ws_receiver");
 			websocketpp::lib::error_code ec;
 			// https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-basic-request#using-the-websocket-interface
 			client::connection_ptr con = wsClient->get_connection(uri, ec);
-			SPLAPPTRC(L_DEBUG, traceIntro << "-->Receiver 4 (after get_connection) ec.value=" << ec.value(), "ws_receiver");
+			SPLAPPTRC(L_DEBUG, traceIntro << "-->RE4 (after get_connection) ec.value=" << ec.value(), "ws_receiver");
 			if (ec)
 				throw ec;
 
 			wsClient->connect(con);
 			// A new Websocket connection has just been made. Reset this flag.
-			SPLAPPTRC(L_DEBUG, traceIntro << "-->Receiver 5 (after connect)", "ws_receiver");
+			SPLAPPTRC(L_DEBUG, traceIntro << "-->RE5 (after connect)", "ws_receiver");
 
 			// Start the ASIO io_service run loop
 			wsClient->run();
-			SPLAPPTRC(L_INFO, traceIntro << "-->Receiver 10 (after run)", "ws_receiver");
+			SPLAPPTRC(L_INFO, traceIntro << "-->RE10 (after run)", "ws_receiver");
 		} catch (const std::exception & e) {
-			SPLAPPTRC(L_ERROR, traceIntro << "-->Receiver 11 std::exception: " << e.what(), "ws_receiver");
+			SPLAPPTRC(L_ERROR, traceIntro << "-->RE11 std::exception: " << e.what(), "ws_receiver");
 			setWsState(WsState::error);
 			//SPL::Functions::Utility::abort(__FILE__, __LINE__);
 		} catch (const websocketpp::lib::error_code & e) {
 			//websocketpp::lib::error_code is a class -> catching by reference makes sense
-			SPLAPPTRC(L_ERROR, traceIntro << "-->Receiver 12 websocketpp::lib::error_code: " << e.message(), "ws_receiver");
+			SPLAPPTRC(L_ERROR, traceIntro << "-->RE12 websocketpp::lib::error_code: " << e.message(), "ws_receiver");
 			setWsState(WsState::error);
 			//SPL::Functions::Utility::abort(__FILE__, __LINE__);
 		} catch (...) {
-			SPLAPPTRC(L_ERROR, traceIntro << "-->Receiver 13 Other exception in WatsonSTT operator's Websocket initializtion.", "ws_receiver");
+			SPLAPPTRC(L_ERROR, traceIntro << "-->RE13 Other exception in WatsonSTT operator's Websocket initializtion.", "ws_receiver");
 			setWsState(WsState::error);
 			//SPL::Functions::Utility::abort(__FILE__, __LINE__);
 		}
@@ -405,7 +405,7 @@ void WatsonSTTImplReceiver<OP, OT>::on_open(client* c, websocketpp::connection_h
 
 	setWsState(WsState::open);
 
-	SPLAPPTRC(L_DEBUG, traceIntro << "-->Receiver 6 (on_open)", "ws_receiver");
+	SPLAPPTRC(L_DEBUG, traceIntro << "-->RE6 (on_open)", "ws_receiver");
 	// On Websocket connection open, establish a session with the STT service.
 	// https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-websockets#WSstart
 	// We have to form a proper JSON message structure for the
@@ -1019,13 +1019,15 @@ void WatsonSTTImplReceiver<OP, OT>::on_message(client* c, websocketpp::connectio
 					if (not oTupleUsedForSubmission)
 						oTupleUsedForSubmission = recentOTuple;
 					if (idx1 > 0) {
+						std::string const * utteranceTextPtr_ = &utteranceText_;
+						if (sttResultMode == complete)
+							utteranceTextPtr_ = &fullTranscriptionText_;
 						splOperator.setResultAttributes(
 								oTupleUsedForSubmission,
 								utteranceNumber_ + 1,
-								utteranceText_,
+								*utteranceTextPtr_,
 								final_,
 								confidence_,
-								fullTranscriptionText_,
 								utteranceAlternatives_,
 								wordAlternatives_,
 								wordAlternativesConfidences_,

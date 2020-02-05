@@ -27,6 +27,12 @@
       This operator may also be customized with many other optional parameters including 
       custom patch files and appropriate custom patch weights.
       
+      The operator parameter `sttResultMode` specifies what type of STT result is needed:
+        * partial: to get partial utterances,
+        * final to get completed/final utterance,
+        * complete (default) to get the full text after transcribing the entire audio.
+      The setting of this this parameter influences the validity of output functions and parameters. 
+      
       Requirements: 
       * Intel RHEL6 or RHEL7 hosts installed with IBM Streams. 
       
@@ -128,117 +134,178 @@
         </metric>
       </metrics>
       
+      <customLiterals>
+        <enumeration>
+          <name>SttResultMode</name>
+          <value>partial</value>
+          <value>final</value>
+          <value>complete</value>
+        </enumeration>
+      </customLiterals>
+      
       <customOutputFunctions>
         <customOutputFunction>
           <name>STTGatewayFunctions</name>
           <function>
-            <description>The default function for output attributes. This function assigns the output attribute to the value of the input attribute with the same name.</description>
+            <description>
+            The default function for output attributes. This function assigns the output attribute to the value of the 
+            input attribute with the same name.
+            </description>
             <prototype><![CDATA[<any T> T AsIs(T)]]></prototype> 
           </function>
           <function>
-            <description>Returns an int32 number indicating the utterance number.</description>
+            <description>
+            Returns an int32 number indicating the utterance number. 
+            
+            **Note:** This function is not available if `sttResult` mode equals `complete`.
+            </description>
             <prototype><![CDATA[int32 getUtteranceNumber()]]></prototype>
-          </function>                    
+          </function>
           <function>
             <description>Returns the transcription of audio in the form of a single utterance.</description>
             <prototype><![CDATA[rstring getUtteranceText()]]></prototype>
           </function>
           <function>
-            <description>Returns a boolean value to indicate if this is an interim partial utterance or a finalized utterance.</description>
+            <description>
+            Returns a boolean value to indicate if this is an interim partial utterance or a finalized utterance.
+            
+            **Note:** This function is not available if `sttResult` mode equals `complete`.
+            </description>
             <prototype><![CDATA[boolean isFinalizedUtterance()]]></prototype>
           </function>
           <function>
-            <description>Returns a float32 confidence value for an interim partial utterance or for a finalized utterance or for the full text.</description>
+            <description>
+            Returns a float32 confidence value for an interim partial utterance or for a finalized utterance or for the full text. 
+            
+            **Note:** This function is not available if `sttResult` mode equals `complete`.
+            </description>
             <prototype><![CDATA[float32 getConfidence()]]></prototype>
-          </function>          
-          <function>
-            <description>Returns the transcription of audio in the form of full text after completing the entire transcription.</description>
-            <prototype><![CDATA[rstring getFullTranscriptionText()]]></prototype>
           </function>
           <function>
             <description>Returns the Watson STT error message if any.</description>
             <prototype><![CDATA[rstring getSTTErrorMessage()]]></prototype>
           </function>
           <function>
-            <description>Returns a boolean value to indicate whether the full transcription is completed.</description>
+            <description>
+            Returns a boolean value to indicate whether the full transcription/conversation is completed. 
+            
+            **Note:** This function is not available if `sttResult` mode equals `complete`.
+            </description>
             <prototype><![CDATA[boolean isTranscriptionCompleted()]]></prototype>
           </function>
           <function>
-              <description>Returns a list of n-best alternative hypotheses for an utterance result. List will have the very best guess first followed by the next best ones in that order.</description>
-              <prototype><![CDATA[list<rstring> getUtteranceAlternatives()]]></prototype>
+            <description>
+            Returns a list of n-best alternative hypotheses for an utterance result. 
+            List will have the very best guess first followed by the next best ones in that order. 
+            
+            **Note:** This function is not available if `sttResult` mode equals `complete`.
+            </description>
+            <prototype><![CDATA[list<rstring> getUtteranceAlternatives()]]></prototype>
           </function>
           <function>
-              <description>Returns a nested list of word alternatives (Confusion Networks).</description>
-              <prototype><![CDATA[list<list<rstring>> getWordAlternatives()]]></prototype>
+            <description>
+            Returns a nested list of word alternatives (Confusion Networks). 
+            
+            **Note:** This function is not available if `sttResult` mode equals `complete`.
+            </description>
+            <prototype><![CDATA[list<list<rstring>> getWordAlternatives()]]></prototype>
           </function>
           <function>
-              <description>Returns a nested list of word alternatives confidences (Confusion Networks).</description>
-              <prototype><![CDATA[list<list<float64>> getWordAlternativesConfidences()]]></prototype>
+            <description>
+            Returns a nested list of word alternatives confidences (Confusion Networks). 
+            
+            **Note:** This function is not available if `sttResult` mode equals `complete`.
+            </description>
+            <prototype><![CDATA[list<list<float64>> getWordAlternativesConfidences()]]></prototype>
           </function>
           <function>
-              <description>Returns a list of word alternatives start times (Confusion Networks).</description>
-              <prototype><![CDATA[list<float64> getWordAlternativesStartTimes()]]></prototype>
+            <description>
+            Returns a list of word alternatives start times (Confusion Networks). 
+            
+            **Note:** This function is not available if `sttResult` mode equals `complete`.
+            </description>
+            <prototype><![CDATA[list<float64> getWordAlternativesStartTimes()]]></prototype>
           </function>
           <function>
-              <description>Returns a list of word alternatives end times (Confusion Networks).</description>
-              <prototype><![CDATA[list<float64> getWordAlternativesEndTimes()]]></prototype>
+            <description>
+            Returns a list of word alternatives end times (Confusion Networks). 
+            
+            **Note:** This function is not available if `sttResult` mode equals `complete`.
+            </description>
+            <prototype><![CDATA[list<float64> getWordAlternativesEndTimes()]]></prototype>
           </function>
           <function>
-              <description>Returns a list of words in an utterance result.</description>
-              <prototype><![CDATA[list<rstring> getUtteranceWords()]]></prototype>
+            <description>
+            Returns a list of words in an utterance result. 
+            
+            **Note:** This function is not available if `sttResult` mode equals `complete`.
+            </description>
+            <prototype><![CDATA[list<rstring> getUtteranceWords()]]></prototype>
           </function>
           <function>
-              <description>
-              Returns a list of confidences of the words in an utterance result.
-              
-              **Note:** This function deliver an empt result if `sttResultMode` equals 3.
-              </description>
-              <prototype><![CDATA[list<float64> getUtteranceWordsConfidences()]]></prototype>
+            <description>
+            Returns a list of confidences of the words in an utterance result. 
+            
+            **Note:** This function is not available if `sttResult` mode equals `complete`.
+            </description>
+            <prototype><![CDATA[list<float64> getUtteranceWordsConfidences()]]></prototype>
           </function>
           <function>
-              <description>
-              Returns a list of start times of the words in an utterance result relative to the start of the audio.
-              
-              **Note:** This function deliver an empt result if `sttResultMode` equals 3.
-              </description>
-              <prototype><![CDATA[list<float64> getUtteranceWordsStartTimes()]]></prototype>
-          </function>          
-          <function>
-              <description>
-              Returns a list of end times of the words in an utterance result relative to the start of the audio.
-              
-              **Note:** This function deliver an empt result if `sttResultMode` equals 3.
-              </description>
-              <prototype><![CDATA[list<float64> getUtteranceWordsEndTimes()]]></prototype>
-          </function>          
-          <function>
-              <description>Returns the start time of an utterance relative to the start of the audio.</description>
-              <prototype><![CDATA[float64 getUtteranceStartTime()]]></prototype>
-          </function>          
-          <function>
-              <description>Returns the end time of an utterance relative to the start of the audio.</description>
-              <prototype><![CDATA[float64 getUtteranceEndTime()]]></prototype>
-          </function>          
-          <function>
-              <description>
-              Returns a list of speaker ids for the individual words in an utterance result.
-              
-              **Note:** This function deliver an empt result if `sttResultMode` equals 3.
-              </description>
-              <prototype><![CDATA[list<int32> getUtteranceWordsSpeakers()]]></prototype>
+            <description>
+            Returns a list of start times of the words in an utterance result relative to the start of the audio. 
+            
+            **Note:** This function is not available if `sttResult` mode equals `complete`.
+            </description>
+            <prototype><![CDATA[list<float64> getUtteranceWordsStartTimes()]]></prototype>
           </function>
           <function>
-              <description>
-              Returns a list of confidences in identifying the speakers of the individual words in an utterance result.
-              
-              **Note:** This function deliver an empt result if `sttResultMode` equals 3.
-              </description>
-              <prototype><![CDATA[list<float64> getUtteranceWordsSpeakersConfidences()]]></prototype>
+            <description>
+            Returns a list of end times of the words in an utterance result relative to the start of the audio. 
+            
+            **Note:** This function is not available if `sttResult` mode equals `complete`.
+            </description>
+            <prototype><![CDATA[list<float64> getUtteranceWordsEndTimes()]]></prototype>
           </function>
           <function>
-              <description>Returns the STT keywords spotting results as a map of key/value pairs. Read this toolkit's documentation to learn about the map contents.</description>
-              <prototype><![CDATA[map<rstring, list<map<rstring, float64>>> getKeywordsSpottingResults()]]></prototype>
-          </function> 
+            <description>
+            Returns the start time of an utterance relative to the start of the audio. 
+            
+            **Note:** This function is not available if `sttResult` mode equals `complete`.
+            </description>
+            <prototype><![CDATA[float64 getUtteranceStartTime()]]></prototype>
+          </function>
+          <function>
+            <description>
+            Returns the end time of an utterance relative to the start of the audio. 
+            
+            **Note:** This function is not available if `sttResult` mode equals `complete`.
+            </description>
+            <prototype><![CDATA[float64 getUtteranceEndTime()]]></prototype>
+          </function>
+          <function>
+            <description>
+            Returns a list of speaker ids for the individual words in an utterance result. 
+            
+            **Note:** This function is not available if `sttResult` mode equals `complete`.
+            </description>
+            <prototype><![CDATA[list<int32> getUtteranceWordsSpeakers()]]></prototype>
+          </function>
+          <function>
+            <description>
+            Returns a list of confidences in identifying the speakers of the individual words in an utterance result. 
+            
+            **Note:** This function is not available if `sttResult` mode equals `complete`.
+            </description>
+            <prototype><![CDATA[list<float64> getUtteranceWordsSpeakersConfidences()]]></prototype>
+          </function>
+          <function>
+            <description>
+            Returns the STT keywords spotting results as a map of key/value pairs. Read this toolkit's documentation to learn about the map contents. 
+            
+            **Note:** This function is not available if `sttResult` mode equals `complete`.
+            </description>
+            <prototype><![CDATA[map<rstring, list<map<rstring, float64>>> getKeywordsSpottingResults()]]></prototype>
+          </function>
         </customOutputFunction>
       </customOutputFunctions>
       
@@ -315,15 +382,24 @@
       <parameter>
         <name>sttResultMode</name>
         <description>
-        This parameter specifies what type of STT result is needed: 1 to get partial utterances, 2 to get completed utterance, 
-        3 (default) to get the full text after transcribing the entire audio. If this parameter is set to value 3, the features 
-        `utteranceAlternatives`, `wordAlternatives`, `wordConfidenceNeeded`, `wordTimestampNeeded`, `identifySpeakers` and `keywordsSpotting` 
-        are forced disabled.
+        This parameter specifies what type of STT result is needed: `partial`: to get partial utterances, `final`: to get completed/final utterance, 
+        `complete`: (default) to get the full text after transcribing the entire audio. The setting of this If this parameter 
+        influences the validity of output functions.
+
+        In sttResultMode `complete` the following parameters are not allowed:
+        `maxUtteranceAlternatives`, `wordAlternativesThreshold`, `keywordsSpottingThreshold`, `keywordsToBeSpotted`, 
+        
+        In sttResultMode `complete` the following output functions are not allowed: 
+        `getUtteranceNumber()`, `isFinalizedUtterance()`, `getConfidence()`, `isTranscriptionCompleted()`, `getUtteranceAlternatives()`, 
+        `getWordAlternatives()`, `getWordAlternativesConfidences()`, `getWordAlternativesStartTimes()`, `getWordAlternativesEndTimes()`, 
+        `getUtteranceWords()`, `getUtteranceWordsConfidences()`, `getUtteranceWordsStartTimes()`, `getUtteranceWordsEndTimes()`, 
+        `getUtteranceStartTime()`, `getUtteranceEndTime()`, `getUtteranceWordsSpeakers()`, `getUtteranceWordsSpeakersConfidences()`, 
+        `getKeywordsSpottingResults()`
         </description>
         <optional>true</optional>
-        <rewriteAllowed>true</rewriteAllowed>
-        <expressionMode>AttributeFree</expressionMode>
-        <type>int32</type>
+        <rewriteAllowed>false</rewriteAllowed>
+        <expressionMode>CustomLiteral</expressionMode>
+        <type>SttResultMode</type>
         <cardinality>1</cardinality>
       </parameter> 
       
@@ -402,7 +478,7 @@
         <description>
         This parameter indicates the required number of n-best alternative hypotheses for the transcription results. (Default is 1)
         
-        **Note:** This parameter is forced to 1 if `sttResultMode` equals 3.
+        **Note:** This parameter is not valid if `sttResultMode` equals `complete`.
         </description>
         <optional>true</optional>
         <rewriteAllowed>true</rewriteAllowed>
@@ -417,7 +493,7 @@
         This parameter controls the density of the word alternatives results (a.k.a. Confusion Networks). A value of 0.0 
         disables this feature. Valid value must be less than 1.0 (Default is 0.0)
         
-        **Note:** This parameter is forced to 0.0 if `sttResultMode` equals 3.
+        **Note:** This parameter is not valid if `sttResultMode` equals `complete`.
         </description>
         <optional>true</optional>
         <rewriteAllowed>true</rewriteAllowed>
@@ -442,7 +518,7 @@
         This parameter specifies the minimum confidence level that the STT service must have for an utterance word to 
         match a given keyword. A value of 0.0 disables this feature. Valid value must be less than 1.0. (Default is 0.0)
         
-        **Note:** This parameter is forced to 0.0 if `sttResultMode` equals 3.
+        **Note:** This parameter is not valid if `sttResultMode` equals `complete`.
         </description>
         <optional>true</optional>
         <rewriteAllowed>true</rewriteAllowed>
@@ -453,7 +529,11 @@
 
       <parameter>
         <name>keywordsToBeSpotted</name>
-        <description>This parameter specifies a list (array) of strings to be spotted. (Default is an empty list)</description>
+        <description>
+        This parameter specifies a list (array) of strings to be spotted. (Default is an empty list)
+        
+        **Note:** This parameter is not valid if `sttResultMode` equals `complete`.
+        </description>
         <optional>true</optional>
         <rewriteAllowed>true</rewriteAllowed>
         <expressionMode>AttributeFree</expressionMode>
