@@ -3,17 +3,16 @@ use com.ibm.streamsx.sttgateway.watson::IAMAccessToken;
 use com.ibm.streamsx.sttgateway.watson::WatsonSTT;
 use com.ibm.streamsx.testframe::FileSink1;
 
-composite WatsonSTTFileOutFunct {
+composite WatsonSTTFileModes {
 	param
 		expression<rstring> $apiKey :      getSubmissionTimeValue("apiKey", "invalid");
 		expression<rstring> $audioDir:     getSubmissionTimeValue("audioDir");
 		
 		expression<rstring> $sttBaseLanguageModel : getSubmissionTimeValue("sttBaseLanguageModel", "en-US_NarrowbandModel");
 		expression<rstring> $contentType : getSubmissionTimeValue("contentType", "audio/wav");
-		expression<int32> $sttResultMode : (int32)getSubmissionTimeValue("sttResultMode");
 		expression<int32> $maxUtteranceAlternatives : (int32)getSubmissionTimeValue("maxUtteranceAlternatives", "1");	
 		expression<rstring> $iamTokenURL : getSubmissionTimeValue("iamTokenURL", "https://iam.cloud.ibm.com/identity/token");
-		expression<rstring> $uri : getSubmissionTimeValue("uri", "wss://stream.watsonplatform.net/speech-to-text/api/v1/recognize");
+		expression<rstring> $uri : getSubmissionTimeValue("uri");
 		
 		
 		expression<list<rstring>> $filesList :
@@ -24,22 +23,22 @@ composite WatsonSTTFileOutFunct {
 	type
 		STTResult = rstring conversationId, int32 utteranceNumber,
 			rstring utteranceText, boolean finalizedUtterance,
-			float32 confidence, rstring fullTranscriptionText,
 			rstring sttErrorMessage,
-			//<!*Mode3>list<rstring> utteranceAlternatives,
-			//<!*Mode3>list<list<rstring>> wordAlternatives,
-			//<!*Mode3>list<list<float64>> wordAlternativesConfidences,
-			//<!*Mode3>list<float64> wordAlternativesStartTimes,
-			//<!*Mode3>list<float64> wordAlternativesEndTimes,
-			//<!*Mode3>list<rstring> utteranceWords,
-			//<!*Mode3>list<float64> utteranceWordsConfidences,
-			//<!*Mode3>list<float64> utteranceWordsStartTimes,
-			//<!*Mode3>list<float64> utteranceWordsEndTimes,
-			float64 utteranceStartTime,
-			float64 utteranceEndTime,
-			//<!*Mode3>list<int32> utteranceWordsSpeakers,
-			//<!*Mode3>list<float64> utteranceWordsSpeakersConfidences,
-			map<rstring, list<map<rstring, float64>>> keywordsSpottingResults,
+			//<*Mode1 *Mode2>float32 confidence,
+			//<*Mode1 *Mode2>list<rstring> utteranceAlternatives,
+			//<*Mode1 *Mode2>list<list<rstring>> wordAlternatives,
+			//<*Mode1 *Mode2>list<list<float64>> wordAlternativesConfidences,
+			//<*Mode1 *Mode2>list<float64> wordAlternativesStartTimes,
+			//<*Mode1 *Mode2>list<float64> wordAlternativesEndTimes,
+			//<*Mode1 *Mode2>list<rstring> utteranceWords,
+			//<*Mode1 *Mode2>list<float64> utteranceWordsConfidences,
+			//<*Mode1 *Mode2>list<float64> utteranceWordsStartTimes,
+			//<*Mode1 *Mode2>list<float64> utteranceWordsEndTimes,
+			//<*Mode1 *Mode2>float64 utteranceStartTime,
+			//<*Mode1 *Mode2>float64 utteranceEndTime,
+			//<*Mode1 *Mode2>list<int32> utteranceWordsSpeakers,
+			//<*Mode1 *Mode2>list<float64> utteranceWordsSpeakersConfidences,
+			//<*Mode1 *Mode2>map<rstring, list<map<rstring, float64>>> keywordsSpottingResults,
 			boolean transcriptionCompleted,
 			uint64 myseq;
 		
@@ -82,38 +81,40 @@ composite WatsonSTTFileOutFunct {
 				uri: $uri;
 				baseLanguageModel: $sttBaseLanguageModel;
 				contentType: $contentType;
-				sttResultMode: $sttResultMode;
+				//<*Mode1>sttResultMode: partial;
+				//<*Mode2>sttResultMode: final;
+				//<*Mode3>sttResultMode: complete;
 				
 			output O:
-				conversationId = speech, 
-				utteranceNumber = getUtteranceNumber(),
+				conversationId = speech,
+				//<*Mode1 *Mode2>utteranceNumber = getUtteranceNumber(),
 				utteranceText = getUtteranceText(),
-				finalizedUtterance = isFinalizedUtterance(),
-				//<!*Mode3>confidence = getConfidence(),
-				fullTranscriptionText = getFullTranscriptionText(),
-				sttErrorMessage = getSTTErrorMessage(),
-				transcriptionCompleted = isTranscriptionCompleted(),
+				//<*Mode1 *Mode2>finalizedUtterance = isFinalizedUtterance(),
+				//<*Mode1 *Mode2>confidence = getConfidence(),
+				//<*Mode1 *Mode2>transcriptionCompleted = isTranscriptionCompleted(),
 				// n-best utterance alternative hypotheses.
-				//<!*Mode3>utteranceAlternatives = getUtteranceAlternatives(),
+				//<*Mode1 *Mode2>utteranceAlternatives = getUtteranceAlternatives(),
 				// Confusion networks (a.k.a. Consensus)
-				//<!*Mode3>wordAlternatives = getWordAlternatives(),
-				//<!*Mode3>wordAlternativesConfidences = getWordAlternativesConfidences(),
-				//<!*Mode3>wordAlternativesStartTimes = getWordAlternativesStartTimes(),
-				//<!*Mode3>wordAlternativesEndTimes = getWordAlternativesEndTimes(),
-				//<!*Mode3>utteranceWords = getUtteranceWords(),
-				//<!*Mode3>utteranceWordsConfidences = getUtteranceWordsConfidences(),
-				//<!*Mode3>utteranceWordsStartTimes = getUtteranceWordsStartTimes(),
-				//<!*Mode3>utteranceWordsEndTimes = getUtteranceWordsEndTimes(),
-				utteranceStartTime = getUtteranceStartTime(),
-				utteranceEndTime = getUtteranceEndTime(),
+				//<*Mode1 *Mode2>wordAlternatives = getWordAlternatives(),
+				//<*Mode1 *Mode2>wordAlternativesConfidences = getWordAlternativesConfidences(),
+				//<*Mode1 *Mode2>wordAlternativesStartTimes = getWordAlternativesStartTimes(),
+				//<*Mode1 *Mode2>wordAlternativesEndTimes = getWordAlternativesEndTimes(),
+				//<*Mode1 *Mode2>utteranceWords = getUtteranceWords(),
+				//<*Mode1 *Mode2>utteranceWordsConfidences = getUtteranceWordsConfidences(),
+				//<*Mode1 *Mode2>utteranceWordsStartTimes = getUtteranceWordsStartTimes(),
+				//<*Mode1 *Mode2>utteranceWordsEndTimes = getUtteranceWordsEndTimes(),
+				//<*Mode1 *Mode2>utteranceStartTime = getUtteranceStartTime(),
+				//<*Mode1 *Mode2>utteranceEndTime = getUtteranceEndTime(),
 				// Speaker label a.k.a. Speaker id
-				//<!*Mode3>utteranceWordsSpeakers = getUtteranceWordsSpeakers(),
-				//<!*Mode3>utteranceWordsSpeakersConfidences = getUtteranceWordsSpeakersConfidences(),
+				//<*Mode1 *Mode2>utteranceWordsSpeakers = getUtteranceWordsSpeakers(),
+				//<*Mode1 *Mode2>utteranceWordsSpeakersConfidences = getUtteranceWordsSpeakersConfidences(),
 				// Results from keywords spotting (matching) in an utterance.
-				keywordsSpottingResults = getKeywordsSpottingResults();
+				//<*Mode1 *Mode2>keywordsSpottingResults = getKeywordsSpottingResults(),
+				sttErrorMessage = getSTTErrorMessage();
 			config
 				//<fused*>placement : partitionColocation("somePartitionColocationId");
 				//<unFused*>placement : partitionIsolation;
+				//<*Queue*>threadedPort : queue(I, Sys.Wait, 100);
 			
 		}
 		

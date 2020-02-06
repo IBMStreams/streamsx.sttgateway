@@ -13,7 +13,15 @@ getapikey() {
   # the file apikey must have the form
   # sttApiKey=<your api key>nl
   local myvar;
-  myvar=$(openssl enc -d -aes-256-cbc -in ${TTRO_inputDir}/apikey.enc -k tesframeworkpass)
-  eval "$myvar"
+  openssl enc -d -aes-256-cbc -in ${TTRO_inputDir}/apikey.enc -out sttenv.sh -k tesframeworkpass
+  source ./sttenv.sh
+  export SPEECH_TO_TEXT_APIKEY
+  export SPEECH_TO_TEXT_URI
+  export SPEECH_TO_TEXT_URL
+  rm ./sttenv.sh
 }
 export -f getapikey
+
+PREPS=(
+  'getapikey'
+)
