@@ -60,107 +60,41 @@ use com.ibm.streamsx.sttgateway.watson::*;
  * 
  * @param	audioDir	directory with the audio files
  * @param	numberOfSTTEngines	the number of stt engines
- * @param	sttUri	the stt service uri; Default wss://stream.watsonplatform.net/speech-to-text/api/v1/recognize
+ * @param	sttUri	the stt service uri
  * @param	sttBaseLanguageModel	base language model; Default: en-US_NarrowbandModel
  * @param	contentType	content type; Default audio/wav
  * @param	baseModelVersion	base model version
  * @param	customizationId	"customizationId"
  * @param	acousticCustomizationId	acousticCustomizationId
  * @param	customizationWeight	customizationWeight; Default 0.30
- * @param	sttBatchSize	stt batch size
- * @param	maxUtteranceAlternatives	maxUtteranceAlternatives; Default 1
- * @param	sttRequestLogging	sttRequestLogging; Default false
- * @param	filterProfanity	filterProfanity; Default false
  * @param	sttJsonResponseDebugging	sttJsonResponseDebugging; Default false
- * @param	wordAlternativesThreshold	"wordAlternativesThreshold; Default 0.0
  * @param	smartFormattingNeeded	smartFormattingNeeded; Default false
  * @param	keywordsSpottingThreshold	"keywordsSpottingThreshold; Default 0.0
  * @param	keywordsToBeSpotted	keywordsToBeSpotted
  * @param	websocketLoggingNeeded	websocketLoggingNeeded; Default false
- * @param	cpuYieldTimeInAudioSenderThread	cpuYieldTimeInAudioSenderThread; Default 0.001
- * @param	sttLiveMetricsUpdateNeeded	sttLiveMetricsUpdateNeeded; Default true
  */
 
 public composite AudioFileWatsonSTT {
+
 	param
-		expression<rstring> $sttApiKey : getSubmissionTimeValue("sttApiKey", "");
-		expression<rstring> $sttIAMTokenURL : 
-			getSubmissionTimeValue("sttIAMTokenURL", "https://iam.cloud.ibm.com/identity/token");
-		expression<rstring> $sttOnCP4DAccessToken : getSubmissionTimeValue("sttOnCP4DAccessToken", "");
-		expression<rstring> $audioDir : getSubmissionTimeValue("audioDir", "../../audio-files"); 
-		expression<int32> $numberOfSTTEngines :(int32)
-			getSubmissionTimeValue("numberOfSTTEngines", "5") ;
-		expression<rstring> $sttUri : getSubmissionTimeValue("sttUri",
-			"wss://stream.watsonplatform.net/speech-to-text/api/v1/recognize");
-		expression<rstring> $sttBaseLanguageModel : 
-			getSubmissionTimeValue("sttBaseLanguageModel", "en-US_NarrowbandModel");
-		expression<rstring> $contentType : 
-			getSubmissionTimeValue("contentType", "audio/wav");
-		expression<rstring> $baseModelVersion : 
-			getSubmissionTimeValue("baseModelVersion", "");
-		expression<rstring> $customizationId : 
-			getSubmissionTimeValue("customizationId", "");
-		expression<rstring> $acousticCustomizationId : 
-			getSubmissionTimeValue("acousticCustomizationId", "");
-		expression<float64> $customizationWeight : 
-			(float64)getSubmissionTimeValue("customizationWeight", "0.30");
-		expression<int32> $sttBatchSize : (int32)getSubmissionTimeValue("sttBatchSize", "0");
-		expression<int32> $maxUtteranceAlternatives : 
-			(int32)getSubmissionTimeValue("maxUtteranceAlternatives", "1");	
-		expression<boolean> $sttRequestLogging : 
-			(boolean)getSubmissionTimeValue("sttRequestLogging", "false");
-		expression<boolean> $filterProfanity : 
-			(boolean)getSubmissionTimeValue("filterProfanity", "false");
-		expression<boolean> $sttJsonResponseDebugging : 
-			(boolean)getSubmissionTimeValue("sttJsonResponseDebugging", "false");
-		expression<float64> $wordAlternativesThreshold : 
-			(float64)getSubmissionTimeValue("wordAlternativesThreshold", "0.0");
-		expression<boolean> $smartFormattingNeeded : 
-			(boolean)getSubmissionTimeValue("smartFormattingNeeded", "false");
-		expression<float64> $keywordsSpottingThreshold : 
-			(float64)getSubmissionTimeValue("keywordsSpottingThreshold", "0.0");
-		expression<list<rstring>> $keywordsToBeSpotted : 
-			(list<rstring>)getSubmissionTimeValue("keywordsToBeSpotted", "[]");	
-		expression<boolean> $websocketLoggingNeeded : 
-			(boolean)getSubmissionTimeValue("websocketLoggingNeeded", "false");
-		expression<float64> $cpuYieldTimeInAudioSenderThread : 
-			(float64)getSubmissionTimeValue("cpuYieldTimeInAudioSenderThread", "0.001");
-		expression<boolean> $sttLiveMetricsUpdateNeeded : 
-			(boolean)getSubmissionTimeValue("sttLiveMetricsUpdateNeeded", "true");
+		expression<rstring> $sttApiKey:                getSubmissionTimeValue("sttApiKey", "");
+		expression<rstring> $sttIAMTokenURL:           getSubmissionTimeValue("sttIAMTokenURL", "https://iam.cloud.ibm.com/identity/token");
+		expression<rstring> $sttOnCP4DAccessToken:     getSubmissionTimeValue("sttOnCP4DAccessToken", "");
+		expression<rstring> $audioDir:                 getSubmissionTimeValue("audioDir", "../../audio-files"); 
+		expression<int32> $numberOfSTTEngines:  (int32)getSubmissionTimeValue("numberOfSTTEngines", "5") ;
+		expression<rstring> $sttUri:                   getSubmissionTimeValue("sttUri");
+		expression<rstring> $sttBaseLanguageModel:     getSubmissionTimeValue("sttBaseLanguageModel", "en-US_NarrowbandModel");
+		expression<rstring> $contentType:              getSubmissionTimeValue("contentType", "audio/wav");
+		expression<rstring> $baseModelVersion:         getSubmissionTimeValue("baseModelVersion", "");
+		expression<rstring> $customizationId:          getSubmissionTimeValue("customizationId", "");
+		expression<rstring> $acousticCustomizationId:  getSubmissionTimeValue("acousticCustomizationId", "");
+		expression<float64> $customizationWeight: (float64)getSubmissionTimeValue("customizationWeight", "0.30");
+		expression<boolean> $sttJsonResponseDebugging:(boolean)getSubmissionTimeValue("sttJsonResponseDebugging", "false");
+		expression<boolean> $smartFormattingNeeded:(boolean)getSubmissionTimeValue("smartFormattingNeeded", "false");
 
 	type
-		// This STT result type contains many attributes to
-		// demonstrate all the basic and very advanced features of 
-		// the Watson STT service. Not all real life applications will need 
-		// all these attributes. You can decide to include or omit these
-		// attributes based on the specific STT features your application will need. 
-		// Trimming the unused attributes will also help in 
-		// reducing the STT processing overhead and in turn 
-		// help in receiving the STT results faster.
-		// Read the streamsx.sttgateway toolkit documentation to learn about
-		// what features are available, how they work and how different attributes are 
-		// related to those features.
-		STTResult_t = rstring conversationId, int32 utteranceNumber,
-			boolean finalizedUtterance,
-			boolean transcriptionCompleted,
-			rstring sttErrorMessage,
-			float32 confidence,
-			rstring utteranceText,
-			list<rstring> utteranceAlternatives, 
-			list<list<rstring>> wordAlternatives,
-			list<list<float64>> wordAlternativesConfidences,
-			list<float64> wordAlternativesStartTimes,
-			list<float64> wordAlternativesEndTimes,
-			list<rstring> utteranceWords,
-			list<float64> utteranceWordsConfidences,
-			list<float64> utteranceWordsStartTimes,
-			list<float64> utteranceWordsEndTimes,
-			float64 utteranceStartTime,
-			float64 utteranceEndTime,
-			list<int32> utteranceWordsSpeakers,
-			list<float64> utteranceWordsSpeakersConfidences,
-			map<rstring, list<map<rstring, float64>>> keywordsSpottingResults,
-			int32 sequence;
+		// This STT result type
+		STTResult_t = int32 sequence, rstring conversationId, rstring sttErrorMessage, rstring utterance;
 
 	graph
 		// IMPORTANT: IBM STT service on public cloud requires
@@ -173,16 +107,16 @@ public composite AudioFileWatsonSTT {
 		// second input stream of the WatsonSTT operator that is used below.
 		// For a correct STT operation, user must set only one of these two
 		// submission time parameters to a non-empty value: sttAPIKey or sttOnCP4DAccessToken.
-		(stream<IAMAccessToken> IamAccessToken as IAT)
-			as IamAccessTokenGenerator = IAMAccessTokenGenerator() {
+		stream<IAMAccessToken> IamAccessToken = IAMAccessTokenGenerator() {
 			param
-				// This operator takes these four parameters.
 				apiKey: $sttApiKey;
 				iamTokenURL: $sttIAMTokenURL;
 				accessToken: $sttOnCP4DAccessToken;
 				// All connection parameter are taken from params.
 				// So if we clean the app config name, we avoid error logs
 				appConfigName: "";
+			config
+				placement : partitionColocation("somePartitionColocationId");
 		}
 
 		// Scan a directory periodically to pick up the audio files and 
@@ -199,19 +133,20 @@ public composite AudioFileWatsonSTT {
 		// attributes can be sent in the input stream to be auto assigned to
 		// the output stream of the WatsonSTT operator.
 		stream<rstring speech, int32 sequence> AudioFileName as O = DirectoryScan() {
-			logic state:
-				mutable int32 counter = 0;
+			logic
+				state:
+					mutable int32 sequence_ = 0;
 			param
 				directory : $audioDir;
 				pattern : "\\.wav$";
-				// Give sufficient delay here so that the
-				// previous operator can complete generating the
-				// IAM access token and send it to the WatsonSTT operator.
 				sortBy: name;
-			output O:
-				sequence = counter++;
+				// Give sufficient delay here so that the previous operator can complete generating the
+				// IAM access token and send it to the WatsonSTT operator.
+				// This is not a requirement but avoids error logs in WatsonSTT operator
+				initDelay: 5.0;
+			output O: sequence = sequence_++;
 			config
-				placement: partitionIsolation;
+				placement : partitionColocation("somePartitionColocationId");
 		}
 		
 		// The WatsonSTT Operator required that each conversation end is flagged with
@@ -220,6 +155,8 @@ public composite AudioFileWatsonSTT {
 			param
 				punctuate: true;
 				position: after;
+			config
+				placement : partitionColocation("somePartitionColocationId");
 		}
 		
 		// Invoke one or more instances of the WatsonSTT operator.
@@ -234,37 +171,21 @@ public composite AudioFileWatsonSTT {
 		stream<STTResult_t> STTResult = 
 			WatsonSTT(AudioFileNameFlagged as AFN; IamAccessToken as AT) {
 			logic
-				state: {
+				state:
 					mutable int32 _conversationCnt = 0;
-				}
 				
 				onTuple AFN: {
+					// Print the input
 					printStringLn(hourMinuteSecondMillisec(getTimestamp()) + " Channel " + (rstring)getChannel() + 
 						", Speech input " + (rstring)++_conversationCnt +
 						": " + (rstring)AFN.speech);
 				}
-			
-			// Just to demonstrate, we are using all the operator parameters below.
-			// Except for the first three parameters, every other parameter is an
-			// optional one. In real-life applications, such optional parameters
-			// can be omitted unless you want to change the default behavior of them.
 			param
-				sttResultMode: final;
+				sttResultMode: complete;
 				uri: $sttUri;
 				baseLanguageModel: $sttBaseLanguageModel;
 				contentType: $contentType;
-				sttRequestLogging: $sttRequestLogging;
-				filterProfanity: $filterProfanity;
 				sttJsonResponseDebugging: $sttJsonResponseDebugging;
-				maxUtteranceAlternatives: $maxUtteranceAlternatives;
-				wordAlternativesThreshold: $wordAlternativesThreshold;
-				smartFormattingNeeded: $smartFormattingNeeded;
-				keywordsSpottingThreshold: $keywordsSpottingThreshold;
-				keywordsToBeSpotted: $keywordsToBeSpotted;
-				websocketLoggingNeeded: $websocketLoggingNeeded;
-				cpuYieldTimeInAudioSenderThread: $cpuYieldTimeInAudioSenderThread;
-				sttLiveMetricsUpdateNeeded : $sttLiveMetricsUpdateNeeded;
-				
 				// Use the following operator parameters as needed.
 				// Point to a specific version of the base model if needed.
 				//
@@ -278,101 +199,24 @@ public composite AudioFileWatsonSTT {
 				acousticCustomizationId: $acousticCustomizationId;
 				// Relative weight to be given to the words in the custom Language model.
 				customizationWeight: $customizationWeight;
-			
-			// Just for demonstrative purposes, we are showing below the output attribute
-			// assignments using all the available custom output functions. In your
-			// real-life applications, it is sufficient to do the assignments via
-			// custom output functions only as needed.
-			//
-			// Some of the important output functions that must be used to check
-			// the result of the transcription are:
-			// getSTTErrorMessage --> It tells whether the transcription succeeded or not.
-			// isFinalizedUtterance --> In sttResultMode partial, it tells whether this is a 
-			//                          partial utterance or a finalized utterance.
-			// isTranscriptionCompleted --> It tells whether the transcription is 
-			//                              completed for the current audio conversation or not.
-			//
+				smartFormattingNeeded: $smartFormattingNeeded;
 			output
 				STTResult: conversationId = speech, 
-					utteranceNumber = getUtteranceNumber(),
-					utteranceText = getUtteranceText(),
-					finalizedUtterance = isFinalizedUtterance(),
-					confidence = getConfidence(),
-					sttErrorMessage = getSTTErrorMessage(),
-					transcriptionCompleted = isTranscriptionCompleted(),
-					// n-best utterance alternative hypotheses.
-					utteranceAlternatives = getUtteranceAlternatives(),
-					// Confusion networks (a.k.a. Consensus)
-					wordAlternatives = getWordAlternatives(),
-					wordAlternativesConfidences = getWordAlternativesConfidences(),
-					wordAlternativesStartTimes = getWordAlternativesStartTimes(),
-					wordAlternativesEndTimes = getWordAlternativesEndTimes(),
-					utteranceWords = getUtteranceWords(),
-					utteranceWordsConfidences = getUtteranceWordsConfidences(),
-					utteranceWordsStartTimes = getUtteranceWordsStartTimes(),
-					utteranceWordsEndTimes = getUtteranceWordsEndTimes(),
-					utteranceStartTime = getUtteranceStartTime(),
-					utteranceEndTime = getUtteranceEndTime(),
-					// Speaker label a.k.a. Speaker id
-					utteranceWordsSpeakers = getUtteranceWordsSpeakers(),
-					utteranceWordsSpeakersConfidences = getUtteranceWordsSpeakersConfidences(),
-					// Results from keywords spotting (matching) in an utterance.
-					keywordsSpottingResults = getKeywordsSpottingResults();
-
-			// If needed, you can decide not to fuse the WatsonSTT operator instances and
-			// keep each instance of this operator on its own PE (a.k.a Linux process) by
-			// removing the block comment around this config clause.
-			/*
+				utterance = getUtteranceText();
 			config
-				placement : partitionExlocation("sttpartition");
-			*/
+				placement : partitionColocation("somePartitionColocationId");
 		}
 		
-		// In a real-life application, there will be additional operators here with the 
-		// necessary logic to look inside the tuples arriving on the STTResult stream and
-		// analyze different kinds of speech to text result attributes returned from the STT service.
-		// 
-		// But, in this simple example we will only collect the results arriving from the 
-		// WatsonSTT operator and display them on stdout.
+		// Print the results
 		() as MySink1 = Custom(STTResult as SR) {
-			logic
-				state: {
-					mutable int32 _conversationCnt = 0;
-				}
-				
+			logic state: mutable int32 _conversationCnt = 0;
 				onTuple SR: {
-					// If the user gave us a non-zero batch size, we will print a single line
-					// about the batch completion at the very end. In that case, we will 
-					// avoid printing every individual transcription result. This will not
-					// make the file system very busy in the Distributed Mode execution.
-					// This is only useful if someone is interested in doing a 
-					// timing measurement to see how long it takes to transcribe a 
-					// known batch of audio conversations with the sttResultMode operator
-					// parameter to set to a value of complete (get the full text after the
-					// entire conversation is transcribed).
-					if ($sttBatchSize > 0) {
-						++_conversationCnt;
-						
-						if (_conversationCnt == 1) {
-							printStringLn(hourMinuteSecondMillisec(getTimestamp()) + " STT result for conversation " + (rstring) _conversationCnt
-								+ " " + conversationId + " arrived.");
-						} else if (_conversationCnt == $sttBatchSize) {
-							printStringLn(hourMinuteSecondMillisec(getTimestamp()) + " STT result for conversation " + (rstring) _conversationCnt
-								+ " " + conversationId + " arrived.");
-						}
-					} else {
-						// User didn't give a non-zero batch size. In that case,
-						// we will print every transcription result, which will make the
-						// file system busy in the Distributed Mode execution.
-						printStringLn(hourMinuteSecondMillisec(getTimestamp()) + " " + (rstring)++_conversationCnt + 
-							") STT result: " + (rstring)SR);
-					}
+					printStringLn(hourMinuteSecondMillisec(getTimestamp()) + " " + (rstring)++_conversationCnt + 
+						") STT result: " + (rstring)SR);
 				}
-				
+				onPunct SR: printStringLn(hourMinuteSecondMillisec(getTimestamp()) + (rstring)currentPunct());
 			config
-				//Place this operator into an own PE to separate the final result printouts from all other printouts
-				placement: partitionIsolation;
-				threadedPort: queue(SR, Sys.Wait);
+				placement : partitionColocation("somePartitionColocationId");
 		}
 
 	config restartable: false;

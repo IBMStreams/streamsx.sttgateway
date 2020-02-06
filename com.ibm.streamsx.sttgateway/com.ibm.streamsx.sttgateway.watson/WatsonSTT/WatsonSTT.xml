@@ -415,7 +415,12 @@
 
       <parameter>
         <name>baseModelVersion</name>
-        <description>This parameter specifies a particular base model version to be used for transcription. (Default is an empty string)</description>
+        <description>
+        This parameter specifies a particular base model version to be used for transcription. (Default is an empty string)
+        
+        The parameter may point to a specific version of the base model if needed.
+        e-g: "en-US_NarrowbandModel.v07-06082016.06202016"
+        </description>
         <optional>true</optional>
         <rewriteAllowed>true</rewriteAllowed>
         <expressionMode>AttributeFree</expressionMode>
