@@ -335,78 +335,79 @@ public composite AudioRawWatsonSTT {
 						return;
 					}
 
-					if (audioBlobFragmentSize == 0l) {
-						// User has configured to send the entire audio file content in a single blob.
-						audioBlobFragmentSize = fileSize;
-					}
-
-					int32 numberOfBlobFragments = fileSize / audioBlobFragmentSize;
-					int32 numberOfBytesRemaining = fileSize % audioBlobFragmentSize;
-					mutable int32 loopCnt = 0;
+					// prepare output tuple
 					mutable boolean atleastOneBlobFragmentWasSent = false;
-					mutable list<uint8> audioBlob = [];
-					mutable boolean audioBlobReadError = false;
 					mutable AudioBlobContent oTuple = {};
 					oTuple.conversationId = AFN.fileName;
-					
-					// Stay in a loop to read all the blob fragments and send.
-					while(++loopCnt <= numberOfBlobFragments) {
-						++counter;
-						// Read an audio blob fragment from the audio file.
-						clearM(audioBlob);
-						fread(audioBlob, fh, (uint64)audioBlobFragmentSize, err);
-
-						if (err != 0) {
-							appTrc(Trace.error, "Unable to read the binary contents of the audio file " +
-								fileName + ". Error code=" + (rstring)err, "AUDIO_BLOB_READ_ERROR");
-							audioBlobReadError = true;
-							break;
-						}
-						
-						// Send this blob data now.
-						oTuple.speech = (blob)audioBlob;
-						oTuple.sequence = counter;
-						submit(oTuple, ABC);
-						atleastOneBlobFragmentWasSent = true;
-					} // End of while(++loopCnt <= numberOfBlobFragments)
-					
-					// See if there are still any remaining bytes that didn't manage to 
-					// fit in a full blob in the previous while loop. 
-					// (i.e. less than the configured audo blob fragment size).
-					while (numberOfBytesRemaining > 0 && audioBlobReadError == false) {
-						++counter;
-						// Read the remaining bytes.
-						clearM(audioBlob);
-						fread(audioBlob, fh, (uint64)numberOfBytesRemaining, err);
-
-						if (err != 0) {
-							appTrc(Trace.error, "Unable to read the binary contents of the audio file " +
-								fileName + ". Error code=" + (rstring)err, "AUDIO_BLOB_READ_ERROR");
-							break;
-						}
-
-						// Send this blob data now.
-						oTuple.speech = (blob)audioBlob;
-						oTuple.sequence = counter;
-						submit(oTuple, ABC);
-						atleastOneBlobFragmentWasSent = true;
-						// This must be the very last statement in this while loop.
-						// We must only do a single iteration of this while loop.
-						break;
-					}
 
 					// write at least one empty blob for an empty file
 					if (fileSize == 0l) {
 						++counter;
-						clearM(audioBlob);
-						// Send this blob data now.
-						oTuple.speech = (blob)audioBlob;
+						// Send this blob data now. Audio blob is new
 						oTuple.sequence = counter;
 						submit(oTuple, ABC);
 						atleastOneBlobFragmentWasSent = true;
+					} else {
+
+						if (audioBlobFragmentSize == 0l) {
+							// User has configured to send the entire audio file content in a single blob.
+							audioBlobFragmentSize = fileSize;
+						}
+						// audioBlobFragmentSize must be != 0
+						int32 numberOfBlobFragments = fileSize / audioBlobFragmentSize;
+						int32 numberOfBytesRemaining = fileSize % audioBlobFragmentSize;
+						mutable int32 loopCnt = 0;
+						mutable list<uint8> audioBlob = [];
+						mutable boolean audioBlobReadError = false;
+						
+						// Stay in a loop to read all the blob fragments and send.
+						while(++loopCnt <= numberOfBlobFragments) {
+							++counter;
+							// Read an audio blob fragment from the audio file.
+							clearM(audioBlob);
+							fread(audioBlob, fh, (uint64)audioBlobFragmentSize, err);
+	
+							if (err != 0) {
+								appTrc(Trace.error, "Unable to read the binary contents of the audio file " +
+									fileName + ". Error code=" + (rstring)err, "AUDIO_BLOB_READ_ERROR");
+								audioBlobReadError = true;
+								break;
+							}
+							
+							// Send this blob data now.
+							oTuple.speech = (blob)audioBlob;
+							oTuple.sequence = counter;
+							submit(oTuple, ABC);
+							atleastOneBlobFragmentWasSent = true;
+						} // End of while(++loopCnt <= numberOfBlobFragments)
+						
+						// See if there are still any remaining bytes that didn't manage to 
+						// fit in a full blob in the previous while loop. 
+						// (i.e. less than the configured audo blob fragment size).
+						while (numberOfBytesRemaining > 0 && audioBlobReadError == false) {
+							++counter;
+							// Read the remaining bytes.
+							clearM(audioBlob);
+							fread(audioBlob, fh, (uint64)numberOfBytesRemaining, err);
+	
+							if (err != 0) {
+								appTrc(Trace.error, "Unable to read the binary contents of the audio file " +
+									fileName + ". Error code=" + (rstring)err, "AUDIO_BLOB_READ_ERROR");
+								break;
+							}
+	
+							// Send this blob data now.
+							oTuple.speech = (blob)audioBlob;
+							oTuple.sequence = counter;
+							submit(oTuple, ABC);
+							atleastOneBlobFragmentWasSent = true;
+							// This must be the very last statement in this while loop.
+							// We must only do a single iteration of this while loop.
+							break;
+						}
+	
+						fclose(fh, err);
 					}
-					
-					fclose(fh, err);
 					
 					// *** IMPORTANT LOGIC *** IMPORTANT LOGIC *** IMPORTANT LOGIC ***
 					//	
