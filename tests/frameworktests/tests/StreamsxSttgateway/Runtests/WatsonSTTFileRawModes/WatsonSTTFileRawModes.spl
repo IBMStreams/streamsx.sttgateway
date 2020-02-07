@@ -1,0 +1,262 @@
+use spl.file::*;
+use com.ibm.streamsx.sttgateway.watson::IAMAccessTokenGenerator;
+use com.ibm.streamsx.sttgateway.watson::IAMAccessToken;
+use com.ibm.streamsx.sttgateway.watson::WatsonSTT;
+use com.ibm.streamsx.testframe::FileSink1;
+
+composite WatsonSTTFileRawModes {
+	param
+		expression<rstring> $apiKey :      getSubmissionTimeValue("apiKey", "invalid");
+		expression<rstring> $audioDir:     getSubmissionTimeValue("audioDir");
+		
+		expression<rstring> $sttBaseLanguageModel : getSubmissionTimeValue("sttBaseLanguageModel", "en-US_NarrowbandModel");
+		expression<rstring> $contentType : getSubmissionTimeValue("contentType", "audio/wav");
+		expression<int32> $maxUtteranceAlternatives : (int32)getSubmissionTimeValue("maxUtteranceAlternatives", "1");	
+		expression<rstring> $iamTokenURL : getSubmissionTimeValue("iamTokenURL", "https://iam.cloud.ibm.com/identity/token");
+		expression<rstring> $uri : getSubmissionTimeValue("uri");
+		expression<int64>   $audioBlobFragmentSize: (int64)getSubmissionTimeValue("audioBlobFragmentSize",
+		//<*TokenDelay>"0"
+		//<!*TokenDelay>"512"
+		);
+		
+		
+		expression<list<rstring>> $filesList :
+				["01-call-center-10sec.wav", "02-call-center-25sec.wav", "03-call-center-28sec.wav",
+				"04-empty-audio.wav", "05-gettysburg-address-2min.wav", "07-ibm-earnings-2min.wav",
+				"08-ibm-watson-ai-3min.wav", "10-invalid-audio.wav", "12-jfk-speech-12sec.wav"];
+				
+	type
+		STTResult = rstring conversationId, int32 utteranceNumber,
+			rstring utteranceText, boolean finalizedUtterance,
+			rstring sttErrorMessage,
+			//<*Mode1 *Mode2>float32 confidence,
+			//<*Mode1 *Mode2>list<rstring> utteranceAlternatives,
+			//<*Mode1 *Mode2>list<list<rstring>> wordAlternatives,
+			//<*Mode1 *Mode2>list<list<float64>> wordAlternativesConfidences,
+			//<*Mode1 *Mode2>list<float64> wordAlternativesStartTimes,
+			//<*Mode1 *Mode2>list<float64> wordAlternativesEndTimes,
+			//<*Mode1 *Mode2>list<rstring> utteranceWords,
+			//<*Mode1 *Mode2>list<float64> utteranceWordsConfidences,
+			//<*Mode1 *Mode2>list<float64> utteranceWordsStartTimes,
+			//<*Mode1 *Mode2>list<float64> utteranceWordsEndTimes,
+			//<*Mode1 *Mode2>float64 utteranceStartTime,
+			//<*Mode1 *Mode2>float64 utteranceEndTime,
+			//<*Mode1 *Mode2>list<int32> utteranceWordsSpeakers,
+			//<*Mode1 *Mode2>list<float64> utteranceWordsSpeakersConfidences,
+			//<*Mode1 *Mode2>map<rstring, list<map<rstring, float64>>> keywordsSpottingResults,
+			boolean transcriptionCompleted,
+			uint64 myseq;
+		
+	graph
+		
+		stream<rstring fileName> FileNameStream as O = Beacon() {
+			param
+				iterations: size($filesList);
+				//<!*TokenDelay>initDelay: 5.0;
+			output O:
+				fileName = $audioDir + "/" + $filesList[IterationCount()];
+			config
+				//<fused*>placement : partitionColocation("somePartitionColocationId");
+				//<unFused*>placement : partitionIsolation;
+		}
+		
+		stream<rstring conversationId, blob speech, uint64 myseq> AudioContentStream as O = 
+			Custom(FileNameStream as I) {
+			logic
+				// The counter for the sequece id of the results. Sequence should start with 0
+				state: mutable uint64 counter = -1;
+				onTuple I: {
+					mutable int64 audioBlobFragmentSize =  $audioBlobFragmentSize;
+					
+					// Audio blob fragment size can be any value >= 0.
+					// If it is given as 0, then this operator will read the
+					// entire audio file content into a single blob and send it. 
+					if (audioBlobFragmentSize < 0l) {
+						printStringLn("Invalid blob fragment size " + 
+							(rstring)audioBlobFragmentSize + " given. It must be >= 0.");
+						abort();
+					}
+					
+					mutable uint64 fh = 0ul;
+					mutable int32 err = 0;
+
+					// Read the given binary audio file.
+					fh = fopen(fileName, "rb", err);
+
+					if (err != 0) {
+						appTrc(Trace.error, "Unable to open the audio file " + fileName + 
+							". Error code=" + (rstring)err, "AUDIO_BLOB_READ_ERROR");
+						return;
+					}
+
+					// Get the file size by seeking to the end of the audio file.
+					fseek(fh, 0l, optSEEK_END(), err);
+
+					if (err != 0) {
+						appTrc(Trace.error, "Unable to seek to the end of the audio file " + 
+							fileName + ". Error code=" + (rstring)err, "AUDIO_BLOB_READ_ERROR");
+						fclose(fh, err);
+						return;
+					}
+
+					// Get the current position at the very end of the audio file.
+					int64 fileSize = ftell(fh, err);
+
+					if (err != 0) {
+						appTrc(Trace.error, "Unable to get the size of the audio file " + 
+							fileName + ". Error code=" + (rstring)err, "AUDIO_BLOB_READ_ERROR");
+						fclose(fh, err);
+						return;
+					}
+
+					// Rewind to the top of the audio file.
+					fseek(fh, 0l, optSEEK_SET(), err);
+
+					if (err != 0) {
+						appTrc(Trace.error, "Unable to seek to the top of the audio file " + 
+							fileName + ". Error code=" + (rstring)err, "AUDIO_BLOB_READ_ERROR");
+						fclose(fh, err);
+						return;
+					}
+
+					// Prepare output tuple
+					mutable boolean atleastOneBlobFragmentWasSent = false;
+					mutable O oTuple = {};
+					oTuple.conversationId = I.fileName;
+
+					// write at least one empty blob for an empty file
+					if (fileSize == 0l) {
+						++counter;
+						// Send this blob data now.
+						oTuple.myseq = counter;
+						submit(oTuple, O);
+						atleastOneBlobFragmentWasSent = true;
+					} else {
+
+						if (audioBlobFragmentSize == 0l) {
+							// User has configured to send the entire audio file content in a single blob.
+							audioBlobFragmentSize = fileSize;
+						}
+						int32 numberOfBlobFragments = fileSize / audioBlobFragmentSize;
+						int32 numberOfBytesRemaining = fileSize % audioBlobFragmentSize;
+						mutable int32 loopCnt = 0;
+						mutable list<uint8> audioBlob = [];
+						mutable boolean audioBlobReadError = false;
+						
+						// Stay in a loop to read all the blob fragments and send.
+						while(++loopCnt <= numberOfBlobFragments) {
+							++counter;
+							// Read an audio blob fragment from the audio file.
+							clearM(audioBlob);
+							fread(audioBlob, fh, (uint64)audioBlobFragmentSize, err);
+	
+							if (err != 0) {
+								appTrc(Trace.error, "Unable to read the binary contents of the audio file " +
+									fileName + ". Error code=" + (rstring)err, "AUDIO_BLOB_READ_ERROR");
+								audioBlobReadError = true;
+								break;
+							}
+							
+							// Send this blob data now.
+							oTuple.speech = (blob)audioBlob;
+							oTuple.myseq = counter;
+							submit(oTuple, O);
+							atleastOneBlobFragmentWasSent = true;
+						} // End of while(++loopCnt <= numberOfBlobFragments)
+						
+						while (numberOfBytesRemaining > 0 && audioBlobReadError == false) {
+							++counter;
+							// Read the remaining bytes.
+							clearM(audioBlob);
+							fread(audioBlob, fh, (uint64)numberOfBytesRemaining, err);
+	
+							if (err != 0) {
+								appTrc(Trace.error, "Unable to read the binary contents of the audio file " +
+									fileName + ". Error code=" + (rstring)err, "AUDIO_BLOB_READ_ERROR");
+								break;
+							}
+	
+							// Send this blob data now.
+							oTuple.speech = (blob)audioBlob;
+							oTuple.myseq = counter;
+							submit(oTuple, O);
+							atleastOneBlobFragmentWasSent = true;
+							// This must be the very last statement in this while loop.
+							// We must only do a single iteration of this while loop.
+							break;
+						}
+	
+	
+						fclose(fh, err);
+					}
+
+					if (atleastOneBlobFragmentWasSent == true) {
+						submit(Sys.WindowMarker, O);
+					}
+				}
+			config
+				//<fused*>placement : partitionColocation("somePartitionColocationId");
+				//<unFused*>placement : partitionIsolation;
+		}
+		
+		stream<IAMAccessToken> IAMAccessTokenStream = IAMAccessTokenGenerator() {
+			param
+				appConfigName: "";
+				apiKey: $apiKey;
+				iamTokenURL: $iamTokenURL;
+				//<*TokenDelay>initDelay: 10.0;
+			config
+				//<fused*>placement : partitionColocation("somePartitionColocationId");
+				//<unFused*>placement : partitionIsolation;
+		}
+
+		stream<STTResult> STTResultStream as O = WatsonSTT(AudioContentStream as I; IAMAccessTokenStream) {
+			param
+				uri: $uri;
+				baseLanguageModel: $sttBaseLanguageModel;
+				contentType: $contentType;
+				//<*Mode1>sttResultMode: partial;
+				//<*Mode2>sttResultMode: final;
+				//<*Mode3>sttResultMode: complete;
+				
+			output O:
+				//<*Mode1 *Mode2>utteranceNumber = getUtteranceNumber(),
+				utteranceText = getUtteranceText(),
+				//<*Mode1 *Mode2>finalizedUtterance = isFinalizedUtterance(),
+				//<*Mode1 *Mode2>confidence = getConfidence(),
+				//<*Mode1 *Mode2>transcriptionCompleted = isTranscriptionCompleted(),
+				// n-best utterance alternative hypotheses.
+				//<*Mode1 *Mode2>utteranceAlternatives = getUtteranceAlternatives(),
+				// Confusion networks (a.k.a. Consensus)
+				//<*Mode1 *Mode2>wordAlternatives = getWordAlternatives(),
+				//<*Mode1 *Mode2>wordAlternativesConfidences = getWordAlternativesConfidences(),
+				//<*Mode1 *Mode2>wordAlternativesStartTimes = getWordAlternativesStartTimes(),
+				//<*Mode1 *Mode2>wordAlternativesEndTimes = getWordAlternativesEndTimes(),
+				//<*Mode1 *Mode2>utteranceWords = getUtteranceWords(),
+				//<*Mode1 *Mode2>utteranceWordsConfidences = getUtteranceWordsConfidences(),
+				//<*Mode1 *Mode2>utteranceWordsStartTimes = getUtteranceWordsStartTimes(),
+				//<*Mode1 *Mode2>utteranceWordsEndTimes = getUtteranceWordsEndTimes(),
+				//<*Mode1 *Mode2>utteranceStartTime = getUtteranceStartTime(),
+				//<*Mode1 *Mode2>utteranceEndTime = getUtteranceEndTime(),
+				// Speaker label a.k.a. Speaker id
+				//<*Mode1 *Mode2>utteranceWordsSpeakers = getUtteranceWordsSpeakers(),
+				//<*Mode1 *Mode2>utteranceWordsSpeakersConfidences = getUtteranceWordsSpeakersConfidences(),
+				// Results from keywords spotting (matching) in an utterance.
+				//<*Mode1 *Mode2>keywordsSpottingResults = getKeywordsSpottingResults(),
+				sttErrorMessage = getSTTErrorMessage();
+			config
+				//<fused*>placement : partitionColocation("somePartitionColocationId");
+				//<unFused*>placement : partitionIsolation;
+				//<*Queue*>threadedPort : queue(I, Sys.Wait, 100);
+			
+		}
+		
+		() as Sink = FileSink1(STTResultStream) {
+			config
+				//<fused*>placement : partitionColocation("somePartitionColocationId");
+				//<unFused*>placement : partitionIsolation;
+		}
+
+	config
+		restartable: false;
+}
