@@ -6,8 +6,8 @@
 
 setCategory 'quick'
 
-TT_mainComposite='WatsonSTTFileRawModes'
-TT_sabFile="output/WatsonSTTFileRawModes.sab"
+TT_mainComposite='WatsonSTT0RawModes'
+TT_sabFile="output/WatsonSTT0RawModes.sab"
 
 declare -A description=(
 	[fusedMode1]='######################## sttResultMode 1 Partition colocation; Expect success ###'

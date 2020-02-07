@@ -3,7 +3,7 @@ use com.ibm.streamsx.sttgateway.watson::IAMAccessToken;
 use com.ibm.streamsx.sttgateway.watson::WatsonSTT;
 use com.ibm.streamsx.testframe::FileSink1;
 
-composite WatsonSTTFileModes {
+composite WatsonSTT0FileModes {
 	param
 		expression<rstring> $apiKey :      getSubmissionTimeValue("apiKey", "invalid");
 		expression<rstring> $audioDir:     getSubmissionTimeValue("audioDir");

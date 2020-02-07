@@ -204,7 +204,7 @@ composite WatsonSTTParallelRaw {
 				//<unFused*>placement : partitionIsolation;
 		}
 
-		@parallel(width = 4, broadcast=[AT])
+		@parallel(width = 4, partitionBy=[{port=I, attributes=[conversationId]}], broadcast=[AT])
 		stream<STTResult> STTResultStream as O = WatsonSTT(AudioContentStream as I; IAMAccessTokenStream as AT) {
 			param
 				uri: $uri;
