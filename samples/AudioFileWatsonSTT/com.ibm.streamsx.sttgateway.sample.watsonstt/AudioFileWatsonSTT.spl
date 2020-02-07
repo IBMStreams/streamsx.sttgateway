@@ -66,7 +66,6 @@ use com.ibm.streamsx.sttgateway.watson::*;
  * @param   smartFormattingNeeded  smartFormattingNeeded; Default false
  * @param   websocketLoggingNeeded websocketLoggingNeeded; Default false
  */
-
 public composite AudioFileWatsonSTT {
 
 	param
@@ -177,8 +176,9 @@ public composite AudioFileWatsonSTT {
 				contentType: $contentType;
 				smartFormattingNeeded: $smartFormattingNeeded;
 				websocketLoggingNeeded: $websocketLoggingNeeded;
-			output
-				STTResult: conversationId = speech, 
+			output STTResult:
+				conversationId = speech,
+				sttErrorMessage = getSTTErrorMessage(),
 				utterance = getUtteranceText();
 			config
 				placement : partitionColocation("somePartitionColocationId");
@@ -193,7 +193,8 @@ public composite AudioFileWatsonSTT {
 				}
 				// Window marker have no meaning in this merged stream
 				// Each tuple represents an full audio transcription or one error
-				onPunct SR: printStringLn(hourMinuteSecondMillisec(getTimestamp()) + " " + (rstring)currentPunct());
+				onPunct SR: printStringLn(hourMinuteSecondMillisec(getTimestamp()) + (rstring)_conversationCnt + 
+						") STT result: " + (rstring)currentPunct());
 			config
 				placement : partitionColocation("somePartitionColocationId");
 		}
