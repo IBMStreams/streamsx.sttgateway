@@ -119,12 +119,12 @@ https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-websocke
 				SPL::CodeGen::exitln("In sttResultMode complete, Output Function $op is not allowed", $model->getContext()->getSourceLocation());
 			}
 			$wordConfidenceNeeded = 1;
-		} elsif ($op eq "getUtteranceWordsStartTimes") {
+		} elsif (($op eq "getUtteranceWordsStartTimes") || ($op eq "getUtteranceWordsEndTimes")) {
 			if ($sttResultMode eq "complete") {
 				SPL::CodeGen::exitln("In sttResultMode complete, Output Function $op is not allowed", $model->getContext()->getSourceLocation());
 			}
 			$wordTimestampNeeded = 1;
-		} elsif ($op eq "getUtteranceWordsEndTimes") {
+		} elsif (($op eq "getUtteranceStartTime") || ($op eq "getUtteranceEndTime")) {
 			if ($sttResultMode eq "complete") {
 				SPL::CodeGen::exitln("In sttResultMode complete, Output Function $op is not allowed", $model->getContext()->getSourceLocation());
 			}
@@ -145,7 +145,6 @@ https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-websocke
 				($op eq "getWordAlternativesStartTimes") || ($op eq "getWordAlternativesEndTimes") ||
 				($op eq "getUtteranceWords") || ($op eq "getUtteranceWordsConfidences") ||
 				($op eq "getUtteranceWordsStartTimes") || ($op eq "getUtteranceWordsEndTimes") ||
-				($op eq "getUtteranceStartTime") || ($op eq "getUtteranceEndTime") ||
 				($op eq "getUtteranceWordsSpeakers") || ($op eq "getUtteranceWordsSpeakersConfidences") ||
 				($op eq "getKeywordsSpottingResults")) {
 			if ($sttResultMode eq "complete") {
