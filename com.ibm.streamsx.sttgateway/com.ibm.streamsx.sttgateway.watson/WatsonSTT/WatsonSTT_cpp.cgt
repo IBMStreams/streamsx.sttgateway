@@ -91,7 +91,7 @@ https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-websocke
 		}
 	}
 	if ($accessTokenAttributeFound == 0 ) {
-		SPL::CodeGen::exitln(SttGatewayResource::STTGW_INP_ATTRIBUTE_TYPE_CHECK2("WatsonSTT", "accessToken"),
+		SPL::CodeGen::exitln(SttGatewayResource::STTGW_INP_ATTRIBUTE_CHECK2("WatsonSTT", "accessToken"),
 				$model->getContext()->getSourceLocation());
 	}
 	if (!(defined($accessTokenAsString))) {

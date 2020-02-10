@@ -351,7 +351,10 @@
       <allowAny>false</allowAny>
       <parameter>
         <name>uri</name>
-        <description>This parameter specifies the Watson STT Websocket service URI.</description>
+        <description>
+        This parameter specifies the Watson STT Websocket service URI. 
+        see: [https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-websockets#WSopen] 
+        </description>
         <optional>false</optional>
         <rewriteAllowed>true</rewriteAllowed>
         <expressionMode>AttributeFree</expressionMode>
@@ -361,7 +364,10 @@
 
       <parameter>
         <name>baseLanguageModel</name>
-        <description>This parameter specifies the name of the Watson STT base language model that should be used.</description>
+        <description>
+        This parameter specifies the name of the Watson STT base language model that should be used. 
+        see: [https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-input#models] 
+        </description>
         <optional>false</optional>
         <rewriteAllowed>true</rewriteAllowed>
         <expressionMode>AttributeFree</expressionMode>
@@ -405,7 +411,11 @@
       
       <parameter>
         <name>sttRequestLogging</name>
-        <description>Indicates whether IBM can use data that is sent over the connection to improve the service for future users. Specify false to prevent IBM from accessing the logged data. (Default is false)</description>
+        <description>
+        Indicates whether IBM can use data that is sent over the connection to improve the service for future users. 
+        Specify false to prevent IBM from accessing the logged data. (Default is false)
+        see: [https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-input#logging] 
+        </description>
         <optional>true</optional>
         <rewriteAllowed>true</rewriteAllowed>
         <expressionMode>AttributeFree</expressionMode>
@@ -420,6 +430,7 @@
         
         The parameter may point to a specific version of the base model if needed.
         e-g: "en-US_NarrowbandModel.v07-06082016.06202016"
+        see: [https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-input#version] 
         </description>
         <optional>true</optional>
         <rewriteAllowed>true</rewriteAllowed>
@@ -430,7 +441,11 @@
 
       <parameter>
         <name>customizationId</name>
-        <description>This parameter specifies a custom language model to be used for transcription. (Default is an empty string)</description>
+        <description>
+        This parameter specifies a custom language model to be used for transcription. 
+        see: [https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-input#custom] 
+        (Default is an empty string)
+        </description>
         <optional>true</optional>
         <rewriteAllowed>true</rewriteAllowed>
         <expressionMode>AttributeFree</expressionMode>
@@ -460,7 +475,10 @@
 
       <parameter>
         <name>filterProfanity</name>
-        <description>This parameter indicates whether profanity should be filtered from a transcript. (Default is false)</description>
+        <description>
+        This parameter indicates whether profanity should be filtered from a transcript. (Default is false) 
+        see: [https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-output#profanity_filter] 
+        </description>
         <optional>true</optional>
         <rewriteAllowed>true</rewriteAllowed>
         <expressionMode>AttributeFree</expressionMode>
@@ -482,6 +500,7 @@
         <name>maxUtteranceAlternatives</name>
         <description>
         This parameter indicates the required number of n-best alternative hypotheses for the transcription results. (Default is 1)
+        see: [https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-output#max_alternatives] 
         
         **Note:** This parameter is not valid if `sttResultMode` equals `complete`.
         </description>
@@ -497,6 +516,7 @@
         <description>
         This parameter controls the density of the word alternatives results (a.k.a. Confusion Networks). A value of 0.0 
         disables this feature. Valid value must be less than 1.0 (Default is 0.0)
+        see: [https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-output#word_alternatives] 
         
         **Note:** This parameter is not valid if `sttResultMode` equals `complete`.
         </description>
@@ -509,7 +529,10 @@
 
       <parameter>
         <name>smartFormattingNeeded</name>
-        <description>This parameter indicates whether to convert date, time, phone numbers, currency values, email and URLs into conventional representations. (Default is false)</description>
+        <description>
+        This parameter indicates whether to convert date, time, phone numbers, currency values, email and URLs into conventional representations. (Default is false)
+        see: [https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-output#smart_formatting] 
+        </description>
         <optional>true</optional>
         <rewriteAllowed>true</rewriteAllowed>
         <expressionMode>AttributeFree</expressionMode>
@@ -522,6 +545,7 @@
         <description>
         This parameter specifies the minimum confidence level that the STT service must have for an utterance word to 
         match a given keyword. A value of 0.0 disables this feature. Valid value must be less than 1.0. (Default is 0.0)
+        see: [https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-output#keyword_spotting] 
         
         **Note:** This parameter is not valid if `sttResultMode` equals `complete`.
         </description>

@@ -268,8 +268,6 @@ void WatsonSTTImplReceiver<OP, OT>::process(uint32_t idx) {
 
 // This method initializes the Websocket driver, TLS and then
 // opens a connection. This is going to run on its own thread.
-// See the commentary in the allPortsReady method above to
-// understand our need to run it in a separate thread.
 template<typename OP, typename OT>
 void WatsonSTTImplReceiver<OP, OT>::ws_init() {
 
@@ -291,7 +289,7 @@ void WatsonSTTImplReceiver<OP, OT>::ws_init() {
 		std::string uri = this->uri;
 		// https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-input#models
 		uri += "?model=" + baseLanguageModel;
-		https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-input#logging
+		// https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-input#logging
 		uri += "&x-watson-learning-opt-out=" + std::string(sttRequestLogging ? "false" : "true");
 
 		// https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-input#version

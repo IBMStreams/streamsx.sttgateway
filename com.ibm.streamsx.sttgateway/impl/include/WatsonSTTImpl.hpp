@@ -223,29 +223,15 @@ WatsonSTTImpl<OP, OT>::WatsonSTTImpl(OP & splOperator_,Conf config_)
 		throw std::runtime_error(STTGW_INVALID_PARAM_VALUE_4("WatsonSTT", Conf::maxConnectionRetryDelay,  "maxConnectionRetryDelay", "1.0"));
 	}
 
-	// We are not going to support the following utterance based
-	// features when the STT result mode is 3 (full transcript).
-	// Many of these features return the results in individual arrays for a
-	// given utterance. When we assemble the full transcript using
-	// multiple utterances, it will be too much data to deal with and
-	// it will prove to be not very useful in processing multiple
-	// arrays to make sense out of what happened in the context of
-	// a full transcript. Hence, we are disabling these features for
-	// the STT result mode 3 (full transcript).
-	if (Conf::sttResultMode == 3) {
-		// No n-best utterance alternative hypotheses.
-		Conf::maxUtteranceAlternatives = 1;
-		// No Confusion Networks.
-		Conf::wordAlternativesThreshold = 0.0;
-		// No individual word confidences.
-		Conf::wordConfidenceNeeded = false;
-		// No individual timestamps.
-		Conf::wordTimestampNeeded = false;
-		//No speaker identification for the individual words in an utterance.
-		Conf::identifySpeakers = false;
-		//No keyword spotting inside an utterance.
-		Conf::keywordsSpottingThreshold = 0.0;
-	}
+	// The parameters maxUtteranceAlternatives, wordAlternativesThreshold, keywordsSpottingThreshold, keywordsToBeSpotted
+	// are not available in sttResultMose complete
+	// The COF getUtteranceWordsConfidences, getUtteranceWordsStartTimes, getUtteranceWordsEndTimes,
+	// getUtteranceStartTime, getUtteranceEndTime, getUtteranceWordsSpeakers, getUtteranceWordsSpeakersConfidences,
+	// getUtteranceNumber, isFinalizedUtterance, getConfidence, isTranscriptionCompleted, getUtteranceAlternatives,
+	// getWordAlternatives, getWordAlternativesConfidences, getWordAlternativesStartTimes, getWordAlternativesEndTimes,
+	// getUtteranceWords, getUtteranceWordsConfidences, getUtteranceWordsStartTimes, getUtteranceWordsEndTimes,
+	// getUtteranceWordsSpeakers, getUtteranceWordsSpeakersConfidences, getKeywordsSpottingResults are not available
+	// in sttResultMose complete
 
 	// Update the operator metric.
 	sttResultModeMetric->setValueNoLock(Conf::sttResultMode);
