@@ -52,7 +52,7 @@ WebSocket connections it opened into this operator.
 
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/exception/to_string.hpp>
-#include <boost/thread/thread.hpp>
+#include <set>
 
 // A nice read in this URL about using property_tree for JSON parsing:
 // http://zenol.fr/blog/boost-property-tree/en.html

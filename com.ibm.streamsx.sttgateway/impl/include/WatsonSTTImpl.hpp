@@ -508,6 +508,12 @@ void WatsonSTTImpl<OP, OT>::process_0(IT0 const & inputTuple) {
 			nAudioBytesSendMetric->setValueNoLock(nAudioBytesSend);
 
 		sendDataToSTT(myAudioBytes, myAudioSize);
+		// send end in case of empty data blob
+		if (myAudioBytes == 0) {
+			sendActionStop();
+			mediaEndReached = true;
+			ignoreNextWindowMarker = true;
+		}
 	}
 } // End: WatsonSTTImpl<OP, OT>::process_0
 

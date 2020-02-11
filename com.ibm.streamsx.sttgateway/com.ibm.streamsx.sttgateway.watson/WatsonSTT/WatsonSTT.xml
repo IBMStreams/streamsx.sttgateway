@@ -623,13 +623,14 @@
         Attributes on this input port:
         * **speech** (required, rstring/blob) - In the case of file based input (.wav, .mp3 etc. for batch workload), the expected value will be an absolute path of a file as an rstring. In the case of RAW audio data (received from a network switch for real-time workload), the expected input is of type blob.
         
-        A window punctuation marker is used to mark the end of an conversation. When the end of conversation is encountered,
+        A window punctuation marker or a empty speech blob may be used to mark the end of an conversation. 
+        When the end of conversation is encountered, 
         the STT engine delivers all results of the current conversation and flushes all buffers.
         All the extra input attributes will be forwarded if matching output attributes are found.
         </description>
         <tupleMutationAllowed>false</tupleMutationAllowed>
         <windowingMode>NonWindowed</windowingMode>
-        <windowPunctuationInputMode>Expecting</windowPunctuationInputMode>
+        <windowPunctuationInputMode>Oblivious</windowPunctuationInputMode>
         <cardinality>1</cardinality>
         <optional>false</optional>
       </inputPortSet>

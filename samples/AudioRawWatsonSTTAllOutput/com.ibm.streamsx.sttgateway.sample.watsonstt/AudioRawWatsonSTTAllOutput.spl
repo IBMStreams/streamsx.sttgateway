@@ -99,6 +99,8 @@ use com.ibm.streamsx.sttgateway.watson::*;
  * @param	websocketLoggingNeeded	websocketLoggingNeeded; Default false
  * @param	cpuYieldTimeInAudioSenderThread	cpuYieldTimeInAudioSenderThread; Default 0.001
  * @param	sttLiveMetricsUpdateNeeded	sttLiveMetricsUpdateNeeded; Default true
+ * @param	fileEndEmitWindowMarker		Emit a window punctuation at file end if true. Send an empty blob at file end 
+ *          if false.
  */
 public composite AudioRawWatsonSTTAllOutput {
 	param
@@ -183,6 +185,8 @@ public composite AudioRawWatsonSTTAllOutput {
 			(float64)getSubmissionTimeValue("cpuYieldTimeInAudioSenderThread", "0.001");
 		expression<boolean> $sttLiveMetricsUpdateNeeded : 
 			(boolean)getSubmissionTimeValue("sttLiveMetricsUpdateNeeded", "true");
+		expression<boolean> $fileEndEmitWindowMarker :
+			(boolean)getSubmissionTimeValue("fileEndEmitWindowMarker", "true");
 
 	type
 		// This STT result type contains many attributes to
@@ -345,11 +349,7 @@ public composite AudioRawWatsonSTTAllOutput {
 
 					// write at least one empty blob for an empty file
 					if (fileSize == 0l) {
-						++counter;
-						// Send this blob data now. Audio blob is new
-						oTuple.sequence = counter;
-						submit(oTuple, ABC);
-						atleastOneBlobFragmentWasSent = true;
+						appTrc(Trace.error, "Ignore empty file: " + fileName, "AUDIO_BLOB_READ_ERROR");
 					} else {
 
 						if (audioBlobFragmentSize == 0l) {
@@ -420,13 +420,19 @@ public composite AudioRawWatsonSTTAllOutput {
 					// the WatsonSTT operator will not function correctly. 
 					//
 					if (atleastOneBlobFragmentWasSent == true) {
-						//this code 
-						//clearM(oTuple.speech);
-						//causes a SIGSEV if this operator is not fused with its downstream operator
-						//blob newBlob = [];
-						//oTuple.speech = newBlob;
-						// Send an empty blob as the very last one for this audio conversation.
-						submit(Sys.WindowMarker, ABC);
+						if ($fileEndEmitWindowMarker) {
+							submit(Sys.WindowMarker, ABC);
+						} else {
+							//this code 
+							//clearM(oTuple.speech);
+							//causes a SIGSEV if this operator is not fused with its downstream operator
+							++counter;
+							blob newBlob = [];
+							oTuple.speech = newBlob;
+							oTuple.sequence = counter;
+							// Send an empty blob as the very last one for this audio conversation.
+							submit(Sys.WindowMarker, ABC);
+						}
 					}
 					//
 					// *** IMPORTANT LOGIC *** IMPORTANT LOGIC *** IMPORTANT LOGIC ***

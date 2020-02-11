@@ -527,7 +527,7 @@ public composite VoiceGatewayToStreamsToWatsonSTT {
 				apiKey: $sttApiKey;
 				iamTokenURL: $sttIAMTokenURL;
 				accessToken: $sttOnCP4DAccessToken;
-				initDelay: $initDelayBeforeSendingDataToSttEngines;
+				appConfigName: ""; //This setting avoids error logs when the app config is missing
 		}
 		
 
