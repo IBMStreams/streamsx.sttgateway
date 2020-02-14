@@ -1,0 +1,25 @@
+use com.ibm.streamsx.sttgateway.watson::IAMAccessToken;
+use com.ibm.streamsx.sttgateway.watson::WatsonSTT;
+
+composite WatsonSTTCompileChecks {
+	type
+		STTResult = rstring conversationId, int32 utteranceNumber,
+			rstring utteranceText, boolean finalizedUtterance,
+			rstring sttErrorMessage,
+			boolean transcriptionCompleted,
+			uint64 myseq;
+
+	graph
+		//<0>stream<rstring speech> InputStream as O = Beacon() { param iterations: 100; }
+		//<1>stream<rstring speechxx> InputStream as O = Beacon() { param iterations: 100; }
+		//<2>stream<uint64 speech> InputStream as O = Beacon() { param iterations: 100; }
+		
+		stream<IAMAccessToken> TokenStream as O = Beacon() { param iterations: 1; }
+		
+		stream<STTResult> OutputStream as O = WatsonSTT(InputStream as I; TokenStream) {
+			param
+				uri: "someUri";
+				baseLanguageModel: "someModel";
+		}
+
+}

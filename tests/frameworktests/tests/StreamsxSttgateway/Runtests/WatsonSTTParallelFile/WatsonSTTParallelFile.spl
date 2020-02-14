@@ -81,7 +81,7 @@ composite WatsonSTTParallelFile {
 				uri: $uri;
 				baseLanguageModel: $sttBaseLanguageModel;
 				contentType: $contentType;
-				sttResultMode: partial;
+				sttResultMode: final;
 				
 			output O:
 				conversationId = speech,
