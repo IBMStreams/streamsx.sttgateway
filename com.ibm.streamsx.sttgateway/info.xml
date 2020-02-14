@@ -23,6 +23,14 @@
   <resources>
     <messageSet name="SttGatewayResource">
       <lang default="true">en_US/SttGatewayResource.xlf</lang>
+      <lang>de_DE/SttGatewayResource.xlf</lang>
+      <lang>es_ES/SttGatewayResource.xlf</lang>
+      <lang>fr_FR/SttGatewayResource.xlf</lang>
+      <lang>it_IT/SttGatewayResource.xlf</lang>
+      <lang>ja_JP/SttGatewayResource.xlf</lang>
+      <lang>pt_BR/SttGatewayResource.xlf</lang>
+      <lang>zh_CN/SttGatewayResource.xlf</lang>
+      <lang>zh_TW/SttGatewayResource.xlf</lang>
     </messageSet>
   </resources>
 </toolkitInfoModel>
