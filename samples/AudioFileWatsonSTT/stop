@@ -1,0 +1,18 @@
+#!/bin/bash
+
+if [[ $1 == '-h' || $1 == '--help' || $1 == 'help' ]]; then
+	echo "Script to stop the stream sample job"
+	exit 0
+fi
+
+if [[ -e jobno.log ]]; then
+	jobno=$(<jobno.log)
+	echo "cancel job no $jobno"
+	streamtool canceljob "$@" --collectlogs "$jobno"
+else
+	echo "File jobno.log not found" >&2
+	exit 1
+fi
+rm -v jobno.log
+
+exit 0

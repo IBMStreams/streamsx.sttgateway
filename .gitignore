@@ -46,6 +46,8 @@ samples/*/.toolkitList
 samples/*/toolkit.xml
 samples/*/etc/*.pem
 samples/*/etc/*conf
+samples/*/jobno.log
+samples/*/data/Tuples
 
 demos/*/.apt_generated
 demos/*/output

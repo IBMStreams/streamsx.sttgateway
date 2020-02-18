@@ -1,0 +1,18 @@
+#!/bin/bash
+
+if [[ $1 == '-h' || $1 == '--help' || $1 == 'help' ]]; then
+	echo "Script to start the stream sample job and start the display of the utterance results in a console window"
+	exit 0;
+fi
+
+rm data/Tuples
+rm jobno.log
+
+streamtool submitjob --outfile jobno.log -C tracing=trace output/com.ibm.streamsx.sttgateway.sample.watsonstt.AudioFileWatsonSTT.sab
+
+while [[ ! -e data/Tuples ]]; do
+	echo "Wait for file data/Tuples"
+	sleep 0.5
+done
+echo "Found file data/Tuples"
+tail -f data/Tuples

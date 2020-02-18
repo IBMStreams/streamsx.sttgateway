@@ -90,7 +90,8 @@ type IAMAccessToken = rstring access_token, rstring refresh_token,
  * 
  * @param	appConfigName	The name of the application configuration to look for connection parameters. If this parameter 
  * is non empty, the properties from this application configuration overwrite the operator parameters. An empty string 
- * disables the lookup in the Application Configuration.
+ * disables the lookup in the Application Configuration. This may be used if all non default parameters are supplied in the operator 
+ * invocation. 
  * Type: *rstring*; Default: *sttConnection*
  * 
  * @param	apiKey	The api key required for the generation of the access token. This parameter is evaluated 
