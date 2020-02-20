@@ -27,7 +27,7 @@ composite WatsonSTTParallelRaw {
 		STTResult = uint64 myseq, rstring conversationId, int32 utteranceNumber,
 			boolean finalizedUtterance, boolean transcriptionCompleted,
 			rstring sttErrorMessage,
-			float32 confidence,
+			float64 confidence,
 			float64 utteranceStartTime,
 			float64 utteranceEndTime,
 			rstring utteranceText,
@@ -211,7 +211,7 @@ composite WatsonSTTParallelRaw {
 				baseLanguageModel: $sttBaseLanguageModel;
 				contentType: $contentType;
 				sttResultMode: partial;
-				
+				nonFinalUtterancesNeeded: true;
 			output O:
 				utteranceNumber = getUtteranceNumber(),
 				finalizedUtterance = isFinalizedUtterance(),

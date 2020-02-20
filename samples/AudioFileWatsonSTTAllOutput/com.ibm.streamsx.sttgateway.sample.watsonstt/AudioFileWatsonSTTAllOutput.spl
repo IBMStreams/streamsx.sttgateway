@@ -59,6 +59,7 @@ use com.ibm.streamsx.sttgateway.watson::*;
  *  You should leave this submission time value empty when not using STT on CP4D.
  * 
  * @param	audioDir	directory with the audio files
+ * @param	nonFinalUtterancesNeeded  nonFinalUtterancesNeeded; Default false
  * @param	numberOfSTTEngines	the number of stt engines
  * @param	sttUri	the stt service uri; Default wss://stream.watsonplatform.net/speech-to-text/api/v1/recognize
  * @param	sttBaseLanguageModel	base language model; Default: en-US_NarrowbandModel
@@ -87,7 +88,8 @@ public composite AudioFileWatsonSTTAllOutput {
 		expression<rstring> $sttIAMTokenURL : 
 			getSubmissionTimeValue("sttIAMTokenURL", "https://iam.cloud.ibm.com/identity/token");
 		expression<rstring> $sttOnCP4DAccessToken : getSubmissionTimeValue("sttOnCP4DAccessToken", "");
-		expression<rstring> $audioDir : getSubmissionTimeValue("audioDir", "../../audio-files"); 
+		expression<rstring> $audioDir : getSubmissionTimeValue("audioDir", "../../audio-files");
+		expression<boolean> $nonFinalUtterancesNeeded: (boolean)getSubmissionTimeValue("nonFinalUtterancesNeeded", "false");
 		expression<int32> $numberOfSTTEngines :(int32)
 			getSubmissionTimeValue("numberOfSTTEngines", "5") ;
 		expression<rstring> $sttUri : getSubmissionTimeValue("sttUri",
@@ -144,7 +146,7 @@ public composite AudioFileWatsonSTTAllOutput {
 			boolean finalizedUtterance,
 			boolean transcriptionCompleted,
 			rstring sttErrorMessage,
-			float32 confidence,
+			float64 confidence,
 			rstring utteranceText,
 			list<rstring> utteranceAlternatives, 
 			list<list<rstring>> wordAlternatives,
@@ -249,7 +251,8 @@ public composite AudioFileWatsonSTTAllOutput {
 			// optional one. In real-life applications, such optional parameters
 			// can be omitted unless you want to change the default behavior of them.
 			param
-				sttResultMode: final;
+				sttResultMode: partial;
+				nonFinalUtterancesNeeded: $nonFinalUtterancesNeeded;
 				uri: $sttUri;
 				baseLanguageModel: $sttBaseLanguageModel;
 				contentType: $contentType;

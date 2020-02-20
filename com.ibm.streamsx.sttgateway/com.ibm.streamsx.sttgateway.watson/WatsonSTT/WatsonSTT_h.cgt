@@ -62,7 +62,7 @@ public:
 			int32_t utteranceNumber_,
 			std::string const & utteranceText_,
 			bool final_,
-			float confidence_,
+			SPL::float64 confidence_,
 			SPL::list<SPL::rstring> const & utteranceAlternatives_,
 			SPL::list<SPL::list<SPL::rstring>> const & wordAlternatives_,
 			SPL::list<SPL::list<SPL::float64>> const & wordAlternativesConfidences_,

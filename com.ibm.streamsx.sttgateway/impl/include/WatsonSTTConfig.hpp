@@ -27,7 +27,8 @@ struct WatsonSTTConfig {
 	const std::string uri;
 	const std::string baseLanguageModel;
 	const std::string contentType;
-	const SttResultMode sttResultMode;
+	SttResultMode sttResultMode;
+	bool  nonFinalUtterancesNeeded;
 	const bool sttRequestLogging;
 	const std::string baseModelVersion;
 	const std::string customizationId;

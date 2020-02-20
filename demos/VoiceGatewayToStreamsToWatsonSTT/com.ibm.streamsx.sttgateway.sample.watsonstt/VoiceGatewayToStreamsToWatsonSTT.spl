@@ -66,7 +66,7 @@ type STTResult_t = rstring vgwSessionId, boolean isCustomerSpeechData,
 	int32 sttEngineId, int32 sttResultProcessorId,
 	int32 utteranceNumber,
 	rstring utteranceText, boolean finalizedUtterance,
-	float32 confidence,
+	float64 confidence,
 	rstring sttErrorMessage, boolean transcriptionCompleted,
 	list<rstring> utteranceAlternatives, 
 	list<list<rstring>> wordAlternatives,
@@ -171,6 +171,8 @@ public composite VoiceGatewayToStreamsToWatsonSTT {
 			getSubmissionTimeValue("sttBaseLanguageModel", "en-US_NarrowbandModel");
 		expression<rstring> $contentType : 
 			getSubmissionTimeValue("contentType", "audio/wav");
+		expression<boolean> $nonFinalUtterancesNeeded:
+			(boolean)getSubmissionTimeValue("nonFinalUtterancesNeeded", "false");
 		expression<rstring> $baseModelVersion : 
 			getSubmissionTimeValue("baseModelVersion", "");
 		expression<rstring> $customizationId : 
@@ -660,6 +662,8 @@ public composite IBMWatsonSpeechToText(input AudioBlobContent, AccessToken;
 			getSubmissionTimeValue("sttBaseLanguageModel", "en-US_NarrowbandModel");
 		expression<rstring> $contentType : 
 			getSubmissionTimeValue("contentType", "audio/wav");
+		expression<boolean> $nonFinalUtterancesNeeded:
+			(boolean)getSubmissionTimeValue("nonFinalUtterancesNeeded", "false");
 		expression<rstring> $baseModelVersion : 
 			getSubmissionTimeValue("baseModelVersion", "");
 		expression<rstring> $customizationId : 
@@ -723,7 +727,8 @@ public composite IBMWatsonSpeechToText(input AudioBlobContent, AccessToken;
 				uri: $sttUri;
 				baseLanguageModel: $sttBaseLanguageModel;
 				contentType: $contentType;
-				sttResultMode: final;
+				sttResultMode: partial;
+				nonFinalUtterancesNeeded: $nonFinalUtterancesNeeded;
 				sttRequestLogging: $sttRequestLogging;
 				filterProfanity: $filterProfanity;
 				sttJsonResponseDebugging: $sttJsonResponseDebugging;

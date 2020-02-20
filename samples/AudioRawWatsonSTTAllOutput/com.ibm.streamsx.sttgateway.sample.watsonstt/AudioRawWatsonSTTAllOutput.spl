@@ -63,6 +63,8 @@ use com.ibm.streamsx.sttgateway.watson::*;
  * 
  * @param	audioDir	directory with the audio files
  * 
+ * @param	nonFinalUtterancesNeeded  nonFinalUtterancesNeeded; Default false
+ * 
  * @param	audioBlobFragmentSize audioBlobFragmentSize; Default 512
  * You can specify any audio blob fragment size (in number of bytes) to read 
  * from a given audio file. If you give a size of 0, then the entire 
@@ -123,6 +125,7 @@ public composite AudioRawWatsonSTTAllOutput {
 		// You should leave this submission time value empty when not using STT on CP4D.
 		expression<rstring> $sttOnCP4DAccessToken : getSubmissionTimeValue("sttOnCP4DAccessToken", "");
 		expression<rstring> $audioDir : getSubmissionTimeValue("audioDir", "../../audio-files");
+		expression<boolean> $nonFinalUtterancesNeeded: (boolean)getSubmissionTimeValue("nonFinalUtterancesNeeded", "false");
 		// You can specify any audio blob fragment size (in number of bytes) to read 
 		// from a given audio file. If you give a size of 0, then the entire 
 		// file content will be read in one single blob and sent to the 
@@ -204,7 +207,7 @@ public composite AudioRawWatsonSTTAllOutput {
 			boolean finalizedUtterance,
 			boolean transcriptionCompleted,
 			rstring sttErrorMessage,
-			float32 confidence,
+			float64 confidence,
 			rstring utteranceText,
 			list<rstring> utteranceAlternatives, 
 			list<list<rstring>> wordAlternatives,
@@ -478,7 +481,8 @@ public composite AudioRawWatsonSTTAllOutput {
 			// optional one. In real-life applications, such optional parameters
 			// can be omitted unless you want to change the default behavior of them.
 			param
-				sttResultMode: final;
+				sttResultMode: partial;
+				nonFinalUtterancesNeeded: $nonFinalUtterancesNeeded;
 				uri: $sttUri;
 				baseLanguageModel: $sttBaseLanguageModel;
 				contentType: $contentType;
