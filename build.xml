@@ -17,6 +17,7 @@
 
 	<property name="websocket.version"  value="0.8.1"/>
 	<property name="boost.version"      value="1.69.0"/>
+	<property name="rapidjson.version"  value="1.1.0"/>
 
 	<exec executable="bash" outputproperty="boost.version.name" failonerror="true">
 		<arg value="-c"/>
@@ -27,7 +28,8 @@
 	<property name="boost.archive"      value="https://dl.bintray.com/boostorg/release"/>
 	<property name="boost.str"          value="boost"/>
 	<property name="websocket.str"      value="websocketpp"/>
-
+	<property name="rapidjson.str"      value="rapidjson"/>
+	
 	<property name="toolkit.dir"        value="com.ibm.streamsx.sttgateway"/>
 	<property name="impl.dir"           location="${toolkit.dir}/impl" />
 	<!-- Directories for external libs -->
@@ -53,6 +55,8 @@
 	<property name="release.dir"        location="releases"/>
 	<property name="release.info.file"  value="${toolkit.dir}/build.info"/>
 
+	<property name="rapidjson.lib"      value="${ext.dir}/${rapidjson.str}/${rapidjson.str}-${rapidjson.version}.tar.gz"/>
+	
 	<available property="websocket.src.dir.exists" file="${ext.dir}/${websocket.str}-${websocket.version}/${websocket.str}" type="dir"/>
 	<available property="boost.exists" file="${ext.dir}/boost-install-files/${boost.str}_${boost.version.name}" type="dir"/>
 
@@ -64,7 +68,6 @@
 	<target name="init">
 		<echo message="Toolkit Version: ${tkinfo.identity.version} boost.version: ${boost.version} websocket.version: ${websocket.version}"/>
 		<mkdir dir="${lib.dir}"/>
-		<mkdir dir="${ext.dir}"/>
 	</target>
 
 	<target name="all" depends="toolkit,spldoc"
@@ -141,7 +144,9 @@
 
 	<target name="download-clean"
 		description="Clean up downloaded library sources and the libraries build artifacts from ext directory">
-		<delete dir="${ext.dir}"/>
+		<delete includeemptydirs="true">
+			<fileset dir="${ext.dir}" excludes="${rapidjson.str}/*"/>
+		</delete>
 	</target>
 
 	<target name="requirements" depends="download-websocket,download-boost"
@@ -163,6 +168,16 @@
 			<arg value="--with-system"/>
 			<arg value="-j${no.cpus}"/>
 		</exec>
+		<echo>Copying ${rapidjson.str} ${rapidjson.version}</echo>
+		<untar src="${rapidjson.lib}"
+			dest="${inc.dir}/${rapidjson.str}"
+			compression="gzip"
+			overwrite="false">
+			<patternset>
+				<include name="**/include/**/*"/>
+			</patternset>
+			<cutdirsmapper dirs="3"/>
+		</untar>
 	</target>
 
 	<target name="requirements-clean"

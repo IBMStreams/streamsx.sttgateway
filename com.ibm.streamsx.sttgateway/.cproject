@@ -34,6 +34,7 @@
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/com.ibm.streamsx.sttgateway/include/boost}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/com.ibm.streamsx.sttgateway/include/websocketpp}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/com.ibm.streamsx.sttgateway/impl/nl/include}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/com.ibm.streamsx.sttgateway/include/rapidjson}&quot;"/>
 								</option>
 								<inputType id="cdt.managedbuild.tool.gnu.cpp.compiler.input.1571868322" superClass="cdt.managedbuild.tool.gnu.cpp.compiler.input"/>
 							</tool>
@@ -48,6 +49,7 @@
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/com.ibm.streamsx.sttgateway/include/boost}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/com.ibm.streamsx.sttgateway/include/websocketpp}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/com.ibm.streamsx.sttgateway/impl/nl/include}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/com.ibm.streamsx.sttgateway/include/rapidjson}&quot;"/>
 								</option>
 								<inputType id="cdt.managedbuild.tool.gnu.c.compiler.input.125347971" superClass="cdt.managedbuild.tool.gnu.c.compiler.input"/>
 							</tool>
@@ -67,6 +69,7 @@
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/com.ibm.streamsx.sttgateway/include/boost}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/com.ibm.streamsx.sttgateway/include/websocketpp}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/com.ibm.streamsx.sttgateway/impl/nl/include}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/com.ibm.streamsx.sttgateway/include/rapidjson}&quot;"/>
 								</option>
 								<inputType id="cdt.managedbuild.tool.gnu.assembler.input.681373161" superClass="cdt.managedbuild.tool.gnu.assembler.input"/>
 							</tool>
