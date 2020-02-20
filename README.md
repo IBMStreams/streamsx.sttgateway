@@ -86,12 +86,21 @@ partitionBy=[{port=ABC, attributes=[conversationId]}], broadcast=[AT])
 }
 ```
 
-A built-in example inside this toolkit can be compiled and launched with the default STT options to use the STT service on public cloud as shown below:
+A built-in example inside this toolkit can be compiled and launched with the default STT options to use the STT service on public cloud as shown below.
+The sample AudioFileWatsonSTT required that the stt service connection details are provided as application configuration properties. To create the 
+application configuration enter:
+```
+streamtool mkappconfig --description 'connection configuration for IBM Cloud Watson stt service' \
+	--property 'apiKey=<your api key>' \
+	--property 'iamTokenURL=https://iam.cloud.ibm.com/identity/token' \
+	--property 'url=<your stt instance uri>' \
+	sttConnection
+```
 
 ```
 cd   streamsx.sttgateway/samples/AudioFileWatsonSTT
 make
-st  submitjob  -d  <YOUR_STREAMS_DOMAIN>  -i  <YOUR_STREAMS_INSTANCE>  output/com.ibm.streamsx.sttgateway.sample.watsonstt.AudioFileWatsonSTT.sab  -P  sttApiKey=<YOUR_WATSON_STT_SERVICE_API_KEY> 
+st  submitjob  -d  <YOUR_STREAMS_DOMAIN>  -i  <YOUR_STREAMS_INSTANCE>  output/com.ibm.streamsx.sttgateway.sample.watsonstt.AudioFileWatsonSTT.sab
 ```
 
 Following IBM Streams job sumission command shows how to override the default values with your own as needed for the various STT options:
@@ -99,7 +108,7 @@ Following IBM Streams job sumission command shows how to override the default va
 ```
 cd   streamsx.sttgateway/samples/AudioRawWatsonSTT
 make
-st submitjob  -d  <YOUR_STREAMS_DOMAIN>  -i  <YOUR_STREAMS_INSTANCE>  output/com.ibm.streamsx.sttgateway.sample.watsonstt.AudioRawWatsonSTT.sab -P  sttApiKey=<YOUR_WATSON_STT_SERVICE_API_KEY>  -P sttResultMode=2   -P sttBaseLanguageModel=en-US_NarrowbandModel  -P contentType="audio/wav"    -P filterProfanity=true   -P keywordsSpottingThreshold=0.294   -P keywordsToBeSpotted="['country', 'learning', 'IBM', 'model']"   -P smartFormattingNeeded=true   -P identifySpeakers=true   -P wordTimestampNeeded=true   -P wordConfidenceNeeded=true   -P wordAlternativesThreshold=0.251   -P maxUtteranceAlternatives=5   -P audioBlobFragmentSize=32768   -P sttLiveMetricsUpdateNeeded=true  -P audioDir=<YOUR_AUDIO_FILES_DIRECTORY>   -P numberOfSTTEngines=100
+st submitjob  -d  <YOUR_STREAMS_DOMAIN>  -i  <YOUR_STREAMS_INSTANCE>  output/com.ibm.streamsx.sttgateway.sample.watsonstt.AudioRawWatsonSTT.sab -P  sttApiKey=<YOUR_WATSON_STT_SERVICE_API_KEY>  -P sttBaseLanguageModel=en-US_NarrowbandModel  -P contentType="audio/wav"    -P filterProfanity=true   -P keywordsSpottingThreshold=0.294   -P keywordsToBeSpotted="['country', 'learning', 'IBM', 'model']"   -P smartFormattingNeeded=true   -P wordAlternativesThreshold=0.251   -P maxUtteranceAlternatives=5   -P audioBlobFragmentSize=32768   -P sttLiveMetricsUpdateNeeded=true  -P audioDir=<YOUR_AUDIO_FILES_DIRECTORY>   -P numberOfSTTEngines=100
 ```
 
 Following is another way to run the same application to access the STT service on the IBM Cloud Pak for Data (CP4D). STT URI shown below is for an illustrative purpose and you must use a valid STT URI obtained from your CP4D cluster.
@@ -146,7 +155,7 @@ In addition to the code snippet shown above to invoke the IBMVoiceGatewaySource 
 ```
 cd   streamsx.sttgateway/demos/VoiceGatewayToStreamsToWatsonSTT
 make
-st  submitjob  -d  <YOUR_STREAMS_DOMAIN>  -i  <YOUR_STREAMS_INSTANCE>  output/com.ibm.streamsx.sttgateway.sample.watsonstt.VoiceGatewayToStreamsToWatsonSTT.sab -P tlsPort=9443  -P numberOfSTTEngines=14  -P sttApiKey=<YOUR_WATSON_STT_SERVICE_API_KEY>  -P sttResultMode=2   -P contentType="audio/mulaw;rate=8000"
+st  submitjob  -d  <YOUR_STREAMS_DOMAIN>  -i  <YOUR_STREAMS_INSTANCE>  output/com.ibm.streamsx.sttgateway.sample.watsonstt.VoiceGatewayToStreamsToWatsonSTT.sab -P tlsPort=9443  -P numberOfSTTEngines=14  -P sttApiKey=<YOUR_WATSON_STT_SERVICE_API_KEY>  -P contentType="audio/mulaw;rate=8000"
 ```
 
 **Special Note**
@@ -160,40 +169,5 @@ st submitjob -P tlsPort=9443 -P vgwSessionLoggingNeeded=false -P numberOfS2TEngi
 
 ## WHATS NEW
 
-v1.0.6:
-* Nov/14/2019
-* Added a new ipv6Available parameter to support both the dual stack (ipv4/ipv6) and the single stack (ipv4 only) environments.
-* Added new logic to assign the caller and agent telephone number attributes based on the vgwIsCaller metadata field.
-* Fixed a typo in an operator parameter name.
-* Added new logic in the examples to send the STT results to a file as well as to an HTTP endpoint.
-* Added a new example VoiceGatewayToStreamsToWatsonS2T to showcase an architectural design pattern where all the three IBM products (IBM Voice Gateway, IBM Streams and Watson S2T engine embedded in a Streams operator) can come together to work seamlessly.
+see [CHANGELOG.md]
 
-v1.0.5:
-* Oct/23/2019
-* Added code for the new IBMVoiceGatewaySource operator.
-* Added a new example VoiceGatewayToStreamsToWatsonSTT to showcase an architectural design pattern where all the three IBM products (IBM Voice Gateway, IBM Streams and IBM Watson Speech To Text) can come together to work seamlessly.
-
-v1.0.4:
-* Sep/05/2019
-* Made changes for the user to provide either the API key for public cloud or the access token for IBM Cloud Pak for Data.
-* Made the necessary changes to use either the STT service on public cloud or the STT service on the IBM Cloud Pak for Data (CP4D).
-
-v1.0.3:
-* Jun/12/2019
-* Replaced the use of the auth token with the IAM access token.
-* Added a utility composite named IAMAccessTokenGenerator to generate/refresh an IAM access token. This utility composite can be invoked within the IBM Streams applications that make use of this toolkit to perform speech to text transcription.
-
-v1.0.2:
-* Sep/24/2018
-* Added a .gitkeep file in the data, impl, include and lib empty folders.
-
-v1.0.1:
-- Sep/21/2018
-- In the internal threads of the WatsonSTT operator code, the CPU yield time during idleness and in between the Websocket connection attempts was increased from a few milliseconds to 1 second.
-- New operator parameter sttLiveMetricsUpdateNeeded was added to give the users a way to turn the custom operator metrics reporting on and off in the time critical path of audio transcription.
-- Use of the internal custom metrics update API was changed from setValue to setValueNoLock. 
-- Corresponding documentation refinements were also done.
-
-v1.0.0:
-- Sep/17/2018
-- Very first release of this toolkit that was tested to support all the major features available in the IBM Watson Speech To Text (STT) cloud service.

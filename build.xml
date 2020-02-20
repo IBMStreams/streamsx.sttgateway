@@ -304,14 +304,15 @@
 			<arg value="${releasefilename}"/>
 			<arg value="--exclude=**/.toolkitList"/>
 			<arg value="--exclude=**/.git*"/>
-			<arg value="--exclude=${toolkit.dir}/.settings/"/>
-			<arg value="--exclude=${toolkit.dir}/.externalToolBuilders/"/>
+			<arg value="--exclude=${toolkit.dir}/.settings"/>
+			<arg value="--exclude=${toolkit.dir}/**/.theFileNameList"/>
+			<arg value="--exclude=${toolkit.dir}/.externalToolBuilders"/>
 			<arg value="--exclude=${toolkit.dir}/.project"/>
 			<arg value="--exclude=${toolkit.dir}/.classpath"/>
 			<arg value="--exclude=${toolkit.dir}/build.xml"/>
 			<arg value="--exclude=${toolkit.dir}/pom.xml"/>
-			<arg value="--exclude=${toolkit.dir}/icons/"/>
-			<arg value="--exclude=${toolkit.dir}/impl/java/"/>
+			<arg value="--exclude=${toolkit.dir}/.cproject"/>
+			<arg value="--exclude=${toolkit.dir}/impl/java/*"/>
 			<arg value="${toolkit.dir}/"/>
 			<arg value="${samples.dir}/"/>
 			<arg value="${doc.string}/"/>
