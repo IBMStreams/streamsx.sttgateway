@@ -22,7 +22,7 @@
 <div class="body refbody">
 <div class="section">
 <p class="p">
-<a class="xref" href="../toolkits/toolkits.html">Gateway to the IBM Speech To Text (STT) cloud service</a> &gt; <a class="xref" href="tk$com.ibm.streamsx.sttgateway.html">com.ibm.streamsx.sttgateway 1.0.6</a> &gt; <a class="xref" href="ns$com.ibm.streamsx.sttgateway.watson.html">com.ibm.streamsx.sttgateway.watson</a> &gt; WatsonSTT</p>
+<a class="xref" href="../toolkits/toolkits.html">Gateway to the IBM Speech To Text (STT) cloud service</a> &gt; <a class="xref" href="tk$com.ibm.streamsx.sttgateway.html">com.ibm.streamsx.sttgateway 2.0.0</a> &gt; <a class="xref" href="ns$com.ibm.streamsx.sttgateway.watson.html">com.ibm.streamsx.sttgateway.watson</a> &gt; WatsonSTT</p>
 
 </div>
 
@@ -40,6 +40,16 @@
 
 <p class="p">      This operator must be configured with a Websocket URL, a Watson STT authentication token and       a base language model (see in parameter section).       This operator may also be customized with many other optional parameters including        custom patch files and appropriate custom patch weights.
 </p>
+
+<div class="p">      The operator parameter <tt class="ph tt">sttResultMode</tt> specifies what type of STT result is needed:
+<ul class="ul">
+<li class="li"> partial: to get partial utterances,</li>
+
+<li class="li"> complete (default) to get the full text after transcribing the entire audio.</li>
+
+</ul>
+      The setting of this this parameter influences the validity of output functions and parameters. In <tt class="ph tt">sttResultMode</tt>        <tt class="ph tt">partial</tt> the the parameter <tt class="ph tt">nonFinalUtterancesNeeded</tt> controls the output of non final utterances.
+</div>
 
 <div class="p">      Requirements: 
 <ul class="ul">
@@ -81,14 +91,14 @@
  
   <dt class="dt dlterm">Parameters</dt>
 
-  <dd class="dd">This operator supports 24 parameters.
+  <dd class="dd">This operator supports 21 parameters.
 <p class="p"> Required: 
 <a class="xref" href="#spldoc_operator__parameter__baseLanguageModel">baseLanguageModel</a>, <a class="xref" href="#spldoc_operator__parameter__uri">uri</a>
 
 </p>
 
 <p class="p"> Optional: 
-<a class="xref" href="#spldoc_operator__parameter__acousticCustomizationId">acousticCustomizationId</a>, <a class="xref" href="#spldoc_operator__parameter__baseModelVersion">baseModelVersion</a>, <a class="xref" href="#spldoc_operator__parameter__contentType">contentType</a>, <a class="xref" href="#spldoc_operator__parameter__cpuYieldTimeInAudioSenderThread">cpuYieldTimeInAudioSenderThread</a>, <a class="xref" href="#spldoc_operator__parameter__customizationId">customizationId</a>, <a class="xref" href="#spldoc_operator__parameter__customizationWeight">customizationWeight</a>, <a class="xref" href="#spldoc_operator__parameter__filterProfanity">filterProfanity</a>, <a class="xref" href="#spldoc_operator__parameter__identifySpeakers">identifySpeakers</a>, <a class="xref" href="#spldoc_operator__parameter__keywordsSpottingThreshold">keywordsSpottingThreshold</a>, <a class="xref" href="#spldoc_operator__parameter__keywordsToBeSpotted">keywordsToBeSpotted</a>, <a class="xref" href="#spldoc_operator__parameter__maxAllowedConnectionAttempts">maxAllowedConnectionAttempts</a>, <a class="xref" href="#spldoc_operator__parameter__maxUtteranceAlternatives">maxUtteranceAlternatives</a>, <a class="xref" href="#spldoc_operator__parameter__smartFormattingNeeded">smartFormattingNeeded</a>, <a class="xref" href="#spldoc_operator__parameter__sttJsonResponseDebugging">sttJsonResponseDebugging</a>, <a class="xref" href="#spldoc_operator__parameter__sttLiveMetricsUpdateNeeded">sttLiveMetricsUpdateNeeded</a>, <a class="xref" href="#spldoc_operator__parameter__sttRequestLogging">sttRequestLogging</a>, <a class="xref" href="#spldoc_operator__parameter__sttResultMode">sttResultMode</a>, <a class="xref" href="#spldoc_operator__parameter__waitTimeBeforeSTTServiceConnectionRetry">waitTimeBeforeSTTServiceConnectionRetry</a>, <a class="xref" href="#spldoc_operator__parameter__websocketLoggingNeeded">websocketLoggingNeeded</a>, <a class="xref" href="#spldoc_operator__parameter__wordAlternativesThreshold">wordAlternativesThreshold</a>, <a class="xref" href="#spldoc_operator__parameter__wordConfidenceNeeded">wordConfidenceNeeded</a>, <a class="xref" href="#spldoc_operator__parameter__wordTimestampNeeded">wordTimestampNeeded</a>
+<a class="xref" href="#spldoc_operator__parameter__acousticCustomizationId">acousticCustomizationId</a>, <a class="xref" href="#spldoc_operator__parameter__baseModelVersion">baseModelVersion</a>, <a class="xref" href="#spldoc_operator__parameter__contentType">contentType</a>, <a class="xref" href="#spldoc_operator__parameter__cpuYieldTimeInAudioSenderThread">cpuYieldTimeInAudioSenderThread</a>, <a class="xref" href="#spldoc_operator__parameter__customizationId">customizationId</a>, <a class="xref" href="#spldoc_operator__parameter__customizationWeight">customizationWeight</a>, <a class="xref" href="#spldoc_operator__parameter__filterProfanity">filterProfanity</a>, <a class="xref" href="#spldoc_operator__parameter__keywordsSpottingThreshold">keywordsSpottingThreshold</a>, <a class="xref" href="#spldoc_operator__parameter__keywordsToBeSpotted">keywordsToBeSpotted</a>, <a class="xref" href="#spldoc_operator__parameter__maxConnectionRetryDelay">maxConnectionRetryDelay</a>, <a class="xref" href="#spldoc_operator__parameter__maxUtteranceAlternatives">maxUtteranceAlternatives</a>, <a class="xref" href="#spldoc_operator__parameter__nonFinalUtterancesNeeded">nonFinalUtterancesNeeded</a>, <a class="xref" href="#spldoc_operator__parameter__smartFormattingNeeded">smartFormattingNeeded</a>, <a class="xref" href="#spldoc_operator__parameter__sttJsonResponseDebugging">sttJsonResponseDebugging</a>, <a class="xref" href="#spldoc_operator__parameter__sttLiveMetricsUpdateNeeded">sttLiveMetricsUpdateNeeded</a>, <a class="xref" href="#spldoc_operator__parameter__sttRequestLogging">sttRequestLogging</a>, <a class="xref" href="#spldoc_operator__parameter__sttResultMode">sttResultMode</a>, <a class="xref" href="#spldoc_operator__parameter__websocketLoggingNeeded">websocketLoggingNeeded</a>, <a class="xref" href="#spldoc_operator__parameter__wordAlternativesThreshold">wordAlternativesThreshold</a>
 
 </p>
 </dd>
@@ -97,7 +107,7 @@
  
   <dt class="dt dlterm">Metrics</dt>
 
-  <dd class="dd">This operator reports 4 metrics.</dd>
+  <dd class="dd">This operator reports 9 metrics.</dd>
 
  
 </dl>
@@ -129,20 +139,18 @@
    <dt class="dt dlterm">Ports (0)</dt>
 
    <dd class="dd">
-<p class="p">      	This port brings the audio data into this operator for transcription.
+<p class="p">        This port brings the audio data into this operator for transcription.
 </p>
 
-<div class="p">      	Attributes on this input port:
+<div class="p">        Attributes on this input port:
 <ul class="ul">
 <li class="li"> <strong class="ph b">speech</strong> (required, rstring/blob) - In the case of file based input (.wav, .mp3 etc. for batch workload), the expected value will be an absolute path of a file as an rstring. In the case of RAW audio data (received from a network switch for real-time workload), the expected input is of type blob.</li>
-
-<li class="li"> <strong class="ph b">conversationId</strong> (optional, rstring) - An rstring conversationId field for identifying the origin of the audio data that is being sent for transcription (either an audio filename or a call center specific call identifier).</li>
 
 </ul>
 
 </div>
 
-<p class="p">		All the extra input attributes will be forwarded if matching output attributes are found.  	
+<p class="p">        A window punctuation marker or a empty speech blob may be used to mark the end of an conversation.          When the end of conversation is encountered,          the STT engine delivers all results of the current conversation and flushes all buffers.         All the extra input attributes will be forwarded if matching output attributes are found.
 </p>
 
    <dl class="dl">
@@ -159,7 +167,7 @@
      <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__input_port_set__controlport">ControlPort</a>: false
      </li>
 
-     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__input_port_set__tuplemutationallowed">TupleMutationAllowed</a>: true
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__input_port_set__tuplemutationallowed">TupleMutationAllowed</a>: false
      </li>
 
      <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__input_port_set__windowingmode">WindowingMode</a>: NonWindowed
@@ -182,18 +190,18 @@
    <dt class="dt dlterm">Ports (1)</dt>
 
    <dd class="dd">
-<p class="p">      	This port brings an unexpired IAM access token (generated by using your          service instance's API key) into this operator that is needed to access the Watson STT service.
+<p class="p">        This port brings an unexpired IAM access token (generated by using your          service instance's API key) into this operator that is needed to access the Watson STT service. This input port          should be used in a different thread than port 0.
 </p>
 
-<div class="p">      	Attributes on this input port:
+<div class="p">        Attributes on this input port: 
 <ul class="ul">
-<li class="li"> <strong class="ph b">access_token</strong> (required, rstring) - An rstring access token required for securing the access to the STT service.</li>
+<li class="li"> <strong class="ph b">access_token</strong> (required, rstring) - An rstring access token required for securing the access to the STT service. </li>
 
 </ul>
 
 </div>
 
-<p class="p">		All the extra attributes found in this input port will be ignored.  	
+<p class="p">        All the extra attributes found in this input port will be ignored.
 </p>
 
    <dl class="dl">
@@ -210,7 +218,7 @@
      <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__input_port_set__controlport">ControlPort</a>: true
      </li>
 
-     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__input_port_set__tuplemutationallowed">TupleMutationAllowed</a>: true
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__input_port_set__tuplemutationallowed">TupleMutationAllowed</a>: false
      </li>
 
      <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__input_port_set__windowingmode">WindowingMode</a>: NonWindowed
@@ -263,7 +271,7 @@
 
             <dd class="dd">
 
-<p class="p">The default function for output attributes. This function assigns the output attribute to the value of the input attribute with the same name.
+<p class="p">            The default function for output attributes. This function assigns the output attribute to the value of the              input attribute with the same name.
 </p>
               <p class="p"/>
 
@@ -275,7 +283,10 @@
 
             <dd class="dd">
 
-<p class="p">Returns an int32 number indicating the utterance number.
+<p class="p">            Returns an int32 number indicating the utterance number. 
+</p>
+
+<p class="p">            <strong class="ph b">Note:</strong> This function is not available if <tt class="ph tt">sttResult</tt> mode equals <tt class="ph tt">complete</tt>.
 </p>
               <p class="p"/>
 
@@ -299,7 +310,10 @@
 
             <dd class="dd">
 
-<p class="p">Returns a boolean value to indicate if this is an interim partial utterance or a finalized utterance.
+<p class="p">            Returns a boolean value to indicate if this is an interim partial utterance or a finalized utterance.
+</p>
+
+<p class="p">            <strong class="ph b">Note:</strong> This function is not available if <tt class="ph tt">sttResult</tt> mode equals <tt class="ph tt">complete</tt>.
 </p>
               <p class="p"/>
 
@@ -307,23 +321,14 @@
 
                         
               <dt class="dt dlterm">
-                <tt class="ph tt">   float32 getConfidence()</tt>              </dt>
+                <tt class="ph tt">   float64 getConfidence()</tt>              </dt>
 
             <dd class="dd">
 
-<p class="p">Returns a float32 confidence value for an interim partial utterance or for a finalized utterance or for the full text.
+<p class="p">            Returns a float64 confidence value for an interim partial utterance or for a finalized utterance or for the full text. 
 </p>
-              <p class="p"/>
 
-            </dd>
-
-                        
-              <dt class="dt dlterm">
-                <tt class="ph tt">   rstring getFullTranscriptionText()</tt>              </dt>
-
-            <dd class="dd">
-
-<p class="p">Returns the transcription of audio in the form of full text after completing the entire transcription.
+<p class="p">            <strong class="ph b">Note:</strong> This function is not available if <tt class="ph tt">sttResult</tt> mode equals <tt class="ph tt">complete</tt>.
 </p>
               <p class="p"/>
 
@@ -347,7 +352,10 @@
 
             <dd class="dd">
 
-<p class="p">Returns a boolean value to indicate whether the full transcription is completed.
+<p class="p">            Returns a boolean value to indicate whether the full transcription/conversation is completed. 
+</p>
+
+<p class="p">            <strong class="ph b">Note:</strong> This function is not available if <tt class="ph tt">sttResult</tt> mode equals <tt class="ph tt">complete</tt>.
 </p>
               <p class="p"/>
 
@@ -359,7 +367,10 @@
 
             <dd class="dd">
 
-<p class="p">Returns a list of n-best alternative hypotheses for an utterance result. List will have the very best guess first followed by the next best ones in that order.
+<p class="p">            Returns a list of n-best alternative hypotheses for an utterance result.              List will have the very best guess first followed by the next best ones in that order. 
+</p>
+
+<p class="p">            <strong class="ph b">Note:</strong> This function is not available if <tt class="ph tt">sttResult</tt> mode equals <tt class="ph tt">complete</tt>.
 </p>
               <p class="p"/>
 
@@ -371,7 +382,10 @@
 
             <dd class="dd">
 
-<p class="p">Returns a nested list of word alternatives (Confusion Networks).
+<p class="p">            Returns a nested list of word alternatives (Confusion Networks). 
+</p>
+
+<p class="p">            <strong class="ph b">Note:</strong> This function is not available if <tt class="ph tt">sttResult</tt> mode equals <tt class="ph tt">complete</tt>.
 </p>
               <p class="p"/>
 
@@ -383,7 +397,10 @@
 
             <dd class="dd">
 
-<p class="p">Returns a nested list of word alternatives confidences (Confusion Networks).
+<p class="p">            Returns a nested list of word alternatives confidences (Confusion Networks). 
+</p>
+
+<p class="p">            <strong class="ph b">Note:</strong> This function is not available if <tt class="ph tt">sttResult</tt> mode equals <tt class="ph tt">complete</tt>.
 </p>
               <p class="p"/>
 
@@ -395,7 +412,10 @@
 
             <dd class="dd">
 
-<p class="p">Returns a list of word alternatives start times (Confusion Networks).
+<p class="p">            Returns a list of word alternatives start times (Confusion Networks). 
+</p>
+
+<p class="p">            <strong class="ph b">Note:</strong> This function is not available if <tt class="ph tt">sttResult</tt> mode equals <tt class="ph tt">complete</tt>.
 </p>
               <p class="p"/>
 
@@ -407,7 +427,10 @@
 
             <dd class="dd">
 
-<p class="p">Returns a list of word alternatives end times (Confusion Networks).
+<p class="p">            Returns a list of word alternatives end times (Confusion Networks). 
+</p>
+
+<p class="p">            <strong class="ph b">Note:</strong> This function is not available if <tt class="ph tt">sttResult</tt> mode equals <tt class="ph tt">complete</tt>.
 </p>
               <p class="p"/>
 
@@ -419,7 +442,10 @@
 
             <dd class="dd">
 
-<p class="p">Returns a list of words in an utterance result.
+<p class="p">            Returns a list of words in an utterance result. 
+</p>
+
+<p class="p">            <strong class="ph b">Note:</strong> This function is not available if <tt class="ph tt">sttResult</tt> mode equals <tt class="ph tt">complete</tt>.
 </p>
               <p class="p"/>
 
@@ -431,7 +457,10 @@
 
             <dd class="dd">
 
-<p class="p">Returns a list of confidences of the words in an utterance result.
+<p class="p">            Returns a list of confidences of the words in an utterance result. 
+</p>
+
+<p class="p">            <strong class="ph b">Note:</strong> This function is not available if <tt class="ph tt">sttResult</tt> mode equals <tt class="ph tt">complete</tt>.
 </p>
               <p class="p"/>
 
@@ -443,7 +472,10 @@
 
             <dd class="dd">
 
-<p class="p">Returns a list of start times of the words in an utterance result relative to the start of the audio.
+<p class="p">            Returns a list of start times of the words in an utterance result relative to the start of the audio. 
+</p>
+
+<p class="p">            <strong class="ph b">Note:</strong> This function is not available if <tt class="ph tt">sttResult</tt> mode equals <tt class="ph tt">complete</tt>.
 </p>
               <p class="p"/>
 
@@ -455,7 +487,10 @@
 
             <dd class="dd">
 
-<p class="p">Returns a list of end times of the words in an utterance result relative to the start of the audio.
+<p class="p">            Returns a list of end times of the words in an utterance result relative to the start of the audio. 
+</p>
+
+<p class="p">            <strong class="ph b">Note:</strong> This function is not available if <tt class="ph tt">sttResult</tt> mode equals <tt class="ph tt">complete</tt>.
 </p>
               <p class="p"/>
 
@@ -467,7 +502,10 @@
 
             <dd class="dd">
 
-<p class="p">Returns the start time of an utterance relative to the start of the audio.
+<p class="p">            Returns the start time of an utterance relative to the start of the audio. 
+</p>
+
+<p class="p">            <strong class="ph b">Note:</strong> This function is not available if <tt class="ph tt">sttResult</tt> mode equals <tt class="ph tt">complete</tt>.
 </p>
               <p class="p"/>
 
@@ -479,7 +517,10 @@
 
             <dd class="dd">
 
-<p class="p">Returns the end time of an utterance relative to the start of the audio.
+<p class="p">            Returns the end time of an utterance relative to the start of the audio. 
+</p>
+
+<p class="p">            <strong class="ph b">Note:</strong> This function is not available if <tt class="ph tt">sttResult</tt> mode equals <tt class="ph tt">complete</tt>.
 </p>
               <p class="p"/>
 
@@ -491,7 +532,10 @@
 
             <dd class="dd">
 
-<p class="p">Returns a list of speaker ids for the individual words in an utterance result.
+<p class="p">            Returns a list of speaker ids for the individual words in an utterance result. 
+</p>
+
+<p class="p">            <strong class="ph b">Note:</strong> This function is not available if <tt class="ph tt">sttResult</tt> mode equals <tt class="ph tt">complete</tt>.
 </p>
               <p class="p"/>
 
@@ -503,7 +547,10 @@
 
             <dd class="dd">
 
-<p class="p">Returns a list of confidences in identifying the speakers of the individual words in an utterance result.
+<p class="p">            Returns a list of confidences in identifying the speakers of the individual words in an utterance result. 
+</p>
+
+<p class="p">            <strong class="ph b">Note:</strong> This function is not available if <tt class="ph tt">sttResult</tt> mode equals <tt class="ph tt">complete</tt>.
 </p>
               <p class="p"/>
 
@@ -515,7 +562,10 @@
 
             <dd class="dd">
 
-<p class="p">Returns the STT keywords spotting results as a map of key/value pairs. Read this toolkit's documentation to learn about the map contents.
+<p class="p">            Returns the STT keywords spotting results as a map of key/value pairs. Read this toolkit's documentation to learn about the map contents. 
+</p>
+
+<p class="p">            <strong class="ph b">Note:</strong> This function is not available if <tt class="ph tt">sttResult</tt> mode equals <tt class="ph tt">complete</tt>.
 </p>
               <p class="p"/>
 
@@ -537,10 +587,10 @@
 
    <dd class="dd">
 
-<p class="p">      	This port produces the output tuples that carry the result of the speech to text transcription.
+<p class="p">        This port produces the output tuples that carry the result of the speech to text transcription.
 </p>
 
-<p class="p">        An output tuple is created for every utterance that is observed from the incoming audio data.          An utterance is a group of transcribed words meant to approximate a sentence.          This means there is a one to many relationship between an incoming tuple and outgoing tuples          (i.e. a single .wav file may result in 30 output utterances).         Intermediate utterances are sent out on this output port only when the sttResultMode         operator parameter is set to a value of either 1 or 2. If it is set to 3, then only the         fully transcribed text for the entire audio data will be sent on this output port after         the given audio is completely transcribed.          <strong class="ph b">There are multiple available output functions</strong>, and output attributes can also be          assigned values with any SPL expression that evaluates to the proper type.      	
+<p class="p">        An output tuple is created for every utterance that is observed from the incoming audio data.          An utterance is a group of transcribed words meant to approximate a sentence.          This means there is a one to many relationship between an incoming tuple and outgoing tuples          (i.e. a single .wav file may result in 30 output utterances).         Intermediate utterances are sent out on this output port only when the sttResultMode         operator parameter is set to a value of either 1 or 2. If it is set to 3, then only the         fully transcribed text for the entire audio data will be sent on this output port after         the given audio is completely transcribed. The port emits a window punctuation marker when a conversation          has finished.         <strong class="ph b">There are multiple available output functions</strong>, and output attributes can also be          assigned values with any SPL expression that evaluates to the proper type.
 </p>
 
     <p class="p"/>
@@ -559,7 +609,7 @@
      <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__output_port_set__tuplemutationallowed">TupleMutationAllowed</a>: true
      </li>
 
-     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__output_port_set__windowpunctuationoutputmode">WindowPunctuationOutputMode</a>: Preserving
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__output_port_set__windowpunctuationoutputmode">WindowPunctuationOutputMode</a>: Generating
      </li>
 
    </ul>
@@ -579,14 +629,14 @@
 
 <div class="section">
 <p class="p splhead-1"><strong class="ph b"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters">Parameters</a></strong></p>
-This operator supports 24 parameters.
+This operator supports 21 parameters.
 <p class="p"> Required: 
 <a class="xref" href="#spldoc_operator__parameter__baseLanguageModel">baseLanguageModel</a>, <a class="xref" href="#spldoc_operator__parameter__uri">uri</a>
 
 </p>
 
 <p class="p"> Optional: 
-<a class="xref" href="#spldoc_operator__parameter__acousticCustomizationId">acousticCustomizationId</a>, <a class="xref" href="#spldoc_operator__parameter__baseModelVersion">baseModelVersion</a>, <a class="xref" href="#spldoc_operator__parameter__contentType">contentType</a>, <a class="xref" href="#spldoc_operator__parameter__cpuYieldTimeInAudioSenderThread">cpuYieldTimeInAudioSenderThread</a>, <a class="xref" href="#spldoc_operator__parameter__customizationId">customizationId</a>, <a class="xref" href="#spldoc_operator__parameter__customizationWeight">customizationWeight</a>, <a class="xref" href="#spldoc_operator__parameter__filterProfanity">filterProfanity</a>, <a class="xref" href="#spldoc_operator__parameter__identifySpeakers">identifySpeakers</a>, <a class="xref" href="#spldoc_operator__parameter__keywordsSpottingThreshold">keywordsSpottingThreshold</a>, <a class="xref" href="#spldoc_operator__parameter__keywordsToBeSpotted">keywordsToBeSpotted</a>, <a class="xref" href="#spldoc_operator__parameter__maxAllowedConnectionAttempts">maxAllowedConnectionAttempts</a>, <a class="xref" href="#spldoc_operator__parameter__maxUtteranceAlternatives">maxUtteranceAlternatives</a>, <a class="xref" href="#spldoc_operator__parameter__smartFormattingNeeded">smartFormattingNeeded</a>, <a class="xref" href="#spldoc_operator__parameter__sttJsonResponseDebugging">sttJsonResponseDebugging</a>, <a class="xref" href="#spldoc_operator__parameter__sttLiveMetricsUpdateNeeded">sttLiveMetricsUpdateNeeded</a>, <a class="xref" href="#spldoc_operator__parameter__sttRequestLogging">sttRequestLogging</a>, <a class="xref" href="#spldoc_operator__parameter__sttResultMode">sttResultMode</a>, <a class="xref" href="#spldoc_operator__parameter__waitTimeBeforeSTTServiceConnectionRetry">waitTimeBeforeSTTServiceConnectionRetry</a>, <a class="xref" href="#spldoc_operator__parameter__websocketLoggingNeeded">websocketLoggingNeeded</a>, <a class="xref" href="#spldoc_operator__parameter__wordAlternativesThreshold">wordAlternativesThreshold</a>, <a class="xref" href="#spldoc_operator__parameter__wordConfidenceNeeded">wordConfidenceNeeded</a>, <a class="xref" href="#spldoc_operator__parameter__wordTimestampNeeded">wordTimestampNeeded</a>
+<a class="xref" href="#spldoc_operator__parameter__acousticCustomizationId">acousticCustomizationId</a>, <a class="xref" href="#spldoc_operator__parameter__baseModelVersion">baseModelVersion</a>, <a class="xref" href="#spldoc_operator__parameter__contentType">contentType</a>, <a class="xref" href="#spldoc_operator__parameter__cpuYieldTimeInAudioSenderThread">cpuYieldTimeInAudioSenderThread</a>, <a class="xref" href="#spldoc_operator__parameter__customizationId">customizationId</a>, <a class="xref" href="#spldoc_operator__parameter__customizationWeight">customizationWeight</a>, <a class="xref" href="#spldoc_operator__parameter__filterProfanity">filterProfanity</a>, <a class="xref" href="#spldoc_operator__parameter__keywordsSpottingThreshold">keywordsSpottingThreshold</a>, <a class="xref" href="#spldoc_operator__parameter__keywordsToBeSpotted">keywordsToBeSpotted</a>, <a class="xref" href="#spldoc_operator__parameter__maxConnectionRetryDelay">maxConnectionRetryDelay</a>, <a class="xref" href="#spldoc_operator__parameter__maxUtteranceAlternatives">maxUtteranceAlternatives</a>, <a class="xref" href="#spldoc_operator__parameter__nonFinalUtterancesNeeded">nonFinalUtterancesNeeded</a>, <a class="xref" href="#spldoc_operator__parameter__smartFormattingNeeded">smartFormattingNeeded</a>, <a class="xref" href="#spldoc_operator__parameter__sttJsonResponseDebugging">sttJsonResponseDebugging</a>, <a class="xref" href="#spldoc_operator__parameter__sttLiveMetricsUpdateNeeded">sttLiveMetricsUpdateNeeded</a>, <a class="xref" href="#spldoc_operator__parameter__sttRequestLogging">sttRequestLogging</a>, <a class="xref" href="#spldoc_operator__parameter__sttResultMode">sttResultMode</a>, <a class="xref" href="#spldoc_operator__parameter__websocketLoggingNeeded">websocketLoggingNeeded</a>, <a class="xref" href="#spldoc_operator__parameter__wordAlternativesThreshold">wordAlternativesThreshold</a>
 
 </p>
 <dl class="dl">
@@ -629,7 +679,7 @@ This operator supports 24 parameters.
      <dt class="dt dlterm"><a name="spldoc_operator__parameter__baseLanguageModel"><!-- --></a><tt class="ph tt">baseLanguageModel</tt></dt>
 
      <dd class="dd">
-<p class="p">This parameter specifies the name of the Watson STT base language model that should be used.
+<p class="p">        This parameter specifies the name of the Watson STT base language model that should be used.          see: <a class="xref" href="https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-input#models">https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-input#models</a> 
 </p>
 
   <dl class="dl">
@@ -664,7 +714,10 @@ This operator supports 24 parameters.
      <dt class="dt dlterm"><a name="spldoc_operator__parameter__baseModelVersion"><!-- --></a><tt class="ph tt">baseModelVersion</tt></dt>
 
      <dd class="dd">
-<p class="p">This parameter specifies a particular base model version to be used for transcription. (Default is an empty string)
+<p class="p">        This parameter specifies a particular base model version to be used for transcription. (Default is an empty string)
+</p>
+
+<p class="p">        The parameter may point to a specific version of the base model if needed.         e-g: "en-US_NarrowbandModel.v07-06082016.06202016"         see: <a class="xref" href="https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-input#version">https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-input#version</a> 
 </p>
 
   <dl class="dl">
@@ -769,7 +822,7 @@ This operator supports 24 parameters.
      <dt class="dt dlterm"><a name="spldoc_operator__parameter__customizationId"><!-- --></a><tt class="ph tt">customizationId</tt></dt>
 
      <dd class="dd">
-<p class="p">This parameter specifies a custom language model to be used for transcription. (Default is an empty string)
+<p class="p">        This parameter specifies a custom language model to be used for transcription.          see: <a class="xref" href="https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-input#custom">https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-input#custom</a>          (Default is an empty string)
 </p>
 
   <dl class="dl">
@@ -839,42 +892,7 @@ This operator supports 24 parameters.
      <dt class="dt dlterm"><a name="spldoc_operator__parameter__filterProfanity"><!-- --></a><tt class="ph tt">filterProfanity</tt></dt>
 
      <dd class="dd">
-<p class="p">This parameter indicates whether profanity should be filtered from a transcript. (Default is false)
-</p>
-
-  <dl class="dl">
-    
-     <dt class="dt dlterm">Properties</dt>
-
-     <dd class="dd">   <ul class="sl simple">
-     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__type">Type</a>: boolean
-     </li>
-
-     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__cardinality">Cardinality</a>: 1
-     </li>
-
-     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__optional">Optional</a>: true
-     </li>
-
-     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__expressionmode">ExpressionMode</a>: AttributeFree
-     </li>
-
-   </ul>
-
-     <p class="p"/>
-     </dd>
-
-    
-  </dl>
-
-     </dd>
-
-  
-  
-     <dt class="dt dlterm"><a name="spldoc_operator__parameter__identifySpeakers"><!-- --></a><tt class="ph tt">identifySpeakers</tt></dt>
-
-     <dd class="dd">
-<p class="p">This parameter indicates whether the speakers of the individual words in an utterance result should be identified. (Default is false)
+<p class="p">        This parameter indicates whether profanity should be filtered from a transcript. (Default is false)          see: <a class="xref" href="https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-output#profanity_filter">https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-output#profanity_filter</a> 
 </p>
 
   <dl class="dl">
@@ -909,7 +927,10 @@ This operator supports 24 parameters.
      <dt class="dt dlterm"><a name="spldoc_operator__parameter__keywordsSpottingThreshold"><!-- --></a><tt class="ph tt">keywordsSpottingThreshold</tt></dt>
 
      <dd class="dd">
-<p class="p">This parameter specifies the minimum confidence level that the STT service must have for an utterance word to match a given keyword. A value of 0.0 disables this feature. Valid value must be less than 1.0. (Default is 0.0)
+<p class="p">        This parameter specifies the minimum confidence level that the STT service must have for an utterance word to          match a given keyword. A value of 0.0 disables this feature. Valid value must be less than 1.0. (Default is 0.0)         see: <a class="xref" href="https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-output#keyword_spotting">https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-output#keyword_spotting</a> 
+</p>
+
+<p class="p">        <strong class="ph b">Note:</strong> This parameter is not valid if <tt class="ph tt">sttResultMode</tt> equals <tt class="ph tt">complete</tt>.
 </p>
 
   <dl class="dl">
@@ -944,7 +965,10 @@ This operator supports 24 parameters.
      <dt class="dt dlterm"><a name="spldoc_operator__parameter__keywordsToBeSpotted"><!-- --></a><tt class="ph tt">keywordsToBeSpotted</tt></dt>
 
      <dd class="dd">
-<p class="p">This parameter specifies a list (array) of strings to be spotted. (Default is an empty list)
+<p class="p">        This parameter specifies a list (array) of strings to be spotted. (Default is an empty list)
+</p>
+
+<p class="p">        <strong class="ph b">Note:</strong> This parameter is not valid if <tt class="ph tt">sttResultMode</tt> equals <tt class="ph tt">complete</tt>.
 </p>
 
   <dl class="dl">
@@ -976,10 +1000,10 @@ This operator supports 24 parameters.
 
   
   
-     <dt class="dt dlterm"><a name="spldoc_operator__parameter__maxAllowedConnectionAttempts"><!-- --></a><tt class="ph tt">maxAllowedConnectionAttempts</tt></dt>
+     <dt class="dt dlterm"><a name="spldoc_operator__parameter__maxConnectionRetryDelay"><!-- --></a><tt class="ph tt">maxConnectionRetryDelay</tt></dt>
 
      <dd class="dd">
-<p class="p">This parameter specifies the maximum number of attempts to make a Websocket connection to the STT service. It should be &gt;= 1 (Default is 10)
+<p class="p">        The maximum wait time in seconds before a connection re-try is made. The re-try          delay of connection to the STT service increases exponentially starting from 2 seconds but not exceeding          'maxConnectionRetryDelay'. It must be greater 1.0 (Default is 60.0)
 </p>
 
   <dl class="dl">
@@ -987,7 +1011,7 @@ This operator supports 24 parameters.
      <dt class="dt dlterm">Properties</dt>
 
      <dd class="dd">   <ul class="sl simple">
-     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__type">Type</a>: int32
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__type">Type</a>: float64
      </li>
 
      <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__cardinality">Cardinality</a>: 1
@@ -1014,7 +1038,10 @@ This operator supports 24 parameters.
      <dt class="dt dlterm"><a name="spldoc_operator__parameter__maxUtteranceAlternatives"><!-- --></a><tt class="ph tt">maxUtteranceAlternatives</tt></dt>
 
      <dd class="dd">
-<p class="p">This parameter indicates the required number of n-best alternative hypotheses for the transcription results. (Default is 1)
+<p class="p">        This parameter indicates the required number of n-best alternative hypotheses for the transcription results. (Default is 1)         see: <a class="xref" href="https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-output#max_alternatives">https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-output#max_alternatives</a> 
+</p>
+
+<p class="p">        <strong class="ph b">Note:</strong> This parameter is not valid if <tt class="ph tt">sttResultMode</tt> equals <tt class="ph tt">complete</tt>.
 </p>
 
   <dl class="dl">
@@ -1046,10 +1073,45 @@ This operator supports 24 parameters.
 
   
   
+     <dt class="dt dlterm"><a name="spldoc_operator__parameter__nonFinalUtterancesNeeded"><!-- --></a><tt class="ph tt">nonFinalUtterancesNeeded</tt></dt>
+
+     <dd class="dd">
+<p class="p">        If <tt class="ph tt">sttResultMode</tt> equals <tt class="ph tt">partial</tt> this parameter controls the output of non final utterances. If <tt class="ph tt">sttResultMode</tt>          equals <tt class="ph tt">complete</tt> this parameter is ignored. (Default is false.)
+</p>
+
+  <dl class="dl">
+    
+     <dt class="dt dlterm">Properties</dt>
+
+     <dd class="dd">   <ul class="sl simple">
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__type">Type</a>: boolean
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__cardinality">Cardinality</a>: 1
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__optional">Optional</a>: true
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__expressionmode">ExpressionMode</a>: AttributeFree
+     </li>
+
+   </ul>
+
+     <p class="p"/>
+     </dd>
+
+    
+  </dl>
+
+     </dd>
+
+  
+  
      <dt class="dt dlterm"><a name="spldoc_operator__parameter__smartFormattingNeeded"><!-- --></a><tt class="ph tt">smartFormattingNeeded</tt></dt>
 
      <dd class="dd">
-<p class="p">This parameter indicates whether to convert date, time, phone numbers, currency values, email and URLs into conventional representations. (Default is false)
+<p class="p">        This parameter indicates whether to convert date, time, phone numbers, currency values, email and URLs into conventional representations. (Default is false)         see: <a class="xref" href="https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-output#smart_formatting">https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-output#smart_formatting</a> 
 </p>
 
   <dl class="dl">
@@ -1119,7 +1181,7 @@ This operator supports 24 parameters.
      <dt class="dt dlterm"><a name="spldoc_operator__parameter__sttLiveMetricsUpdateNeeded"><!-- --></a><tt class="ph tt">sttLiveMetricsUpdateNeeded</tt></dt>
 
      <dd class="dd">
-<p class="p">This parameter specifies whether live update for this operator's custom metrics is needed. (Default is true)
+<p class="p">This parameter specifies whether live update for this operator's metrics <tt class="ph tt">nFullAudioConversationsReceived</tt> and <tt class="ph tt">nFullAudioConversationsTranscribed</tt> is needed. (Default is true)
 </p>
 
   <dl class="dl">
@@ -1154,7 +1216,7 @@ This operator supports 24 parameters.
      <dt class="dt dlterm"><a name="spldoc_operator__parameter__sttRequestLogging"><!-- --></a><tt class="ph tt">sttRequestLogging</tt></dt>
 
      <dd class="dd">
-<p class="p">This parameter specifies whether request logging should be done for every STT audio transcription request. (Default is false)
+<p class="p">        Indicates whether IBM can use data that is sent over the connection to improve the service for future users.          Specify false to prevent IBM from accessing the logged data. (Default is false)         see: <a class="xref" href="https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-input#logging">https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-input#logging</a> 
 </p>
 
   <dl class="dl">
@@ -1189,7 +1251,13 @@ This operator supports 24 parameters.
      <dt class="dt dlterm"><a name="spldoc_operator__parameter__sttResultMode"><!-- --></a><tt class="ph tt">sttResultMode</tt></dt>
 
      <dd class="dd">
-<p class="p">This parameter specifies what type of STT result is needed: 1 to get partial utterances, 2 to get completed utterance, 3 (default) to get the full text after transcribing the entire audio.
+<p class="p">        This parameter specifies what type of STT result is needed: <tt class="ph tt">partial</tt>: to get partial utterances,          <tt class="ph tt">complete</tt>: (default) to get the full text after transcribing the entire audio. The setting of this If this parameter          influences the validity of output functions.
+</p>
+
+<p class="p">        In sttResultMode <tt class="ph tt">complete</tt> the following parameters are not allowed:         <tt class="ph tt">maxUtteranceAlternatives</tt>, <tt class="ph tt">wordAlternativesThreshold</tt>, <tt class="ph tt">keywordsSpottingThreshold</tt>, <tt class="ph tt">keywordsToBeSpotted</tt>, 
+</p>
+
+<p class="p">        In sttResultMode <tt class="ph tt">complete</tt> the following output functions are not allowed:          <tt class="ph tt">getUtteranceNumber()</tt>, <tt class="ph tt">isFinalizedUtterance()</tt>, <tt class="ph tt">getConfidence()</tt>, <tt class="ph tt">isTranscriptionCompleted()</tt>, <tt class="ph tt">getUtteranceAlternatives()</tt>,          <tt class="ph tt">getWordAlternatives()</tt>, <tt class="ph tt">getWordAlternativesConfidences()</tt>, <tt class="ph tt">getWordAlternativesStartTimes()</tt>, <tt class="ph tt">getWordAlternativesEndTimes()</tt>,          <tt class="ph tt">getUtteranceWords()</tt>, <tt class="ph tt">getUtteranceWordsConfidences()</tt>, <tt class="ph tt">getUtteranceWordsStartTimes()</tt>, <tt class="ph tt">getUtteranceWordsEndTimes()</tt>,          <tt class="ph tt">getUtteranceStartTime()</tt>, <tt class="ph tt">getUtteranceEndTime()</tt>, <tt class="ph tt">getUtteranceWordsSpeakers()</tt>, <tt class="ph tt">getUtteranceWordsSpeakersConfidences()</tt>,          <tt class="ph tt">getKeywordsSpottingResults()</tt>
 </p>
 
   <dl class="dl">
@@ -1197,8 +1265,8 @@ This operator supports 24 parameters.
      <dt class="dt dlterm">Properties</dt>
 
      <dd class="dd">   <ul class="sl simple">
-     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__type">Type</a>: int32
-     </li>
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__type">Type</a>: SttResultMode
+ (<tt class="ph tt">partial, complete</tt>)     </li>
 
      <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__cardinality">Cardinality</a>: 1
      </li>
@@ -1206,7 +1274,7 @@ This operator supports 24 parameters.
      <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__optional">Optional</a>: true
      </li>
 
-     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__expressionmode">ExpressionMode</a>: AttributeFree
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__expressionmode">ExpressionMode</a>: CustomLiteral
      </li>
 
    </ul>
@@ -1224,7 +1292,7 @@ This operator supports 24 parameters.
      <dt class="dt dlterm"><a name="spldoc_operator__parameter__uri"><!-- --></a><tt class="ph tt">uri</tt></dt>
 
      <dd class="dd">
-<p class="p">This parameter specifies the Watson STT Websocket service URI.
+<p class="p">        This parameter specifies the Watson STT Websocket service URI.          see: <a class="xref" href="https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-websockets#WSopen">https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-websockets#WSopen</a> 
 </p>
 
   <dl class="dl">
@@ -1239,41 +1307,6 @@ This operator supports 24 parameters.
      </li>
 
      <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__optional">Optional</a>: false
-     </li>
-
-     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__expressionmode">ExpressionMode</a>: AttributeFree
-     </li>
-
-   </ul>
-
-     <p class="p"/>
-     </dd>
-
-    
-  </dl>
-
-     </dd>
-
-  
-  
-     <dt class="dt dlterm"><a name="spldoc_operator__parameter__waitTimeBeforeSTTServiceConnectionRetry"><!-- --></a><tt class="ph tt">waitTimeBeforeSTTServiceConnectionRetry</tt></dt>
-
-     <dd class="dd">
-<p class="p">This parameter specifies the time (in seconds) to wait before retrying a connection attempt to the Watson STT service. It should be &gt;= 1.0 (Default is 3.0)
-</p>
-
-  <dl class="dl">
-    
-     <dt class="dt dlterm">Properties</dt>
-
-     <dd class="dd">   <ul class="sl simple">
-     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__type">Type</a>: float64
-     </li>
-
-     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__cardinality">Cardinality</a>: 1
-     </li>
-
-     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__optional">Optional</a>: true
      </li>
 
      <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__expressionmode">ExpressionMode</a>: AttributeFree
@@ -1329,7 +1362,10 @@ This operator supports 24 parameters.
      <dt class="dt dlterm"><a name="spldoc_operator__parameter__wordAlternativesThreshold"><!-- --></a><tt class="ph tt">wordAlternativesThreshold</tt></dt>
 
      <dd class="dd">
-<p class="p">This parameter controls the density of the word alternatives results (a.k.a. Confusion Networks). A value of 0.0 disables this feature. Valid value must be less than 1.0 (Default is 0.0)
+<p class="p">        This parameter controls the density of the word alternatives results (a.k.a. Confusion Networks). A value of 0.0          disables this feature. Valid value must be less than 1.0 (Default is 0.0)         see: <a class="xref" href="https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-output#word_alternatives">https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-output#word_alternatives</a> 
+</p>
+
+<p class="p">        <strong class="ph b">Note:</strong> This parameter is not valid if <tt class="ph tt">sttResultMode</tt> equals <tt class="ph tt">complete</tt>.
 </p>
 
   <dl class="dl">
@@ -1360,76 +1396,6 @@ This operator supports 24 parameters.
      </dd>
 
   
-  
-     <dt class="dt dlterm"><a name="spldoc_operator__parameter__wordConfidenceNeeded"><!-- --></a><tt class="ph tt">wordConfidenceNeeded</tt></dt>
-
-     <dd class="dd">
-<p class="p">This parameter indicates whether the transcription result should include individual words and their confidences or not. (Default is false)
-</p>
-
-  <dl class="dl">
-    
-     <dt class="dt dlterm">Properties</dt>
-
-     <dd class="dd">   <ul class="sl simple">
-     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__type">Type</a>: boolean
-     </li>
-
-     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__cardinality">Cardinality</a>: 1
-     </li>
-
-     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__optional">Optional</a>: true
-     </li>
-
-     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__expressionmode">ExpressionMode</a>: AttributeFree
-     </li>
-
-   </ul>
-
-     <p class="p"/>
-     </dd>
-
-    
-  </dl>
-
-     </dd>
-
-  
-  
-     <dt class="dt dlterm"><a name="spldoc_operator__parameter__wordTimestampNeeded"><!-- --></a><tt class="ph tt">wordTimestampNeeded</tt></dt>
-
-     <dd class="dd">
-<p class="p">This parameter indicates whether the transcription result should include individual words and their timestamps or not. (Default is false)
-</p>
-
-  <dl class="dl">
-    
-     <dt class="dt dlterm">Properties</dt>
-
-     <dd class="dd">   <ul class="sl simple">
-     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__type">Type</a>: boolean
-     </li>
-
-     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__cardinality">Cardinality</a>: 1
-     </li>
-
-     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__optional">Optional</a>: true
-     </li>
-
-     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__expressionmode">ExpressionMode</a>: AttributeFree
-     </li>
-
-   </ul>
-
-     <p class="p"/>
-     </dd>
-
-    
-  </dl>
-
-     </dd>
-
-  
 </dl>
 
 </div>
@@ -1438,11 +1404,14 @@ This operator supports 24 parameters.
 <p class="p splhead-1"><strong class="ph b"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__context__metrics">Metrics</a></strong></p>
 <dl class="dl">
   
-    <dt class="dt dlterm"><tt class="ph tt">nFullAudioConversationsReceived</tt> - <a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__context__metrics_kind_gauge">Gauge</a></dt>
+    <dt class="dt dlterm"><tt class="ph tt">nAudioBytesSend</tt> - <a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__context__metrics_kind_counter">Counter</a></dt>
 
     <dd class="dd">
 
-<p class="p">Number of full audio conversations received for transcription by this operator instance.
+<p class="p">          The amount of audio samples sent to the stt service in bytes.
+</p>
+
+<p class="p">          <em class="ph i">NOTE:</em> This metric is only updated if parameter <tt class="ph tt">sttLiveMetricsUpdateNeeded</tt> is true.
 </p>
 
      <p class="p"/>
@@ -1451,11 +1420,14 @@ This operator supports 24 parameters.
 
   
   
-    <dt class="dt dlterm"><tt class="ph tt">nFullAudioConversationsTranscribed</tt> - <a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__context__metrics_kind_gauge">Gauge</a></dt>
+    <dt class="dt dlterm"><tt class="ph tt">nFullAudioConversationsFailed</tt> - <a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__context__metrics_kind_counter">Counter</a></dt>
 
     <dd class="dd">
 
-<p class="p">Number of full audio conversations transcribed by this operator instance.
+<p class="p">          Number of full audio conversations failures by this operator instance.
+</p>
+
+<p class="p">          <em class="ph i">NOTE:</em> This metric is only updated if parameter <tt class="ph tt">sttLiveMetricsUpdateNeeded</tt> is true.
 </p>
 
      <p class="p"/>
@@ -1464,14 +1436,30 @@ This operator supports 24 parameters.
 
   
   
-    <dt class="dt dlterm"><tt class="ph tt">nSTTResultMode</tt> - <a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__context__metrics_kind_counter">Counter</a></dt>
+    <dt class="dt dlterm"><tt class="ph tt">nFullAudioConversationsReceived</tt> - <a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__context__metrics_kind_counter">Counter</a></dt>
 
     <dd class="dd">
 
-<p class="p">          STT result mode currently in effect for a given operator instance.
+<p class="p">          Number of full audio conversations received for transcription by this operator instance.
 </p>
 
-<p class="p">          NOTE: A few custom metrics are available for the WatsonSTT operator.            The Counter kind metrics listed here will be updated when the operator starts.        	  But, the Gauge kind metrics will be updated live during transcription only        	  when the sttLiveMetricsUpdateNeeded operator parameter is set to true.
+<p class="p">          <em class="ph i">NOTE:</em> This metric is only updated if parameter <tt class="ph tt">sttLiveMetricsUpdateNeeded</tt> is true.
+</p>
+
+     <p class="p"/>
+
+     </dd>
+
+  
+  
+    <dt class="dt dlterm"><tt class="ph tt">nFullAudioConversationsTranscribed</tt> - <a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__context__metrics_kind_counter">Counter</a></dt>
+
+    <dd class="dd">
+
+<p class="p">          Number of full audio conversations transcribed by this operator instance.
+</p>
+
+<p class="p">          <em class="ph i">NOTE:</em> This metric is only updated if parameter <tt class="ph tt">sttLiveMetricsUpdateNeeded</tt> is true.
 </p>
 
      <p class="p"/>
@@ -1484,8 +1472,96 @@ This operator supports 24 parameters.
 
     <dd class="dd">
 
-<p class="p">Number of STT service Websocket connection attempts made by this operator instance.
+<p class="p">The cumulative number of STT service Websocket connection attempts made by this operator instance.
 </p>
+
+     <p class="p"/>
+
+     </dd>
+
+  
+  
+    <dt class="dt dlterm"><tt class="ph tt">nWebsocketConnectionAttemptsCurrent</tt> - <a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__context__metrics_kind_gauge">Gauge</a></dt>
+
+    <dd class="dd">
+
+<p class="p">Number of STT service Websocket connection attempts made by this operator instance for the current connection. The value is reset to zero when a connection attempt succeeds.
+</p>
+
+     <p class="p"/>
+
+     </dd>
+
+  
+  
+    <dt class="dt dlterm"><tt class="ph tt">nWebsocketConnectionAttemptsFailed</tt> - <a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__context__metrics_kind_counter">Counter</a></dt>
+
+    <dd class="dd">
+
+<p class="p">The cumulative number of failed STT service Websocket connection attempts made by this operator instance.
+</p>
+
+     <p class="p"/>
+
+     </dd>
+
+  
+  
+    <dt class="dt dlterm"><tt class="ph tt">sttResultMode</tt> - <a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__context__metrics_kind_gauge">Gauge</a></dt>
+
+    <dd class="dd">
+
+<p class="p">          STT result mode currently in effect for a given operator instance.
+</p>
+
+<div class="p">
+<ul class="ul">
+<li class="li"> 1 sttResultMode == partial and nonFinalUtterancesNeeded == true</li>
+
+<li class="li"> 2 sttResultMode == partial and nonFinalUtterancesNeeded == false</li>
+
+<li class="li"> 3 sttResultMode == complete</li>
+
+</ul>
+
+</div>
+
+     <p class="p"/>
+
+     </dd>
+
+  
+  
+    <dt class="dt dlterm"><tt class="ph tt">wsConnectionState</tt> - <a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__context__metrics_kind_gauge">Gauge</a></dt>
+
+    <dd class="dd">
+
+<p class="p">          The state of the websocket connection:
+</p>
+
+<div class="p">
+<ul class="ul">
+<li class="li"> 0=idle: initial idle state</li>
+
+<li class="li"> 1=start: start a new connection</li>
+
+<li class="li"> 2=connecting: trying to connect to stt</li>
+
+<li class="li"> 3=open: connection is opened</li>
+
+<li class="li"> 4=listening: listening received</li>
+
+<li class="li"> 5=error: error received during transcription</li>
+
+<li class="li"> 6=closed: connection has closed</li>
+
+<li class="li"> 7=failed: connection has failed</li>
+
+<li class="li"> 8=crashed: Error was caught in ws_init tread</li>
+
+</ul>
+
+</div>
 
      <p class="p"/>
 
@@ -1500,39 +1576,39 @@ This operator supports 24 parameters.
 <p class="p splhead-1"><strong class="ph b"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__context__dependencies">Libraries</a></strong></p>
 <dl class="dl">
  
-  <dt class="dt dlterm"><tt class="ph tt">Boost Library</tt>  </dt>
+  <dt class="dt dlterm"><tt class="ph tt">Implementation library</tt>  </dt>
+
+<dd class="dd"/>
+  <dd class="dd"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__context__dependencies__managedlibrary__includepath">Include Path</a>: <tt class="ph tt">../../impl/include</tt></dd>
+
+ 
+ 
+  <dt class="dt dlterm"><tt class="ph tt">Boost Library common/Websocket include and Boost system</tt>  </dt>
 
 <dd class="dd"/>
   <dd class="dd"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__context__dependencies__managedlibrary__lib">Library Name</a>: <tt class="ph tt">boost_system</tt></dd>
 
-  <dd class="dd"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__context__dependencies__managedlibrary__libpath">Library Path</a>: <tt class="ph tt">../../impl/lib</tt></dd>
+  <dd class="dd"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__context__dependencies__managedlibrary__libpath">Library Path</a>: <tt class="ph tt">../../lib</tt></dd>
+
+  <dd class="dd"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__context__dependencies__managedlibrary__includepath">Include Path</a>: <tt class="ph tt">../../include</tt></dd>
 
  
  
-  <dt class="dt dlterm"><tt class="ph tt">Boost Library</tt>  </dt>
+  <dt class="dt dlterm"><tt class="ph tt">Boost Library chrono</tt>  </dt>
 
 <dd class="dd"/>
   <dd class="dd"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__context__dependencies__managedlibrary__lib">Library Name</a>: <tt class="ph tt">boost_chrono</tt></dd>
 
-  <dd class="dd"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__context__dependencies__managedlibrary__libpath">Library Path</a>: <tt class="ph tt">../../impl/lib</tt></dd>
+  <dd class="dd"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__context__dependencies__managedlibrary__libpath">Library Path</a>: <tt class="ph tt">../../lib</tt></dd>
 
  
  
-  <dt class="dt dlterm"><tt class="ph tt">Boost Library</tt>  </dt>
+  <dt class="dt dlterm"><tt class="ph tt">Boost Library random</tt>  </dt>
 
 <dd class="dd"/>
   <dd class="dd"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__context__dependencies__managedlibrary__lib">Library Name</a>: <tt class="ph tt">boost_random</tt></dd>
 
-  <dd class="dd"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__context__dependencies__managedlibrary__libpath">Library Path</a>: <tt class="ph tt">../../impl/lib</tt></dd>
-
- 
- 
-  <dt class="dt dlterm"><tt class="ph tt">Boost Library</tt>  </dt>
-
-<dd class="dd"/>
-  <dd class="dd"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__context__dependencies__managedlibrary__lib">Library Name</a>: <tt class="ph tt">boost_thread</tt></dd>
-
-  <dd class="dd"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__context__dependencies__managedlibrary__libpath">Library Path</a>: <tt class="ph tt">../../impl/lib</tt></dd>
+  <dd class="dd"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__context__dependencies__managedlibrary__libpath">Library Path</a>: <tt class="ph tt">../../lib</tt></dd>
 
  
 </dl>

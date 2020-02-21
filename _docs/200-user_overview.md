@@ -11,6 +11,22 @@ sidebar:
 {% include toc %}
 {%include editme %}
 
+## SPLDOC
+
+[SPLDoc for the streamsx.sttgateway toolkit](https://ibmstreams.github.io/streamsx.sttgateway/doc/spldoc/html/index.html)
+
+Reference of former releases:
+* [v1.0.6](https://ibmstreams.github.io/streamsx.sttgateway/samples/v1.0.6/doc/spldoc/html/index.html)
+
+## Samples
+
+[SPLDoc for the samples of streamsx.sttgateway toolkit](https://ibmstreams.github.io/streamsx.sttgateway/samples/doc/spldoc/html/index.html)
+
+## What is new
+
+[CHANGELOG.md](https://github.com/IBMStreams/streamsx.sttgateway/blob/master/CHANGELOG.md)
+
+
 ## Satisfying the toolkit requirements
 As explained in the "Toolkit Overview [Technical]" section, this toolkit requires network connectivity to the IBM Voice Gateway and the Watson STT service running either on the IBM public cloud or on the Cloud Pak for Data (CP4D).  In addition, a user specific IAM access token to invoke the Watson STT service on public cloud. In order to generate and refresh the IAM access token needed in the public cloud, this toolkit uses the Linux curl command. So, it is necessary to have the curl command working on all the IBM Streams application machines. If you are using the Watson STT on CP4D, then you will need the regular access token obtained from the CP4D web console instead of the IAM access token. In addition, it also requires you to download and install the boost_1_69_0 as well as the websocketpp version 0.8.1 on the IBM Streams application development machine where the application code is compiled to create the application bundle. These two C++ libraries form the major external dependency for this toolkit. 
 

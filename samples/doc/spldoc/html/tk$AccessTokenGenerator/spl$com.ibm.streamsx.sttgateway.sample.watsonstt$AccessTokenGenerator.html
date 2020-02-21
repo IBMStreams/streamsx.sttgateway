@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xml:lang="en-us" lang="en-us">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+<meta name="copyright" content="(C) Copyright 2005"/>
+<meta name="DC.rights.owner" content="(C) Copyright 2005"/>
+<meta name="DC.Type" content="reference"/>
+<meta name="DC.Title" content="SPL File AccessTokenGenerator.spl"/>
+<meta name="DC.Format" content="XHTML"/>
+<meta name="DC.Identifier" content="spldoc_compilationunit"/>
+<link rel="stylesheet" type="text/css" href="../../html/commonltr.css"/>
+<link rel="stylesheet" type="text/css" href="../../html/spldoc.css"/>
+<title>SPL File AccessTokenGenerator.spl</title>
+</head>
+<body id="spldoc_compilationunit">
+
+
+<h1 class="title topictitle1">SPL File <tt class="ph tt">AccessTokenGenerator.spl</tt></h1>
+
+<div class="body refbody">
+<div class="section">
+<p class="p">
+<a class="xref" href="../toolkits/toolkits.html">Gateway to the IBM Speech To Text (STT) cloud service samples</a> &gt; <a class="xref" href="tk$AccessTokenGenerator.html">AccessTokenGenerator 1.0.0</a> &gt; <a class="xref" href="ns$com.ibm.streamsx.sttgateway.sample.watsonstt.html">com.ibm.streamsx.sttgateway.sample.watsonstt</a> &gt; AccessTokenGenerator.spl</p>
+
+</div>
+
+<div class="section"><h2 class="title sectiontitle splhead-1">Content</h2>
+  
+  <dl class="dl">
+    <dt class="dt dlterm"/>
+<dd class="dd"/>
+
+    
+      <dt class="dt dlterm splhead-2">Operators</dt>
+
+      <dd class="dd">
+<ul class="sl simple">
+<li class="sli"><strong class="ph b"><a class="xref" href="spl$com.ibm.streamsx.sttgateway.sample.watsonstt$AccessTokenGenerator.html#spldoc_compilationunit__composite_operator__AccessTokenGenerator">AccessTokenGenerator</a></strong>: This operator demonstrates the usage of the AccessTokenGenerator As soon as the operator is configured with iamTokenURL and apiKey, the operator starts to request a valid access from the authentication service.
+</li>
+
+</ul>
+
+      </dd>
+
+    
+  </dl>
+
+</div>
+
+<div class="section"><h2 class="title sectiontitle splhead-1">Composites</h2>
+  
+</div>
+
+<div class="section" id="spldoc_compilationunit__composite_operator__AccessTokenGenerator"><h2 class="title sectiontitle splpart">composite AccessTokenGenerator</h2>
+  
+</div>
+
+<div class="section splgraph">
+  <embed class="image" src="../../image/tk$AccessTokenGenerator/op$com.ibm.streamsx.sttgateway.sample.watsonstt$AccessTokenGenerator.svg" width="232" height="109"/>
+</div>
+
+<div class="section">
+
+<p class="p">This operator demonstrates the usage of the AccessTokenGenerator As soon as the operator is configured with iamTokenURL and apiKey, the operator starts to request a valid access from the authentication service. The access token  is automatically refreshed. To configure this operator a application configuration sttConnection with property  iamTokenURL and apiKey is required. To enter the application configuration execute the following command: streamtool mkappconfig --property "apiKey=your api key" sttConnection or apply the apiKey as submission time parameter
+</p>
+
+<p class="p">If this sample is provided with a non empty accessToken parameter, the operator  emits this token.
+</p>
+
+</div>
+
+<div class="section"><h2 class="title sectiontitle">Parameters</h2>
+
+<ul class="sl simple">
+<li class="sli"><strong class="ph b">iamTokenURL</strong>: The service url of the IAM Token authorization service to fetch and refresh the IAM access  token. If the parameter is the empty string, the operator thread ends immediately. If the application configuration with name <em class="ph i">appConfigName</em> and property <em class="ph i">iamTokenURL</em> exists, this parameter is overwritten.  Type <em class="ph i">rstring</em>; 
+</li>
+
+<li class="sli"><strong class="ph b">apiKey</strong>: The api key required for the generation of the access token.  This parameter is evaluated when the operator logic starts to generate a initial or a refresh access token.  Thus the parameter may be changed during operation of the streams application. If the value is the empty string,  no access token is requested from IAM cloud service. When the value has changed, the operator requests an initial  access token when the current token becomes invalid. If the application configuration with name <em class="ph i">appConfigName</em>  and property <em class="ph i">apiKey</em> exists, this parameter is overwritten. 
+</li>
+
+<li class="sli"><strong class="ph b">accessToken</strong>: If parameter <em class="ph i">accessToken</em> is non empty, the operator emits <strong class="ph b">one output tuple</strong> with the  access token and the operator thread ends. If parameter <em class="ph i">accessToken</em> is empty, the operator connects to the  IAM authorization service specified by parameter <tt class="ph tt">iamTokenURL</tt> and requests an access token by using the provided <tt class="ph tt">apiKey</tt>.  If the application configuration with name <em class="ph i">appConfigName</em> and property <em class="ph i">accessToken</em> exists, this parameter is overwritten.
+</li>
+
+</ul>
+
+</div>
+
+<div class="section">
+</div>
+
+<div class="section">
+</div>
+
+<div class="section"><h2 class="title sectiontitle splhead-2">SPL Source Code</h2>
+  
+</div>
+
+
+<div class="section">
+   <pre class="pre codeblock">
+
+ public composite AccessTokenGenerator {
+ 	param
+ 		expression&lt;rstring&gt; $iamTokenURL : getSubmissionTimeValue("iamTokenURL", "https://iam.cloud.ibm.com/identity/token");
+ 		expression&lt;rstring&gt; $apiKey      : getSubmissionTimeValue("apiKey", "");
+ 		expression&lt;rstring&gt; $accessToken : getSubmissionTimeValue("accessToken", "");
+ 	graph
+ 		stream&lt;IAMAccessToken&gt; IAMAccessTokenStream = IAMAccessTokenGenerator() {
+ 			param
+ 				iamTokenURL: $iamTokenURL;
+ 				apiKey:      $apiKey;
+ 				accessToken: $accessToken;
+ 				initDelay: 20.0;
+ 				//guardTime: 1l;
+ 				//expiresInTestValue: 65l;
+ 		}
+ 		
+ 		() as Sink = Custom(IAMAccessTokenStream as I) {
+ 			logic onTuple I: {
+ 				printStringLn(hourMinuteSecondMillisec(getTimestamp()) + ": " + (rstring)I);
+ 				// emulate processing time here
+ 				block(15.0);
+ 			}
+ 		}
+ 
+ 	config
+ 		restartable: false;
+ }
+
+   </pre>
+
+</div>
+
+</div>
+
+
+</body>
+</html>

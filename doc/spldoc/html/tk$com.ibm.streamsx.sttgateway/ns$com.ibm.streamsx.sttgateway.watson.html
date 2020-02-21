@@ -22,14 +22,14 @@
 <div class="body refbody">
 <div class="section">
 <p class="p">
-<a class="xref" href="../toolkits/toolkits.html">Gateway to the IBM Speech To Text (STT) cloud service</a> &gt; <a class="xref" href="tk$com.ibm.streamsx.sttgateway.html">com.ibm.streamsx.sttgateway 1.0.6</a> &gt; com.ibm.streamsx.sttgateway.watson</p>
+<a class="xref" href="../toolkits/toolkits.html">Gateway to the IBM Speech To Text (STT) cloud service</a> &gt; <a class="xref" href="tk$com.ibm.streamsx.sttgateway.html">com.ibm.streamsx.sttgateway 2.0.0</a> &gt; com.ibm.streamsx.sttgateway.watson</p>
 
 </div>
 
 <div class="section"><h2 class="title sectiontitle splhead-1">Operators</h2>
   
 <ul class="sl simple">
-<li class="sli"><strong class="ph b"><a class="xref" href="spl$com.ibm.streamsx.sttgateway.watson$IAMAccessTokenGenerator.html#spldoc_compilationunit__composite_operator__IAMAccessTokenGenerator">IAMAccessTokenGenerator</a></strong>
+<li class="sli"><strong class="ph b"><a class="xref" href="spl$com.ibm.streamsx.sttgateway.watson$IAMAccessTokenGenerator.html#spldoc_compilationunit__composite_operator__IAMAccessTokenGenerator">IAMAccessTokenGenerator</a></strong>: IBM Streams applications using the streamsx.sttgateway can use/invoke this non-main composite to submit,  generate and periodically refresh the IAM access token which will be required by the WatsonSTT operator.
 </li>
 
 <li class="sli"><strong class="ph b"><a class="xref" href="op$com.ibm.streamsx.sttgateway.watson$IBMVoiceGatewaySource.html">IBMVoiceGatewaySource</a></strong>:       The IBMVoiceGatewaySource operator is designed to ingest        speech data from the IBM Voice Gateway product version 1.0.3.0 or above.        This speech data is ingested in binary format from the        IBM Voice Gateway into this operator via the Websocket interface.
@@ -45,6 +45,9 @@
 <div class="section"><h2 class="title sectiontitle splhead-1">Functions</h2>
   
 <ul class="sl simple">
+<li class="sli"><strong class="ph b"><a class="xref" href="spl$com.ibm.streamsx.sttgateway.watson$Utils.html#spldoc_compilationunit__function__hourMinuteSecondMillisec.timestamp">hourMinuteSecondMillisec(timestamp)</a></strong>: Function hourMinuteSecondMillisec 
+</li>
+
 <li class="sli"><strong class="ph b"><a class="xref" href="fc$com.ibm.streamsx.sttgateway.watson.html#spldoc_functions__launch_app.rstring.rstring">launch_app(rstring, rstring)</a></strong>: It launches any command or utility or application.
 </li>
 
@@ -55,7 +58,7 @@
 <div class="section"><h2 class="title sectiontitle splhead-1">Types</h2>
   
 <ul class="sl simple">
-<li class="sli"><strong class="ph b"><a class="xref" href="spl$com.ibm.streamsx.sttgateway.watson$IAMAccessTokenGenerator.html#spldoc_compilationunit__type__IamAccessToken_t">IamAccessToken_t</a></strong>
+<li class="sli"><strong class="ph b"><a class="xref" href="spl$com.ibm.streamsx.sttgateway.watson$IAMAccessTokenGenerator.html#spldoc_compilationunit__type__IAMAccessToken">IAMAccessToken</a></strong>: This type represents the data format for the  result returned by the <em class="ph i">IAMAccessTokenGenerator</em> 
 </li>
 
 </ul>
