@@ -155,6 +155,15 @@ https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-websocke
 	print "// wordConfidenceNeeded=$wordConfidenceNeeded wordTimestampNeeded=$wordTimestampNeeded identifySpeakers=$identifySpeakers\n";
 
 	# Following are the operator parameters.
+	
+	my $nonFinalUtterancesNeeded = $model->getParameterByName("nonFinalUtterancesNeeded");
+	if ($nonFinalUtterancesNeeded) {
+		if ($sttResultMode eq "complete") {
+			SPL::CodeGen::warnln("Parmaeter nonFinalUtterancesNeeded is ignored if sttResultMode equals complete", $model->getContext()->getSourceLocation());
+		}
+	}
+	$nonFinalUtterancesNeeded = $nonFinalUtterancesNeeded ? $nonFinalUtterancesNeeded->getValueAt(0)->getCppExpression() : 0;
+	
 	my $uri = $model->getParameterByName("uri");
 	$uri = $uri->getValueAt(0)->getCppExpression();
 
@@ -252,6 +261,7 @@ MY_OPERATOR::MY_OPERATOR()
 						<%=$baseLanguageModel%>,
 						<%=$contentType%>,
 						<%=$sttResultMode%>,
+						<%=$nonFinalUtterancesNeeded%>,
 						<%=$sttRequestLogging%>,
 						<%=$baseModelVersion%>,
 						<%=$customizationId%>,
@@ -396,7 +406,7 @@ void MY_OPERATOR::setResultAttributes(
 		int32_t utteranceNumber_,
 		std::string const & utteranceText_,
 		bool final_,
-		float confidence_,
+		SPL::float64 confidence_,
 		SPL::list<SPL::rstring> const & utteranceAlternatives_,
 		SPL::list<SPL::list<SPL::rstring>> const & wordAlternatives_,
 		SPL::list<SPL::list<SPL::float64>> const & wordAlternativesConfidences_,

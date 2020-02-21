@@ -1,5 +1,35 @@
-Changes
-=======
+# Changes
+
+## v2.0.0:
+* Many changes in implementation and many corrections
+* WatsonSTT move implementation to implementation class
+* Samples: print results to console with time stamp
+* Samples: added simplified samples AudioFileWatsonSTT and AudioRawWatsonSTT
+* Samples: added AccessTokenGenerator
+* Samples: WatsonSTTRaw avoid SIGFPE
+* Demos: Adapt demos to new S2T toolkit release 3.6.0
+* Corrects metrics for operator WatsonSTT and IBMVoiceGatewaySource
+* New metrics for operator WatsonSTT: nWebsocketConnectionAttemptsFailed, nWebsocketConnectionAttemptsCurrent,
+  wsConnectionState, nAudioBytesSend and nAudioBytesSend
+* Improved parameter description
+* Complete initialization of state variables
+* Functional logging for Operator WatsonSTT
+* Graceful connection close on operator shutdown
+* Use Streams Operator threads instead of boost-threads in Operator WatsonSTT
+* Improvements in re-Connection handling of WatsonSTT operator, new parameter maxConnectionRetryDelay
+* Logging of failed filenames
+* Remove Potential Ressource Problem see #29, Sender works now in input port process thread
+* WatsonSTT: generate back pressure if no access token is available
+* WatsonSTT emit window marker on conversation end; Delay final marker until conversation end
+* WatsonSTT: make parameter sttResultMode to custom literal; invalidate functions and params in sttResultMode complete
+* WatsonSTT: new parameter nonFinalUtterancesNeeded
+* WatsonSTT: Use empty blob or Window punctuation marker as conversation end identifier
+* New implementation of New IAMAccessTokenGenerator with many new features
+* Support application configuration for connection parameters and credentials
+* Move external libraries to toolkit directory folder include and lib
+* Toolkit internationalization
+* Add complete test suite
+
 ## v1.0.6:
 * Nov/14/2019
 * Added a new ipv6Available parameter to support both the dual stack (ipv4/ipv6) and the single stack (ipv4 only) environments.

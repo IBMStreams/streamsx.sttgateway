@@ -24,7 +24,7 @@ composite WatsonSTT0FileModes {
 		STTResult = rstring conversationId, int32 utteranceNumber,
 			rstring utteranceText, boolean finalizedUtterance,
 			rstring sttErrorMessage,
-			//<*Mode1 *Mode2>float32 confidence,
+			//<*Mode1 *Mode2>float64 confidence,
 			//<*Mode1 *Mode2>list<rstring> utteranceAlternatives,
 			//<*Mode1 *Mode2>list<list<rstring>> wordAlternatives,
 			//<*Mode1 *Mode2>list<list<float64>> wordAlternativesConfidences,
@@ -81,10 +81,10 @@ composite WatsonSTT0FileModes {
 				uri: $uri;
 				baseLanguageModel: $sttBaseLanguageModel;
 				contentType: $contentType;
-				//<*Mode1>sttResultMode: partial;
-				//<*Mode2>sttResultMode: final;
+				//<*Mode1 *Mode2>sttResultMode: partial;
 				//<*Mode3>sttResultMode: complete;
-				
+				//<*Mode1>nonFinalUtterancesNeeded: true;
+				//<*Mode2>nonFinalUtterancesNeeded: false;
 			output O:
 				conversationId = speech,
 				//<*Mode1 *Mode2>utteranceNumber = getUtteranceNumber(),

@@ -687,9 +687,9 @@ void WatsonSTTImplReceiver<OP, OT>::on_message(client* c, websocketpp::connectio
 	SPL::map<SPL::rstring, SPL::float64> keywordsSpottingResultsMap_;
 
 	bool final_ = false;
-	float confidence_ = 0.0;
+	SPL::float64 confidence_ = 0.0;
 	std::string fullTranscriptionText_ = "";
-	float cumulativeConfidenceForFullTranscription_ = 0.0;
+	SPL::float64 cumulativeConfidenceForFullTranscription_ = 0.0;
 	int32_t idx1 = -1;
 	int32_t idx2 = -1;
 	int32_t idx3 = -1;

@@ -188,6 +188,10 @@ WatsonSTTImpl<OP, OT>::WatsonSTTImpl(OP & splOperator_,Conf config_)
 		nWebsocketConnectionAttemptsFailedMetric{& Rec::splOperator.getContext().getMetrics().getCustomMetricByName("nWebsocketConnectionAttemptsFailed")},
 		nAudioBytesSendMetric{ & Rec::splOperator.getContext().getMetrics().getCustomMetricByName("nAudioBytesSend")}
 {
+	if (Conf::sttResultMode == Conf::partial)
+		if (not Conf::nonFinalUtterancesNeeded)
+			Conf::sttResultMode = Conf::final;
+
 	if (Conf::customizationId == "") {
 		// No customization id configured. Hence, set the customization weight to
 		// 9.9 which will be ignored by the C++ logic later in the on_open method.
@@ -249,6 +253,7 @@ WatsonSTTImpl<OP, OT>::WatsonSTTImpl(OP & splOperator_,Conf config_)
 	<< "\nbaseLanguageModel                       = " << Conf::baseLanguageModel
 	<< "\ncontentType                             = " << Conf::contentType
 	<< "\nsttResultMode                           = " << Conf::sttResultMode
+	<< "\nnonFinalUtterancesNeeded                = " << Conf::nonFinalUtterancesNeeded
 	<< "\nsttRequestLogging                       = " << Conf::sttRequestLogging
 	<< "\nbaseModelVersion                        = " << Conf::baseModelVersion
 	<< "\ncustomizationId                         = " << Conf::customizationId

@@ -29,9 +29,9 @@
       
       The operator parameter `sttResultMode` specifies what type of STT result is needed:
         * partial: to get partial utterances,
-        * final to get completed/final utterance,
         * complete (default) to get the full text after transcribing the entire audio.
-      The setting of this this parameter influences the validity of output functions and parameters. 
+      The setting of this this parameter influences the validity of output functions and parameters. In `sttResultMode` 
+      `partial` the the parameter `nonFinalUtterancesNeeded` controls the output of non final utterances.
       
       Requirements: 
       * Intel RHEL6 or RHEL7 hosts installed with IBM Streams. 
@@ -53,7 +53,13 @@
       <metrics>
         <metric>
           <name>sttResultMode</name>
-          <description>STT result mode currently in effect for a given operator instance.</description>
+          <description>
+          STT result mode currently in effect for a given operator instance.
+          
+          * 1 sttResultMode == partial and nonFinalUtterancesNeeded == true
+          * 2 sttResultMode == partial and nonFinalUtterancesNeeded == false
+          * 3 sttResultMode == complete
+          </description>
           <kind>Gauge</kind>
         </metric>
         
@@ -110,15 +116,15 @@
           <description>
           The state of the websocket connection:
           
-          0=idle: initial idle state
-          1=start: start a new connection
-          2=connecting: trying to connect to stt
-          3=open: connection is opened
-          4=listening: listening received
-          5=error: error received during transcription
-          6=closed: connection has closed
-          7=failed: connection has failed
-          8=crashed: Error was caught in ws_init tread
+          * 0=idle: initial idle state
+          * 1=start: start a new connection
+          * 2=connecting: trying to connect to stt
+          * 3=open: connection is opened
+          * 4=listening: listening received
+          * 5=error: error received during transcription
+          * 6=closed: connection has closed
+          * 7=failed: connection has failed
+          * 8=crashed: Error was caught in ws_init tread
           </description>
           <kind>Gauge</kind>
         </metric>
@@ -138,7 +144,6 @@
         <enumeration>
           <name>SttResultMode</name>
           <value>partial</value>
-          <value>final</value>
           <value>complete</value>
         </enumeration>
       </customLiterals>
@@ -175,11 +180,11 @@
           </function>
           <function>
             <description>
-            Returns a float32 confidence value for an interim partial utterance or for a finalized utterance or for the full text. 
+            Returns a float64 confidence value for an interim partial utterance or for a finalized utterance or for the full text. 
             
             **Note:** This function is not available if `sttResult` mode equals `complete`.
             </description>
-            <prototype><![CDATA[float32 getConfidence()]]></prototype>
+            <prototype><![CDATA[float64 getConfidence()]]></prototype>
           </function>
           <function>
             <description>Returns the Watson STT error message if any.</description>
@@ -388,7 +393,7 @@
       <parameter>
         <name>sttResultMode</name>
         <description>
-        This parameter specifies what type of STT result is needed: `partial`: to get partial utterances, `final`: to get completed/final utterance, 
+        This parameter specifies what type of STT result is needed: `partial`: to get partial utterances, 
         `complete`: (default) to get the full text after transcribing the entire audio. The setting of this If this parameter 
         influences the validity of output functions.
 
@@ -409,6 +414,19 @@
         <cardinality>1</cardinality>
       </parameter> 
       
+      <parameter>
+        <name>nonFinalUtterancesNeeded</name>
+        <description>
+        If `sttResultMode` equals `partial` this parameter controls the output of non final utterances. If `sttResultMode` 
+        equals `complete` this parameter is ignored. (Default is false.)
+        </description>
+        <optional>true</optional>
+        <rewriteAllowed>true</rewriteAllowed>
+        <expressionMode>AttributeFree</expressionMode>
+        <type>boolean</type>
+        <cardinality>1</cardinality>
+      </parameter>
+
       <parameter>
         <name>sttRequestLogging</name>
         <description>

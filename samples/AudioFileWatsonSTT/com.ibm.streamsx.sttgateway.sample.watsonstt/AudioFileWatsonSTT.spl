@@ -80,9 +80,7 @@ use com.ibm.streamsx.sttgateway.watson::*;
  * 
  * @param   contentType            content type; Default audio/wav
  * 
- * @param   smartFormattingNeeded  smartFormattingNeeded; Default false
- * 
- * @param   websocketLoggingNeeded websocketLoggingNeeded; Default false
+ * @param   nonFinalUtterancesNeeded  nonFinalUtterancesNeeded; Default false
  */
 public composite AudioFileWatsonSTT {
 
@@ -91,7 +89,7 @@ public composite AudioFileWatsonSTT {
 		expression<rstring> $audioDir:                       getSubmissionTimeValue("audioDir", "../../audio-files"); 
 		expression<rstring> $baseLanguageModel:              getSubmissionTimeValue("baseLanguageModel", "en-US_NarrowbandModel");
 		expression<rstring> $contentType:                    getSubmissionTimeValue("contentType", "audio/wav");
-		expression<int32> $maxUtteranceAlternatives : (int32)getSubmissionTimeValue("maxUtteranceAlternatives", "1");
+		expression<boolean> $nonFinalUtterancesNeeded: (boolean)getSubmissionTimeValue("nonFinalUtterancesNeeded", "false");
 
 	type
 		// This STT result type
@@ -99,7 +97,7 @@ public composite AudioFileWatsonSTT {
 			uint64 myseq,
 			int32 utteranceNumber,
 			boolean transcriptionCompleted, boolean finalizedUtterance,
-			float32 confidence,
+			float64 confidence,
 			float64 utteranceStartTime,
 			float64 utteranceEndTime,
 			rstring utteranceText,
@@ -180,6 +178,7 @@ public composite AudioFileWatsonSTT {
 				baseLanguageModel: $baseLanguageModel;
 				contentType: $contentType;
 				sttResultMode: partial;
+				nonFinalUtterancesNeeded: $nonFinalUtterancesNeeded;
 				/*maxUtteranceAlternatives: 4;
 				wordAlternativesThreshold: 0.7;
 				keywordsSpottingThreshold: 0.2;

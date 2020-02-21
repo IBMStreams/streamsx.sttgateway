@@ -60,6 +60,7 @@ use com.ibm.streamsx.sttgateway.watson::*;
  *          You should leave this submission time value empty when not using STT on CP4D.
  * 
  * @param   audioDir            directory with the audio files
+ * @param   nonFinalUtterancesNeeded  nonFinalUtterancesNeeded; Default false
  * @param   numberOfSTTEngines  the number of stt engines
  * @param   sttUri              the stt service uri
  * @param   sttBaseLanguageModel   base language model; Default: en-US_NarrowbandModel
@@ -76,7 +77,8 @@ public composite AudioRawWatsonSTT {
 		expression<rstring> $sttApiKey:                      getSubmissionTimeValue("sttApiKey", "");
 		expression<rstring> $sttIAMTokenURL:                 getSubmissionTimeValue("sttIAMTokenURL", "https://iam.cloud.ibm.com/identity/token");
 		expression<rstring> $sttOnCP4DAccessToken:           getSubmissionTimeValue("sttOnCP4DAccessToken", "");
-		expression<rstring> $audioDir:                       getSubmissionTimeValue("audioDir", "../../audio-files"); 
+		expression<rstring> $audioDir:                       getSubmissionTimeValue("audioDir", "../../audio-files");
+		expression<boolean> $nonFinalUtterancesNeeded: (boolean)getSubmissionTimeValue("nonFinalUtterancesNeeded", "false");
 		expression<int32>   $numberOfSTTEngines:      (int32)getSubmissionTimeValue("numberOfSTTEngines", "5") ;
 		expression<rstring> $sttUri:                         getSubmissionTimeValue("sttUri");
 		expression<rstring> $sttBaseLanguageModel:           getSubmissionTimeValue("sttBaseLanguageModel", "en-US_NarrowbandModel");
@@ -95,7 +97,7 @@ public composite AudioRawWatsonSTT {
 			rstring sttErrorMessage,
 			float64 utteranceStartTime,
 			float64 utteranceEndTime,
-			float32 confidence,
+			float64 confidence,
 			rstring utterance;
 
 	graph
@@ -187,7 +189,8 @@ public composite AudioRawWatsonSTT {
 						", Speech sequence " + (rstring)sequence + ": " + I.conversationId);
 				}
 			param
-				sttResultMode: final;
+				sttResultMode: partial;
+				nonFinalUtterancesNeeded: $nonFinalUtterancesNeeded;
 				uri: $sttUri;
 				baseLanguageModel: $sttBaseLanguageModel;
 				contentType: $contentType;

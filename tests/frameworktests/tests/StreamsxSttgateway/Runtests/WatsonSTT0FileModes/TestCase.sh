@@ -31,7 +31,7 @@ PREPS=(
 )
 
 STEPS=(
-	'submitJob -P "audioDir=$TTPR_SreamsxSttgatewaySamplesPath/audio-files" -P "apiKey=$SPEECH_TO_TEXT_APIKEY" -P "uri=wss://$SPEECH_TO_TEXT_URI/v1/recognize"'
+	'submitJob -P "audioDir=$TTPR_SreamsxSttgatewaySamplesPath/audio-files" -P "apiKey=$TTPR_SpeechToTextApikey" -P "uri=$TTPR_SpeechToTextUrl/v1/recognize"'
 	'checkJobNo'
 	'waitForJobHealth'
 	'waitForFinAndCheckHealth'
