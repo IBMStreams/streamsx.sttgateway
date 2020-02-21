@@ -1,0 +1,65 @@
+namespace com.ibm.streamsx.sttgateway.sample.watsonstt;
+
+use com.ibm.streamsx.sttgateway.watson::IAMAccessTokenGenerator;
+use com.ibm.streamsx.sttgateway.watson::IAMAccessToken;
+use com.ibm.streamsx.sttgateway.watson::hourMinuteSecondMillisec;
+
+/**
+ * This operator demonstrates the usage of the AccessTokenGenerator
+ * As soon as the operator is configured with iamTokenURL and apiKey, the operator
+ * starts to request a valid access from the authentication service. The access token 
+ * is automatically refreshed.
+ * To configure this operator a application configuration sttConnection with property 
+ * iamTokenURL and apiKey is required.
+ * To enter the application configuration execute the following command:
+ * streamtool mkappconfig --property "apiKey=your api key" sttConnection
+ * or
+ * apply the apiKey as submission time parameter
+ * 
+ * If this sample is provided with a non empty accessToken parameter, the operator 
+ * emits this token.
+ * 
+ * @param	iamTokenURL	The service url of the IAM Token authorization service to fetch and refresh the IAM access 
+ * token. If the parameter is the empty string, the operator thread ends immediately.
+ * If the application configuration with name *appConfigName* and property *iamTokenURL* exists, this parameter is overwritten. 
+ * Type *rstring*;
+ * 
+ * @param	apiKey	The api key required for the generation of the access token. 
+ * This parameter is evaluated when the operator logic starts to generate a initial or a refresh access token. 
+ * Thus the parameter may be changed during operation of the streams application. If the value is the empty string, 
+ * no access token is requested from IAM cloud service. When the value has changed, the operator requests an initial 
+ * access token when the current token becomes invalid. If the application configuration with name *appConfigName* 
+ * and property *apiKey* exists, this parameter is overwritten.
+ * 
+ * @param	accessToken	If parameter *accessToken* is non empty, the operator emits **one output tuple** with the 
+ * access token and the operator thread ends. If parameter *accessToken* is empty, the operator connects to the 
+ * IAM authorization service specified by parameter `iamTokenURL` and requests an access token by using the provided `apiKey`. 
+ * If the application configuration with name *appConfigName* and property *accessToken* exists, this parameter is overwritten.
+ */
+public composite AccessTokenGenerator {
+	param
+		expression<rstring> $iamTokenURL : getSubmissionTimeValue("iamTokenURL", "https://iam.cloud.ibm.com/identity/token");
+		expression<rstring> $apiKey      : getSubmissionTimeValue("apiKey", "");
+		expression<rstring> $accessToken : getSubmissionTimeValue("accessToken", "");
+	graph
+		stream<IAMAccessToken> IAMAccessTokenStream = IAMAccessTokenGenerator() {
+			param
+				iamTokenURL: $iamTokenURL;
+				apiKey:      $apiKey;
+				accessToken: $accessToken;
+				initDelay: 20.0;
+				//guardTime: 1l;
+				//expiresInTestValue: 65l;
+		}
+		
+		() as Sink = Custom(IAMAccessTokenStream as I) {
+			logic onTuple I: {
+				printStringLn(hourMinuteSecondMillisec(getTimestamp()) + ": " + (rstring)I);
+				// emulate processing time here
+				block(15.0);
+			}
+		}
+
+	config
+		restartable: false;
+}

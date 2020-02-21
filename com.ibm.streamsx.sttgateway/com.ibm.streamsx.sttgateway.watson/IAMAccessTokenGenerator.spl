@@ -6,10 +6,6 @@
 */
 
 /*
-==============================================
-First created on: Jun/11/2019
-Last modified on: Sep/04/2019
-
 This non-main composite provides a way to generate a
 new IAM access token for the IBM STT service on
 public cloud. IBM Streams applications using
@@ -26,17 +22,120 @@ this composite will skip generating an IamAccessToken.
 
 namespace com.ibm.streamsx.sttgateway.watson;
 
-// This non-main composite uses JSON native functions.
+// This non-main composite uses JSON native functions and inet native functions.
 // So, the following toolkit (v1.4.6 or higher) is a dependency.
-use com.ibm.streamsx.json::*;
+use com.ibm.streamsx.json::extractFromJSON;
+use com.ibm.streamsx.inet.http::httpPost;
+use com.ibm.streamsx.inet.http::urlEncode;
 
-// This type represents the data format for the 
-// result returned by the "Generate IAM access token" and the
-// "Refresh IAM access token" CURL commands.
-type IamAccessToken_t = rstring access_token, rstring refresh_token, 
+use spl.math::pow;
+use spl.utility::createCustomMetric;
+use spl.utility::setCustomMetricValue;
+use spl.string::regexMatch;
+use spl.time::getTimestamp;
+use spl.time::getSeconds;
+
+/**
+ * This type represents the data format for the 
+ * result returned by the *IAMAccessTokenGenerator*
+*/
+type IAMAccessToken = rstring access_token, rstring refresh_token, 
 	rstring scope, int64 expiration, rstring token_type, int64 expires_in;
 
-public composite IAMAccessTokenGenerator(output IamAccessToken) {
+/**
+ * IBM Streams applications using the streamsx.sttgateway can use/invoke this non-main composite to submit, 
+ * generate and periodically refresh the IAM access token which will be required by the WatsonSTT operator. 
+ * Without having an unexpired IAM access token, STT service on public cloud will not allow the speech to text 
+ * transcription to happen.
+ * 
+ * This operator has 2 operation modes: 
+ * * If parameter *accessToken* is non empty, the operator emits **one output tuple** with the access token and the operator 
+ * thread ends.
+ * * If parameter *accessToken* is empty, the operator connects to the IAM authorization service specified by parameter 
+ * `iamTokenURL` and requests an access token by using the provided `apiKey`. The received access token is submitted to 
+ * the output port. This operator refreshes the access token automatically after the expiration time by using the received 
+ * refresh token and submits the refreshed access token to the output port. 
+ * If IAM authentication server responses with a non successful result, the operator re-tries the operation after *failureRetryDelay*. 
+ * 
+ * The operator gets the configuration information from operator parameters. These values may be overwritten from Streams Application 
+ * Configuration properties if an Application Configuration with name defined by parameter *appConfigName* and the appropriate 
+ * property exists.
+ * 
+ * **Metrics:**
+ * The following metrics are available if the operator generates and refreshes the access token from IAM authorization 
+ * service (parameter *accessToken* is empty).
+ * 
+ * *nSuccessfulInitialRequests:*	The number of successful requests with grant_type=urn:ibm:params:oauth:grant-type:apikey. 
+ * The authorization was granted in response to the request
+ * 
+ * *nSuccessfulRefreshRequests:*	"The number of successful requests with grant_type=refresh_token.  The authorization 
+ * was granted in response to the request.
+ * 
+ * *nRequestsFailed:*	The cumulative number of requests which return an error status or with invalid response body.
+ * 
+ * *nConnectionAttemptsFailed*:	The cumulative number of failed connection attempts.
+ * 
+ * *nConnectionAttemptsCurrent*:	The number of current consecutive connection attempts until the connection succeeds. 
+ * If an connection attempt succeeds, this metric is reset to 0.
+ * 
+ * @output	IamAccessTokenStream	The output stream with the generated access token and other information received 
+ * from IAM authentication service. The stream must be of type [com.ibm.streamsx.sttgateway.watson::IAMAccessToken]. 
+ * The output generates a tuple once a initial or refreshed access token is available.
+ * 
+ * @param	accessToken	If parameter *accessToken* is non empty, the operator emits **one output tuple** with the 
+ * access token and the operator thread ends. If parameter *accessToken* is empty, the operator connects to the 
+ * IAM authorization service specified by parameter `iamTokenURL` and requests an access token by using the provided `apiKey`. 
+ * If the application configuration with name *appConfigName* and property *accessToken* exists, this parameter is overwritten. 
+ * Type: *rstring*; Default: *""*
+ * 
+ * @param	appConfigName	The name of the application configuration to look for connection parameters. If this parameter 
+ * is non empty, the properties from this application configuration overwrite the operator parameters. An empty string 
+ * disables the lookup in the Application Configuration. This may be used if all non default parameters are supplied in the operator 
+ * invocation. 
+ * Type: *rstring*; Default: *sttConnection*
+ * 
+ * @param	apiKey	The api key required for the generation of the access token. This parameter is evaluated 
+ * when the operator logic starts to generate a initial or a refresh access token. Thus the 
+ * parameter may be changed during operation of the streams application. If the value is the *empty 
+ * string*, no access token is requested from IAM cloud service. When the value has changed, 
+ * the operator requests an initial access token when the current token becomes invalid. 
+ * If the application configuration with name *appConfigName* and property *apiKey* exists, this parameter is overwritten. 
+ * Type: *rstring*; Default: *""*
+ * 
+ * @param	iamTokenURL	The service url of the IAM Token authorization service to fetch and refresh the IAM access 
+ * token. If the parameter is the empty string, the operator thread ends immediately.
+ * If the application configuration with name *appConfigName* and property *iamTokenURL* exists, this parameter is overwritten. 
+ * Type *rstring*; Default: the *empty string*
+ * 
+ * @param	defaultExpiresIn The default value for the access token expiration time in seconds. This value is used, when no 
+ * expires_in value is returned from the authorization service. 
+ * If the application configuration with name *appConfigName* and property *defaultExpiresIn* exists, this parameter is overwritten. 
+ * Type: *int64*; Default: *3600*
+ * 
+ * @param	guardTime	The guard time in seconds. A refresh token is requested 'guard time' seconds before the expiration 
+ * was determined. 
+ * If the application configuration with name *appConfigName* and property *guardTime* exists, this parameter is overwritten. 
+ * Type: *int64*; Default: *300*
+ * 
+ * @param	maxRetryDelay	The maximum wait time in seconds before a connection re-try is made. The connection re-try 
+ * delay increases exponentially starting from 2 seconds but not exceeding 'maxRetryDelay'. This value is used 
+ * in case of unsuccessful connection attempts due to (temporary) network issues. 
+ * If the application configuration with name *appConfigName* and property *maxRetryDelay* exists, this parameter is overwritten.
+ * Type: *float64*; Default: *60.0*
+ * 
+ * @param	failureRetryDelay	The maximum wait time in seconds before a new authorization attempt is made after a non
+ * successful server response. This value is used in case of unsuccessful authorization attempts due to a final failure 
+ * response from the authorization server or due to an empty *apiKey*. 
+ * If the application configuration with name *appConfigName* and property *failureRetryDelay* exists, this parameter is overwritten.
+ * Type: *float64*; Default *120.0*
+ * 
+ * @param	initDelay	The initial delay before the operation starts in seconds. Type: *float64*; Default *0.0*
+ * 
+ * @param	expiresInTestValue	This value is used mainly for tests. If this value is different from *0.0*, it 
+ * overwrites the received expires_in value. Type *float64*; Default *0.0*
+ * 
+ */
+public composite IAMAccessTokenGenerator(output IamAccessTokenStream) {
 	param
 		// IMPORTANT: The WatsonSTT operator uses Websocket to communicate with the 
 		// Watson STT service. For the STT service on public cloud, one must use 
@@ -47,170 +146,408 @@ public composite IAMAccessTokenGenerator(output IamAccessToken) {
 		// There is additional logic available below to keep refreshing that
 		// IAM access token periodically in order for it to stay unexpired.
 		// https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-websockets#WSopen
-		// 
-		// This composite accepts these four operator parameters.
-		expression<rstring> $sttApiKey;
-		// Specify either the public cloud IAM Token fetch/refresh URL.
-		expression<rstring> $sttIAMTokenURL;
-		// Specify the access token refresh interval in minutes.
-		expression<float64> $sttAccessTokenRefreshInterval;
-		// Initial delay before generating the IAM access token.
-		expression<float64> $initDelay;
+
+		//The name of the app config to look for
+		expression<rstring> $appConfigName    : "sttConnection";
+		//These parameter values may be overwritten with values from the app config
+		expression<rstring> $accessToken      : "";
+		expression<rstring> $apiKey           : "";
+		expression<rstring> $iamTokenURL      : "";
+		expression<int64>   $defaultExpiresIn : 3600l;
+		expression<int64>   $guardTime        :  300l;
+		expression<float64> $maxRetryDelay    :  60.0;
+		expression<float64> $failureRetryDelay: 120.0;
+		
+		//these values are not expected in the application configuration
+		expression<float64> $initDelay        :   0.0;
+		
+		// test expiration value
+		// use this value for tests to overwrite the returned expires_in value
+		expression<int64> $expiresInTestValue: 0l;
 
 	graph
-		// ========== START OF GENERATING AND REFRESHING AN IAM ACCESS TOKEN ==========
-		// In order to keep doing the STT transcription continuously, 
-		// the IBM STT service on public cloud will require an
-		// unexpired IAM access token. In this non-main composite, we will 
-		// generate a new IAM access token by using the user-provided IBM public cloud STT service
-		// instance's app key and the IAM access token generation URL. In addition, we will
-		// also keep refreshing the access token for it to stay valid and not get expired.
-		// By default, an IAM access token will expire after one hour. So, we will do a 
-		// special logic here to keep the IAM access token unexpired.
-		(stream<boolean signal> IamTokenSignal) = Beacon() {
-			param
-				initDelay: $initDelay;
-				period: $sttAccessTokenRefreshInterval * 60.00;
-		}
 	
-		// Prepare the data required to generate a new IAM access token.
-		(stream<rstring jsonString> IamAccessTokenJson as IATJ) = 
-			Custom(IamTokenSignal as ITS) {
+		stream<IAMAccessToken> IamAccessTokenStream as O = Custom() {
 			logic
-				state: {
-					mutable uint64 _tupleCnt = 0ul;
-					mutable IamAccessTokenJson _oTuple = {};
-				}
-				onTuple ITS: {
-					++_tupleCnt;
+				onProcess: {
+					rstring appConfigName = $appConfigName;
+					mutable int32 err = 0;
 					
-					if ($sttApiKey == "" || _tupleCnt > 1ul) {
-						// We must generate a new IAM access token only once within this application.
-						// After generating it once, all we have to do is to keep refreshing it at
-						// a periodic interval in a different operator below.
-						// In addition, if the user provided an empty STT API Key, then skip the
-						// generation of an IAM Access Token. An empty STT API key means that the user is
-						// going to use the IBM STT on Cloud Pak for Data (CP4D i.e. private cloud). 
+					//get parameter accessToken
+					mutable rstring accessToken = $accessToken;
+					if (appConfigName != "") {
+						rstring prop = getApplicationConfigurationProperty(appConfigName, "accessToken", err);
+						if (err == 0)
+							accessToken = prop;
+					}
+					// If accessToken is non empty, emit the access token and end the thread
+					if (accessToken != "") {
+						printStringLn("IamAccessTokenStream: accessToken is configured, emit and end!");
+						O otuple = {access_token=accessToken, refresh_token="", scope="", expiration=0l, token_type="", expires_in=0l};
+						// wait initial delay
+						if ($initDelay > 0.0)
+							block($initDelay);
+						submit(otuple, O);
 						return;
 					}
-					
-					// Let us form a CURL command to generate a new IAM access token.
-					mutable rstring curlCommand = "";
-					curlCommand += 'curl -s -k -X POST ';
-					curlCommand += '--header "Authorization: Basic Yng6Yng=" ';
-					curlCommand += '--header "Content-Type: application/x-www-form-urlencoded" ';
-					curlCommand += '--header "Accept: application/json" ';
-					curlCommand += '--data-urlencode "grant_type=urn:ibm:params:oauth:grant-type:apikey" ';
-					curlCommand += '--data-urlencode "apikey=' + $sttApiKey + '" ';
-					curlCommand += '"' + $sttIAMTokenURL + '"';
-					
-					mutable rstring resultStringOutput = "";
-					// This is a C++ native function available as part of the
-					// streamsx.sttgateway toolkit (look in impl/include/CppUtilFunctions.h).
-					int32 rc = launch_app(curlCommand, resultStringOutput);
-					
-					if (rc == 0) {
-						_oTuple.jsonString = resultStringOutput;
-						submit(_oTuple, IATJ);
-					} else {
-						appTrc(Trace.error, 
-							"Error occurred while running the Curl command to generate a new IAM access token. Error=" +
-							resultStringOutput + ". Aborting now.");
-						abort();
-					}
-				}
-		}
-		
-		// Convert the generated IAM access token JSON string into a tuple.
-		(stream<IamAccessToken_t> GeneratedIamAccessToken as GIAT;
-		 stream<rstring jsonString> JsonConversionError as JCE) = JSONToTuple(IamAccessTokenJson) {
-		}
 
-		// This operator converts the generated IAM access token JSON string into a tuple.
-		// It then stores the generated IAM access token in memory. After that, it does the
-		// periodic refreshing of that stored access token.
-		// It also sends the generated and refreshed access tokens out to downstream consumption.
-		(stream<IamAccessToken_t> IamAccessToken as IAT) = 
-			Custom(GeneratedIamAccessToken as GIAT; JsonConversionError as JCE; 
-			IamTokenSignal as ITS) {
-			logic
-				state: {
-					mutable uint64 _iamAccessTokenRefreshCount = 0;
-					mutable IamAccessToken_t _iamAccessToken = {};
-				}
-				
-				onTuple JCE: {
-					appTrc(Trace.error, "Error occurred while converting the " +
-						"IAM access token JSON string to a tuple. " +
-						"Error=" + JCE.jsonString + ". Aborting now.");
-					abort();
-				}
-				
-				onTuple GIAT: {
-					if (GIAT.access_token != "") {
-						// Store the IAM access token for future refresh activities.
-						assignFrom(_iamAccessToken, GIAT);
-						// Send the newly generated access token for downstream consumption.
-						submit(_iamAccessToken, IAT);
-					} else {
-						appTrc(Trace.error, "An empty IAM access token was obtained during token generation. " +
-							"Tuple=" + (rstring)GIAT + ". Aborting now.");
-						abort();					
+					// the access token is empty -> connect to IAM authentication service an request access token ...
+					// constant values
+					// list of request headers
+					list<rstring> requestHeaders = [
+							//"Authorization: Basic Yng6Yng="
+							"Content-Type: application/x-www-form-urlencoded",
+							"Accept: application/json",
+							"Authorization: Basic Yng6Yng="
+					];
+
+					// stored submission time values evaluated only once at start up time
+					mutable rstring iamTokenURL = $iamTokenURL;
+					if (appConfigName != "") {
+						rstring prop = getApplicationConfigurationProperty(appConfigName, "iamTokenURL", err);
+						if (err == 0)
+							iamTokenURL = prop;
 					}
-				}
-				
-				onTuple ITS: {
-					++_iamAccessTokenRefreshCount;
-					
-					// It is time now to do a periodic refresh of the IAM access token.
-					// If the user provided an empty STT API Key, then skip the
-					// refreshing of an IAM Access Token. An empty STT API key means that 
-					// the user is going to use the IBM STT on Cloud Pak for Data (CP4D i.e. private cloud).
-					if ($sttApiKey == "" || _iamAccessTokenRefreshCount <= 1ul) {
-						// We must refresh an existing IAM access token only from the
-						// second timer tick onwards. During the first timer tick,
-						// IAM access token gets generated in the operators above.
-						// So, we will skip the first timer signal and start refreshing
-						// the access token in the subsequent timer ticks.
-						return;
-					}
-					
-					// Let us form a CURL command to refresh our existing IAM access token.
-					mutable rstring curlCommand = "";
-					curlCommand += 'curl -s -k -X POST ';
-					curlCommand += '--header "Authorization: Basic Yng6Yng=" ';
-					// curlCommand += '--header "Content-Type: application/x-www-form-urlencoded" ';
-					// curlCommand += '--header "Accept: application/json" ';
-					curlCommand += '--data-urlencode "grant_type=refresh_token" ';
-					curlCommand += '--data-urlencode "refresh_token=' + 
-						_iamAccessToken.refresh_token + '" ';
-					curlCommand += '"' + $sttIAMTokenURL + '"';
-					
-					mutable rstring resultStringOutput = "";
-					int32 rc = launch_app(curlCommand, resultStringOutput);
-					
-					if (rc == 0) {
-						_iamAccessToken = (IamAccessToken_t){};
-						extractFromJSON(resultStringOutput, _iamAccessToken);
-						
-						if (_iamAccessToken.access_token != "") {
-							appTrc(Trace.error, "IAM access token refreshed successfully.");
-							// Send the refreshed token for downstream consumption.
-							submit(_iamAccessToken, IAT);
-						} else {
-							appTrc(Trace.error, "An empty IAM access token was obtained during token refresh. " +
-								"Tuple=" + (rstring)_iamAccessToken + ". Aborting now.");
-							abort();											
-						}
-					} else {
-						appTrc(Trace.error, 
-							"Error occurred while running the Curl command to refresh an " +
-							"existing IAM access token. Error=" +
-							resultStringOutput + ". Aborting now.");
+					if (iamTokenURL == "") {
+						tuple<rstring op> _t = { op="IAMAccessTokenGenerator"};
+						rstring msg = loadAndFormatResource("com.ibm.streamsx.sttgateway", "SttGatewayResource", "CDIST3814E", _t);
+						printStringLn(msg);
+						appTrc(Trace.error, msg);
 						abort();
 					}
+					
+					int64 expiresInTestValue = $expiresInTestValue;
+
+					// defaultExpiresIn is used when no expires_in was received in last operation
+					mutable int64 defaultExpiresIn = $defaultExpiresIn;
+					if (appConfigName != "") {
+						rstring prop = getApplicationConfigurationProperty(appConfigName, "defaultExpiresIn", err);
+						if (err == 0)
+							defaultExpiresIn = (int64)prop;
+					}
+					if (defaultExpiresIn <= 0l) {
+						tuple<rstring op, float64 val, rstring par> _t = { op="IAMAccessTokenGenerator", val=(float64)defaultExpiresIn, par="defaultExpiresIn"};
+						rstring msg = loadAndFormatResource("com.ibm.streamsx.sttgateway", "SttGatewayResource", "CDIST3815E", _t);
+						printStringLn(msg);
+						appTrc(Trace.error, msg);
+						abort();
+					}
+					
+					// the refresh request is issued guardTime seconds before the the token expires
+					mutable int64 guardTime = $guardTime;
+					if (appConfigName != "") {
+						rstring prop = getApplicationConfigurationProperty(appConfigName, "guardTime", err);
+						if (err == 0)
+							guardTime = (int64)prop;
+					}
+					if (guardTime < 0l) {
+						tuple<rstring op, float64 val, rstring par> _t = { op="IAMAccessTokenGenerator", val=(float64)guardTime, par="guardTime"};
+						rstring msg = loadAndFormatResource("com.ibm.streamsx.sttgateway", "SttGatewayResource", "CDIST3816E", _t);
+						printStringLn(msg);
+						appTrc(Trace.error, msg);
+						abort();
+					}
+					
+					// In case of unsuccessful request attempts, the wait time is 2 ** (number of  retry - 1)
+					// but not more than maxRetryDelay = 60.0 seconds
+					mutable float64 maxRetryDelay = $maxRetryDelay;
+					if (appConfigName != "") {
+						rstring prop = getApplicationConfigurationProperty(appConfigName, "maxRetryDelay", err);
+						if (err == 0)
+							maxRetryDelay = (float64)prop;
+					}
+					if (maxRetryDelay <= 0.0) {
+						tuple<rstring op, float64 val, rstring par> _t = { op="IAMAccessTokenGenerator", val=maxRetryDelay, par="maxRetryDelay"};
+						rstring msg = loadAndFormatResource("com.ibm.streamsx.sttgateway", "SttGatewayResource", "CDIST3815E", _t);
+						printStringLn(msg);
+						appTrc(Trace.error, msg);
+						abort();
+					}
+					
+					// In case of unsuccessful authorization requests use this wait time before a new authorization attempt is made
+					mutable float64 failureRetryDelay = $failureRetryDelay;
+					if (appConfigName != "") {
+						rstring prop = getApplicationConfigurationProperty(appConfigName, "failureRetryDelay", err);
+						if (err == 0)
+							failureRetryDelay = (float64)prop;
+					}
+					if (failureRetryDelay <= 0.0) {
+						tuple<rstring op, float64 val, rstring par> _t = { op="IAMAccessTokenGenerator", val=failureRetryDelay, par="failureRetryDelay"};
+						rstring msg = loadAndFormatResource("com.ibm.streamsx.sttgateway", "SttGatewayResource", "CDIST3815E", _t);
+						printStringLn(msg);
+						appTrc(Trace.error, msg);
+						abort();
+					}
+
+					// print operator configuration
+					printStringLn("**** Configuration : " + getThisOperatorName()
+							+ "\ndefaultExpiresIn:      " + (rstring)defaultExpiresIn
+							+ "\nguardTime:             " + (rstring)guardTime
+							+ "\nmaxRetryDelay:         " + (rstring)maxRetryDelay
+							+ "\nfailureRetryDelay:     " + (rstring)failureRetryDelay
+							+ "\ninitDelay:             " + (rstring)$initDelay
+							+ "\niamTokenURL:           " + iamTokenURL
+							+ "\nexpiresInTestValue:    " + (rstring)expiresInTestValue
+					);
+					
+					// create and get custom metrics
+					createCustomMetric(
+						"nSuccessfulInitialRequests",
+						"The number of successful requests with grant_type=urn:ibm:params:oauth:grant-type:apikey. The authorization was granted in response to the request.",
+						Sys.Counter,
+						0l
+					);
+					createCustomMetric(
+						"nSuccessfulRefreshRequests",
+						"The number of successful requests with grant_type=refresh_token. The authorization was granted in response to the request.",
+						Sys.Counter,
+						0l
+					);
+					createCustomMetric(
+						"nRequestsFailed",
+						"The cumulative number of requests which return an error status or with invalid response body.",
+						Sys.Counter,
+						0l
+					);
+					createCustomMetric(
+						"nConnectionAttemptsFailed",
+						"The cumulative number of failed connection attempts.",
+						Sys.Counter,
+						0l
+					);
+					createCustomMetric(
+						"nConnectionAttemptsCurrent",
+						"The number of current consecutive connection attempts until the connection succeeds. If an connection attempt succeeds, this metric is reset to 0.",
+						Sys.Gauge,
+						0l
+					);
+					mutable int64 nSuccessfulInitialRequests = 0l;
+					mutable int64 nSuccessfulRefreshRequests = 0l;
+					mutable int64 nRequestsFailed = 0l;
+					mutable int64 nConnectionAttemptsFailed = 0l;
+					mutable int64 nConnectionAttemptsCurrent = 0l;
+					
+					// use this value to detect a change of the api key
+					mutable rstring previousApiKey = "";
+					// If the refreshToken is empty, we try the initial request
+					mutable rstring refreshToken = "";
+					
+					// wait initial delay
+					if ($initDelay > 0.0)
+						block($initDelay);
+
+					// the loop until shutdown
+					// set the initial authorizationSucess to avoid the delay in the very first loop iteration
+					mutable boolean authorizationSucess = true;
+					while ( ! isShutdown() ) {
+						if ( ! authorizationSucess ) {
+							appTrc(Trace.debug, "authorizationSucess is false. Authorization has failed. Block for " + (rstring)failureRetryDelay + " seconds");
+							block(failureRetryDelay);
+							// short cut when block was interrupted due to shutdown request
+							if (isShutdown())
+								continue;
+						}
+						// no operation until api key is available
+						mutable rstring apiKeyTemp = $apiKey;
+						if (appConfigName != "") {
+							rstring prop = getApplicationConfigurationProperty(appConfigName, "apiKey", err);
+							if (err == 0)
+								apiKeyTemp = prop;
+						}
+						if (apiKeyTemp == "") {
+							appTrc(Trace.warn, "No apiKey available!");
+							authorizationSucess = false;
+							continue;
+						}
+						
+						if ((apiKeyTemp != previousApiKey) && (refreshToken != "")) {
+							appTrc(Trace.info, "apiKey has changed during a valid authorization. Reset refreshToken");
+							refreshToken = "";
+						}
+						mutable rstring requestBody = "";
+						if (refreshToken == "") {
+							//we have no refresh token received -> try to get the initial request
+							requestBody = "grant_type=" + urlEncode("urn:ibm:params:oauth:grant-type:apikey") + "&apikey=" + urlEncode(apiKeyTemp);
+							appTrc(Trace.debug, "Try to get the initial request token and refresh token from: " + iamTokenURL);
+							//printStringLn(requestBody);
+						} else {
+							//we have a refresh token received -> try to get the refresh request
+							requestBody = "grant_type=" + urlEncode("refresh_token") + "&refresh_token=" + urlEncode(refreshToken);
+							appTrc(Trace.debug, "Try to get the refresh request token and refresh token from: " + iamTokenURL);
+							//printStringLn(requestBody);
+						}
+						
+						//this inner loop tries to get the response from the server
+						authorizationSucess = false;
+						mutable boolean httpOperationSuccess = false;
+						nConnectionAttemptsCurrent = 0l;
+						while (! isShutdown() && ! httpOperationSuccess) {
+
+							//implement wait time when one ore more unsuccessful attempts 
+							if ( nConnectionAttemptsCurrent >= 1l ) {
+								mutable float64 waitTime = pow(2.0, (float64)nConnectionAttemptsCurrent);
+								if (waitTime > maxRetryDelay)
+									waitTime = maxRetryDelay;
+								appTrc(Trace.error, "Retry httpPost nConnectionAttemptsCurrent=" + (rstring)nConnectionAttemptsCurrent
+										+ " block for " + (rstring)waitTime + " seconds");
+								block(waitTime);
+								// short cut when block was interrupted due to shutdown request
+								if (isShutdown())
+									continue;
+							}
+
+							setCustomMetricValue("nConnectionAttemptsCurrent", ++nConnectionAttemptsCurrent);
+
+							//try operation with http functions in inet toolkit
+							mutable int32 err = 0;
+							mutable list<rstring> headers = [];
+							rstring response = httpPost(requestBody, iamTokenURL, requestHeaders, "", "", headers, err, 60, 30);
+							
+							if (err != 0) {
+								appTrc(Trace.error, "httpPost curl error (see: https://curl.haxx.se/libcurl/c/libcurl-errors.html). url="
+										+ iamTokenURL + " err=" + (rstring)err);
+								setCustomMetricValue("nConnectionAttemptsFailed", ++nConnectionAttemptsFailed);
+								continue;
+							}
+							appTrc(Trace.info, "httpPost returns headers: " + (rstring)headers);
+							if (size(headers) < 1) {
+								appTrc(Trace.error, "httpPost no headers returned. url=" + iamTokenURL + " headers="
+										+ (rstring)headers + "\nresponse=" + response);
+								setCustomMetricValue("nRequestsFailed", ++nRequestsFailed);
+								continue;
+							}
+							// eval return code and skip continuation responses
+							mutable int64 statusCode = 0;
+							if (skipContinuationHeaders(headers, statusCode) != 0) {
+								appTrc(Trace.error, "httpPost returns invalid status line. url=" + iamTokenURL
+										+ " headers=" + (rstring)headers + "\nresponse=" + response);
+								setCustomMetricValue("nRequestsFailed", ++nRequestsFailed);
+								continue;
+							}
+							
+							httpOperationSuccess = true;
+							int64 nConnectionAttemptsFailedTempoary = nConnectionAttemptsCurrent;
+							nConnectionAttemptsCurrent = 0l;
+							setCustomMetricValue("nConnectionAttemptsCurrent", nConnectionAttemptsCurrent);
+							if ((statusCode < 200l) || (statusCode > 299l)) {
+								setCustomMetricValue("nRequestsFailed", ++nRequestsFailed);
+								appTrc(Trace.error, "httpPost returns no success status code=" + (rstring)statusCode
+										+ " url=" + iamTokenURL + " headers=" + (rstring)headers + "\nresponse=" + response);
+								// If no valid access token was returned we reset the refresh token to force a new initial request
+								refreshToken = "";
+								continue;
+							}
+
+							// HTTP response successful eval response body
+							mutable O otuple = {};
+							extractFromJSON(response, otuple);
+							
+							if (otuple.access_token == "") {
+								setCustomMetricValue("nRequestsFailed", ++nRequestsFailed);
+								rstring kind = refreshToken == "" ? "initial" : "refresh";
+								appTrc(Trace.error, "An empty IAM access token was obtained during " + kind
+										+ " token generation. headers=" + (rstring)headers + "\nresponse=" + response);
+								// If no valid access token was returned we reset the refresh token to force a new initial request
+								refreshToken = "";
+								continue;
+							}
+							
+							//received an successful response from server
+							authorizationSucess = true;
+							appTrc(Trace.info, "received an successful response from server after "
+									+ (rstring)nConnectionAttemptsFailedTempoary + " attempts. exires_in=" + (rstring)otuple.expires_in
+									+ " scope=" + otuple.scope + " token_type=" + otuple.token_type);
+							appTrc(Trace.trace, "otuple=" + (rstring)otuple);
+							if (refreshToken == "") {
+								setCustomMetricValue("nSuccessfulInitialRequests", ++nSuccessfulInitialRequests);
+							} else {
+								setCustomMetricValue("nSuccessfulRefreshRequests", ++nSuccessfulRefreshRequests);
+							}
+
+							// save refresh token and api key for following refresh operations
+							refreshToken = otuple.refresh_token;
+							previousApiKey = apiKeyTemp;
+
+							// store now to compensate the execution time from submit function 
+							int64 now = getSeconds(getTimestamp());
+							mutable int64 currentExpiresIn = otuple.expires_in;
+							if (expiresInTestValue != 0l)
+								currentExpiresIn = expiresInTestValue;
+							
+							submit(otuple, O);
+							
+							//evaluate point in time for next refresh
+							if (currentExpiresIn <= 0l) {
+								appTrc(Trace.error, "No expires_in or negative was obtained during generation. currentExpiresIn: "
+										+ (rstring)currentExpiresIn + " use default value: " +(rstring)defaultExpiresIn);
+								currentExpiresIn = defaultExpiresIn;
+							}
+							mutable int64 effectiveExireIn = currentExpiresIn - guardTime;
+							if (effectiveExireIn < 0l) {
+								appTrc(Trace.error, "effectiveExireIn is less zero: " + (rstring)effectiveExireIn
+										+ " use currentExpiresIn: " + (rstring)currentExpiresIn);
+								effectiveExireIn = currentExpiresIn;
+							}
+							// compensate the time elapsed during submit operation
+							int64 now2 = getSeconds(getTimestamp());
+							int64 timeElapsed = now2 - now;
+							if (timeElapsed >= effectiveExireIn) {
+								appTrc(Trace.error, "Operation overdue! Procceed immediately timeElapsed: " + (rstring)timeElapsed
+										+ " effectiveExireIn: " +(rstring)effectiveExireIn);
+							} else {
+								int64 timeToBlock = effectiveExireIn - timeElapsed;
+								float64 tb = timeToBlock;
+								appTrc(Trace.debug, "Operation succeeds, bock for: " + (rstring)tb);
+								block(tb);
+							}
+						} // END while (! isShutdown() && ! httpOperationSuccess)
+					} // END while ( ! isShutdown() )
+					appTrc(Trace.info, "Exit loop");
 				}
 		}
-		// ========== END OF GENERATING AND REFRESHING AN IAM ACCESS TOKEN ==========
 } // End of the non-main composite
 
+int32 getStatusCode(rstring header, mutable int64 status) {
+	list<rstring> matches = regexMatch(header, "(.+)[[:space:]]+([0123456789]{3})[[:space:]]+(.*)\r\n");
+	if (size(matches) == 4) {
+		if (parseNumber(status, matches[2]) < 1) {
+			return 1;
+		} else {
+			return 0;
+		}
+	} else {
+		return 1;
+	}
+}
+
+
+int32 skipContinuationHeaders(mutable list<rstring> headers, mutable int64 status) {
+	mutable boolean finished = false;
+	while ( ! finished ) {
+		if (getStatusCode(headers[0], status) == 0) {
+			if ((status >= 100l) && (status < 200l)) {
+				//sjkip cont header
+				mutable int32 x = 0;
+				while (x < size(headers)) {
+					if (headers[x] == "\r\n") {
+						break;
+					}
+					++x;
+				}
+				if (x == size(headers)) {
+					return 1;
+				} else {
+					appTrc(Trace.debug, "remove headers from index 0 to " + (rstring)x, "skipContinuationHeaders");
+					removeM(headers, 0, x);
+				}
+			} else {
+				//no continuation
+				appTrc(Trace.debug, "status " + (rstring)status + " is no continuation code. Nothing to remove", "skipContinuationHeaders");
+				finished = true;
+			}
+		} else {
+			return 1;
+		}
+	}
+	return 0;
+}

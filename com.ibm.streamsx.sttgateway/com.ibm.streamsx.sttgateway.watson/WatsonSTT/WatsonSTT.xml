@@ -27,6 +27,12 @@
       This operator may also be customized with many other optional parameters including 
       custom patch files and appropriate custom patch weights.
       
+      The operator parameter `sttResultMode` specifies what type of STT result is needed:
+        * partial: to get partial utterances,
+        * complete (default) to get the full text after transcribing the entire audio.
+      The setting of this this parameter influences the validity of output functions and parameters. In `sttResultMode` 
+      `partial` the the parameter `nonFinalUtterancesNeeded` controls the output of non final utterances.
+      
       Requirements: 
       * Intel RHEL6 or RHEL7 hosts installed with IBM Streams. 
       
@@ -46,167 +52,301 @@
 
       <metrics>
         <metric>
-          <name>nSTTResultMode</name>
+          <name>sttResultMode</name>
           <description>
           STT result mode currently in effect for a given operator instance.
           
-          NOTE: A few custom metrics are available for the WatsonSTT operator. 
-          The Counter kind metrics listed here will be updated when the operator starts. 
-      	  But, the Gauge kind metrics will be updated live during transcription only 
-      	  when the sttLiveMetricsUpdateNeeded operator parameter is set to true.
+          * 1 sttResultMode == partial and nonFinalUtterancesNeeded == true
+          * 2 sttResultMode == partial and nonFinalUtterancesNeeded == false
+          * 3 sttResultMode == complete
+          </description>
+          <kind>Gauge</kind>
+        </metric>
+        
+        <metric>
+          <name>nWebsocketConnectionAttempts</name>
+          <description>The cumulative number of STT service Websocket connection attempts made by this operator instance.</description>
+          <kind>Counter</kind>
+        </metric>
+
+        <metric>
+          <name>nWebsocketConnectionAttemptsFailed</name>
+          <description>The cumulative number of failed STT service Websocket connection attempts made by this operator instance.</description>
+          <kind>Counter</kind>
+        </metric>
+
+        <metric>
+          <name>nWebsocketConnectionAttemptsCurrent</name>
+          <description>Number of STT service Websocket connection attempts made by this operator instance for the current connection. The value is reset to zero when a connection attempt succeeds.</description>
+          <kind>Gauge</kind>
+        </metric>
+        
+        <metric>
+          <name>nFullAudioConversationsReceived</name>
+          <description>
+          Number of full audio conversations received for transcription by this operator instance.
+          
+          *NOTE:* This metric is only updated if parameter `sttLiveMetricsUpdateNeeded` is true.
           </description>
           <kind>Counter</kind>
         </metric>
         
         <metric>
-          <name>nWebsocketConnectionAttempts</name>
-          <description>Number of STT service Websocket connection attempts made by this operator instance.</description>
+          <name>nFullAudioConversationsTranscribed</name>
+          <description>
+          Number of full audio conversations transcribed by this operator instance.
+          
+          *NOTE:* This metric is only updated if parameter `sttLiveMetricsUpdateNeeded` is true.
+          </description>
           <kind>Counter</kind>
         </metric>
-        
+
         <metric>
-          <name>nFullAudioConversationsReceived</name>
-          <description>Number of full audio conversations received for transcription by this operator instance.</description>
+          <name>nFullAudioConversationsFailed</name>
+          <description>
+          Number of full audio conversations failures by this operator instance.
+          
+          *NOTE:* This metric is only updated if parameter `sttLiveMetricsUpdateNeeded` is true.
+          </description>
+          <kind>Counter</kind>
+        </metric>
+
+        <metric>
+          <name>wsConnectionState</name>
+          <description>
+          The state of the websocket connection:
+          
+          * 0=idle: initial idle state
+          * 1=start: start a new connection
+          * 2=connecting: trying to connect to stt
+          * 3=open: connection is opened
+          * 4=listening: listening received
+          * 5=error: error received during transcription
+          * 6=closed: connection has closed
+          * 7=failed: connection has failed
+          * 8=crashed: Error was caught in ws_init tread
+          </description>
           <kind>Gauge</kind>
         </metric>
-        
+
         <metric>
-          <name>nFullAudioConversationsTranscribed</name>
-          <description>Number of full audio conversations transcribed by this operator instance.</description>
-          <kind>Gauge</kind>
+          <name>nAudioBytesSend</name>
+          <description>
+          The amount of audio samples sent to the stt service in bytes.
+          
+          *NOTE:* This metric is only updated if parameter `sttLiveMetricsUpdateNeeded` is true.
+          </description>
+          <kind>Counter</kind>
         </metric>
       </metrics>
+      
+      <customLiterals>
+        <enumeration>
+          <name>SttResultMode</name>
+          <value>partial</value>
+          <value>complete</value>
+        </enumeration>
+      </customLiterals>
       
       <customOutputFunctions>
         <customOutputFunction>
           <name>STTGatewayFunctions</name>
           <function>
-            <description>The default function for output attributes. This function assigns the output attribute to the value of the input attribute with the same name.</description>
+            <description>
+            The default function for output attributes. This function assigns the output attribute to the value of the 
+            input attribute with the same name.
+            </description>
             <prototype><![CDATA[<any T> T AsIs(T)]]></prototype> 
           </function>
           <function>
-            <description>Returns an int32 number indicating the utterance number.</description>
+            <description>
+            Returns an int32 number indicating the utterance number. 
+            
+            **Note:** This function is not available if `sttResult` mode equals `complete`.
+            </description>
             <prototype><![CDATA[int32 getUtteranceNumber()]]></prototype>
-          </function>                    
+          </function>
           <function>
             <description>Returns the transcription of audio in the form of a single utterance.</description>
             <prototype><![CDATA[rstring getUtteranceText()]]></prototype>
           </function>
           <function>
-            <description>Returns a boolean value to indicate if this is an interim partial utterance or a finalized utterance.</description>
+            <description>
+            Returns a boolean value to indicate if this is an interim partial utterance or a finalized utterance.
+            
+            **Note:** This function is not available if `sttResult` mode equals `complete`.
+            </description>
             <prototype><![CDATA[boolean isFinalizedUtterance()]]></prototype>
           </function>
           <function>
-            <description>Returns a float32 confidence value for an interim partial utterance or for a finalized utterance or for the full text.</description>
-            <prototype><![CDATA[float32 getConfidence()]]></prototype>
-          </function>          
-          <function>
-            <description>Returns the transcription of audio in the form of full text after completing the entire transcription.</description>
-            <prototype><![CDATA[rstring getFullTranscriptionText()]]></prototype>
+            <description>
+            Returns a float64 confidence value for an interim partial utterance or for a finalized utterance or for the full text. 
+            
+            **Note:** This function is not available if `sttResult` mode equals `complete`.
+            </description>
+            <prototype><![CDATA[float64 getConfidence()]]></prototype>
           </function>
           <function>
             <description>Returns the Watson STT error message if any.</description>
             <prototype><![CDATA[rstring getSTTErrorMessage()]]></prototype>
           </function>
           <function>
-            <description>Returns a boolean value to indicate whether the full transcription is completed.</description>
+            <description>
+            Returns a boolean value to indicate whether the full transcription/conversation is completed. 
+            
+            **Note:** This function is not available if `sttResult` mode equals `complete`.
+            </description>
             <prototype><![CDATA[boolean isTranscriptionCompleted()]]></prototype>
           </function>
           <function>
-              <description>Returns a list of n-best alternative hypotheses for an utterance result. List will have the very best guess first followed by the next best ones in that order.</description>
-              <prototype><![CDATA[list<rstring> getUtteranceAlternatives()]]></prototype>
+            <description>
+            Returns a list of n-best alternative hypotheses for an utterance result. 
+            List will have the very best guess first followed by the next best ones in that order. 
+            
+            **Note:** This function is not available if `sttResult` mode equals `complete`.
+            </description>
+            <prototype><![CDATA[list<rstring> getUtteranceAlternatives()]]></prototype>
           </function>
           <function>
-              <description>Returns a nested list of word alternatives (Confusion Networks).</description>
-              <prototype><![CDATA[list<list<rstring>> getWordAlternatives()]]></prototype>
+            <description>
+            Returns a nested list of word alternatives (Confusion Networks). 
+            
+            **Note:** This function is not available if `sttResult` mode equals `complete`.
+            </description>
+            <prototype><![CDATA[list<list<rstring>> getWordAlternatives()]]></prototype>
           </function>
           <function>
-              <description>Returns a nested list of word alternatives confidences (Confusion Networks).</description>
-              <prototype><![CDATA[list<list<float64>> getWordAlternativesConfidences()]]></prototype>
+            <description>
+            Returns a nested list of word alternatives confidences (Confusion Networks). 
+            
+            **Note:** This function is not available if `sttResult` mode equals `complete`.
+            </description>
+            <prototype><![CDATA[list<list<float64>> getWordAlternativesConfidences()]]></prototype>
           </function>
           <function>
-              <description>Returns a list of word alternatives start times (Confusion Networks).</description>
-              <prototype><![CDATA[list<float64> getWordAlternativesStartTimes()]]></prototype>
+            <description>
+            Returns a list of word alternatives start times (Confusion Networks). 
+            
+            **Note:** This function is not available if `sttResult` mode equals `complete`.
+            </description>
+            <prototype><![CDATA[list<float64> getWordAlternativesStartTimes()]]></prototype>
           </function>
           <function>
-              <description>Returns a list of word alternatives end times (Confusion Networks).</description>
-              <prototype><![CDATA[list<float64> getWordAlternativesEndTimes()]]></prototype>
+            <description>
+            Returns a list of word alternatives end times (Confusion Networks). 
+            
+            **Note:** This function is not available if `sttResult` mode equals `complete`.
+            </description>
+            <prototype><![CDATA[list<float64> getWordAlternativesEndTimes()]]></prototype>
           </function>
           <function>
-              <description>Returns a list of words in an utterance result.</description>
-              <prototype><![CDATA[list<rstring> getUtteranceWords()]]></prototype>
+            <description>
+            Returns a list of words in an utterance result. 
+            
+            **Note:** This function is not available if `sttResult` mode equals `complete`.
+            </description>
+            <prototype><![CDATA[list<rstring> getUtteranceWords()]]></prototype>
           </function>
           <function>
-              <description>Returns a list of confidences of the words in an utterance result.</description>
-              <prototype><![CDATA[list<float64> getUtteranceWordsConfidences()]]></prototype>
+            <description>
+            Returns a list of confidences of the words in an utterance result. 
+            
+            **Note:** This function is not available if `sttResult` mode equals `complete`.
+            </description>
+            <prototype><![CDATA[list<float64> getUtteranceWordsConfidences()]]></prototype>
           </function>
           <function>
-              <description>Returns a list of start times of the words in an utterance result relative to the start of the audio.</description>
-              <prototype><![CDATA[list<float64> getUtteranceWordsStartTimes()]]></prototype>
-          </function>          
-          <function>
-              <description>Returns a list of end times of the words in an utterance result relative to the start of the audio.</description>
-              <prototype><![CDATA[list<float64> getUtteranceWordsEndTimes()]]></prototype>
-          </function>          
-          <function>
-              <description>Returns the start time of an utterance relative to the start of the audio.</description>
-              <prototype><![CDATA[float64 getUtteranceStartTime()]]></prototype>
-          </function>          
-          <function>
-              <description>Returns the end time of an utterance relative to the start of the audio.</description>
-              <prototype><![CDATA[float64 getUtteranceEndTime()]]></prototype>
-          </function>          
-          <function>
-              <description>Returns a list of speaker ids for the individual words in an utterance result.</description>
-              <prototype><![CDATA[list<int32> getUtteranceWordsSpeakers()]]></prototype>
+            <description>
+            Returns a list of start times of the words in an utterance result relative to the start of the audio. 
+            
+            **Note:** This function is not available if `sttResult` mode equals `complete`.
+            </description>
+            <prototype><![CDATA[list<float64> getUtteranceWordsStartTimes()]]></prototype>
           </function>
           <function>
-              <description>Returns a list of confidences in identifying the speakers of the individual words in an utterance result.</description>
-              <prototype><![CDATA[list<float64> getUtteranceWordsSpeakersConfidences()]]></prototype>
+            <description>
+            Returns a list of end times of the words in an utterance result relative to the start of the audio. 
+            
+            **Note:** This function is not available if `sttResult` mode equals `complete`.
+            </description>
+            <prototype><![CDATA[list<float64> getUtteranceWordsEndTimes()]]></prototype>
           </function>
           <function>
-              <description>Returns the STT keywords spotting results as a map of key/value pairs. Read this toolkit's documentation to learn about the map contents.</description>
-              <prototype><![CDATA[map<rstring, list<map<rstring, float64>>> getKeywordsSpottingResults()]]></prototype>
-          </function> 
-		</customOutputFunction>
+            <description>
+            Returns the start time of an utterance relative to the start of the audio. 
+            
+            **Note:** This function is not available if `sttResult` mode equals `complete`.
+            </description>
+            <prototype><![CDATA[float64 getUtteranceStartTime()]]></prototype>
+          </function>
+          <function>
+            <description>
+            Returns the end time of an utterance relative to the start of the audio. 
+            
+            **Note:** This function is not available if `sttResult` mode equals `complete`.
+            </description>
+            <prototype><![CDATA[float64 getUtteranceEndTime()]]></prototype>
+          </function>
+          <function>
+            <description>
+            Returns a list of speaker ids for the individual words in an utterance result. 
+            
+            **Note:** This function is not available if `sttResult` mode equals `complete`.
+            </description>
+            <prototype><![CDATA[list<int32> getUtteranceWordsSpeakers()]]></prototype>
+          </function>
+          <function>
+            <description>
+            Returns a list of confidences in identifying the speakers of the individual words in an utterance result. 
+            
+            **Note:** This function is not available if `sttResult` mode equals `complete`.
+            </description>
+            <prototype><![CDATA[list<float64> getUtteranceWordsSpeakersConfidences()]]></prototype>
+          </function>
+          <function>
+            <description>
+            Returns the STT keywords spotting results as a map of key/value pairs. Read this toolkit's documentation to learn about the map contents. 
+            
+            **Note:** This function is not available if `sttResult` mode equals `complete`.
+            </description>
+            <prototype><![CDATA[map<rstring, list<map<rstring, float64>>> getKeywordsSpottingResults()]]></prototype>
+          </function>
+        </customOutputFunction>
       </customOutputFunctions>
       
       <libraryDependencies>
+      
         <library>
-          <cmn:description>Boost Library</cmn:description>
+          <cmn:description>Implementation library</cmn:description>
+          <cmn:managedLibrary>
+            <cmn:includePath>../../impl/include</cmn:includePath>
+          </cmn:managedLibrary>
+        </library>
+        
+        <library>
+          <cmn:description>Boost Library common/Websocket include and Boost system</cmn:description>
           <cmn:managedLibrary>
             <cmn:lib>boost_system</cmn:lib>
-            <cmn:libPath>../../impl/lib</cmn:libPath>
-            <!--<cmn:includePath>../../impl/include</cmn:includePath>-->
+            <cmn:libPath>../../lib</cmn:libPath>
+            <cmn:includePath>../../include</cmn:includePath>
           </cmn:managedLibrary>
         </library>
          
         <library>
-          <cmn:description>Boost Library</cmn:description>
+          <cmn:description>Boost Library chrono</cmn:description>
           <cmn:managedLibrary>
             <cmn:lib>boost_chrono</cmn:lib>
-            <cmn:libPath>../../impl/lib</cmn:libPath>
-            <!--<cmn:includePath>../../impl/include</cmn:includePath>-->
+            <cmn:libPath>../../lib</cmn:libPath>
           </cmn:managedLibrary>
         </library>
                 
         <library>
-          <cmn:description>Boost Library</cmn:description>
+          <cmn:description>Boost Library random</cmn:description>
           <cmn:managedLibrary>
             <cmn:lib>boost_random</cmn:lib>
-            <cmn:libPath>../../impl/lib</cmn:libPath>
-            <!--<cmn:includePath>../../impl/include</cmn:includePath>-->
+            <cmn:libPath>../../lib</cmn:libPath>
           </cmn:managedLibrary>
-        </library>       
-
-         <library>
-          <cmn:description>Boost Library</cmn:description>
-          <cmn:managedLibrary>
-            <cmn:lib>boost_thread</cmn:lib>
-            <cmn:libPath>../../impl/lib</cmn:libPath>
-            <!--<cmn:includePath>../../impl/include</cmn:includePath>-->
-          </cmn:managedLibrary>
-        </library> 
+        </library>
 
       </libraryDependencies>
       
@@ -216,7 +356,10 @@
       <allowAny>false</allowAny>
       <parameter>
         <name>uri</name>
-        <description>This parameter specifies the Watson STT Websocket service URI.</description>
+        <description>
+        This parameter specifies the Watson STT Websocket service URI. 
+        see: [https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-websockets#WSopen] 
+        </description>
         <optional>false</optional>
         <rewriteAllowed>true</rewriteAllowed>
         <expressionMode>AttributeFree</expressionMode>
@@ -226,7 +369,10 @@
 
       <parameter>
         <name>baseLanguageModel</name>
-        <description>This parameter specifies the name of the Watson STT base language model that should be used.</description>
+        <description>
+        This parameter specifies the name of the Watson STT base language model that should be used. 
+        see: [https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-input#models] 
+        </description>
         <optional>false</optional>
         <rewriteAllowed>true</rewriteAllowed>
         <expressionMode>AttributeFree</expressionMode>
@@ -246,17 +392,48 @@
 
       <parameter>
         <name>sttResultMode</name>
-        <description>This parameter specifies what type of STT result is needed: 1 to get partial utterances, 2 to get completed utterance, 3 (default) to get the full text after transcribing the entire audio.</description>
+        <description>
+        This parameter specifies what type of STT result is needed: `partial`: to get partial utterances, 
+        `complete`: (default) to get the full text after transcribing the entire audio. The setting of this If this parameter 
+        influences the validity of output functions.
+
+        In sttResultMode `complete` the following parameters are not allowed:
+        `maxUtteranceAlternatives`, `wordAlternativesThreshold`, `keywordsSpottingThreshold`, `keywordsToBeSpotted`, 
+        
+        In sttResultMode `complete` the following output functions are not allowed: 
+        `getUtteranceNumber()`, `isFinalizedUtterance()`, `getConfidence()`, `isTranscriptionCompleted()`, `getUtteranceAlternatives()`, 
+        `getWordAlternatives()`, `getWordAlternativesConfidences()`, `getWordAlternativesStartTimes()`, `getWordAlternativesEndTimes()`, 
+        `getUtteranceWords()`, `getUtteranceWordsConfidences()`, `getUtteranceWordsStartTimes()`, `getUtteranceWordsEndTimes()`, 
+        `getUtteranceStartTime()`, `getUtteranceEndTime()`, `getUtteranceWordsSpeakers()`, `getUtteranceWordsSpeakersConfidences()`, 
+        `getKeywordsSpottingResults()`
+        </description>
         <optional>true</optional>
-        <rewriteAllowed>true</rewriteAllowed>
-        <expressionMode>AttributeFree</expressionMode>
-        <type>int32</type>
+        <rewriteAllowed>false</rewriteAllowed>
+        <expressionMode>CustomLiteral</expressionMode>
+        <type>SttResultMode</type>
         <cardinality>1</cardinality>
       </parameter> 
       
       <parameter>
+        <name>nonFinalUtterancesNeeded</name>
+        <description>
+        If `sttResultMode` equals `partial` this parameter controls the output of non final utterances. If `sttResultMode` 
+        equals `complete` this parameter is ignored. (Default is false.)
+        </description>
+        <optional>true</optional>
+        <rewriteAllowed>true</rewriteAllowed>
+        <expressionMode>AttributeFree</expressionMode>
+        <type>boolean</type>
+        <cardinality>1</cardinality>
+      </parameter>
+
+      <parameter>
         <name>sttRequestLogging</name>
-        <description>This parameter specifies whether request logging should be done for every STT audio transcription request. (Default is false)</description>
+        <description>
+        Indicates whether IBM can use data that is sent over the connection to improve the service for future users. 
+        Specify false to prevent IBM from accessing the logged data. (Default is false)
+        see: [https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-input#logging] 
+        </description>
         <optional>true</optional>
         <rewriteAllowed>true</rewriteAllowed>
         <expressionMode>AttributeFree</expressionMode>
@@ -266,7 +443,13 @@
 
       <parameter>
         <name>baseModelVersion</name>
-        <description>This parameter specifies a particular base model version to be used for transcription. (Default is an empty string)</description>
+        <description>
+        This parameter specifies a particular base model version to be used for transcription. (Default is an empty string)
+        
+        The parameter may point to a specific version of the base model if needed.
+        e-g: "en-US_NarrowbandModel.v07-06082016.06202016"
+        see: [https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-input#version] 
+        </description>
         <optional>true</optional>
         <rewriteAllowed>true</rewriteAllowed>
         <expressionMode>AttributeFree</expressionMode>
@@ -276,7 +459,11 @@
 
       <parameter>
         <name>customizationId</name>
-        <description>This parameter specifies a custom language model to be used for transcription. (Default is an empty string)</description>
+        <description>
+        This parameter specifies a custom language model to be used for transcription. 
+        see: [https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-input#custom] 
+        (Default is an empty string)
+        </description>
         <optional>true</optional>
         <rewriteAllowed>true</rewriteAllowed>
         <expressionMode>AttributeFree</expressionMode>
@@ -306,7 +493,10 @@
 
       <parameter>
         <name>filterProfanity</name>
-        <description>This parameter indicates whether profanity should be filtered from a transcript. (Default is false)</description>
+        <description>
+        This parameter indicates whether profanity should be filtered from a transcript. (Default is false) 
+        see: [https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-output#profanity_filter] 
+        </description>
         <optional>true</optional>
         <rewriteAllowed>true</rewriteAllowed>
         <expressionMode>AttributeFree</expressionMode>
@@ -326,7 +516,12 @@
       
       <parameter>
         <name>maxUtteranceAlternatives</name>
-        <description>This parameter indicates the required number of n-best alternative hypotheses for the transcription results. (Default is 1)</description>
+        <description>
+        This parameter indicates the required number of n-best alternative hypotheses for the transcription results. (Default is 1)
+        see: [https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-output#max_alternatives] 
+        
+        **Note:** This parameter is not valid if `sttResultMode` equals `complete`.
+        </description>
         <optional>true</optional>
         <rewriteAllowed>true</rewriteAllowed>
         <expressionMode>AttributeFree</expressionMode>
@@ -336,7 +531,13 @@
 
       <parameter>
         <name>wordAlternativesThreshold</name>
-        <description>This parameter controls the density of the word alternatives results (a.k.a. Confusion Networks). A value of 0.0 disables this feature. Valid value must be less than 1.0 (Default is 0.0)</description>
+        <description>
+        This parameter controls the density of the word alternatives results (a.k.a. Confusion Networks). A value of 0.0 
+        disables this feature. Valid value must be less than 1.0 (Default is 0.0)
+        see: [https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-output#word_alternatives] 
+        
+        **Note:** This parameter is not valid if `sttResultMode` equals `complete`.
+        </description>
         <optional>true</optional>
         <rewriteAllowed>true</rewriteAllowed>
         <expressionMode>AttributeFree</expressionMode>
@@ -345,38 +546,11 @@
       </parameter>
 
       <parameter>
-        <name>wordConfidenceNeeded</name>
-        <description>This parameter indicates whether the transcription result should include individual words and their confidences or not. (Default is false)</description>
-        <optional>true</optional>
-        <rewriteAllowed>true</rewriteAllowed>
-        <expressionMode>AttributeFree</expressionMode>
-        <type>boolean</type>
-        <cardinality>1</cardinality>
-      </parameter>
-
-      <parameter>
-        <name>wordTimestampNeeded</name>
-        <description>This parameter indicates whether the transcription result should include individual words and their timestamps or not. (Default is false)</description>
-        <optional>true</optional>
-        <rewriteAllowed>true</rewriteAllowed>
-        <expressionMode>AttributeFree</expressionMode>
-        <type>boolean</type>
-        <cardinality>1</cardinality>
-      </parameter>
-
-      <parameter>
-        <name>identifySpeakers</name>
-        <description>This parameter indicates whether the speakers of the individual words in an utterance result should be identified. (Default is false)</description>
-        <optional>true</optional>
-        <rewriteAllowed>true</rewriteAllowed>
-        <expressionMode>AttributeFree</expressionMode>
-        <type>boolean</type>
-        <cardinality>1</cardinality>
-      </parameter>
-
-      <parameter>
         <name>smartFormattingNeeded</name>
-        <description>This parameter indicates whether to convert date, time, phone numbers, currency values, email and URLs into conventional representations. (Default is false)</description>
+        <description>
+        This parameter indicates whether to convert date, time, phone numbers, currency values, email and URLs into conventional representations. (Default is false)
+        see: [https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-output#smart_formatting] 
+        </description>
         <optional>true</optional>
         <rewriteAllowed>true</rewriteAllowed>
         <expressionMode>AttributeFree</expressionMode>
@@ -386,7 +560,13 @@
 
       <parameter>
         <name>keywordsSpottingThreshold</name>
-        <description>This parameter specifies the minimum confidence level that the STT service must have for an utterance word to match a given keyword. A value of 0.0 disables this feature. Valid value must be less than 1.0. (Default is 0.0)</description>
+        <description>
+        This parameter specifies the minimum confidence level that the STT service must have for an utterance word to 
+        match a given keyword. A value of 0.0 disables this feature. Valid value must be less than 1.0. (Default is 0.0)
+        see: [https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-output#keyword_spotting] 
+        
+        **Note:** This parameter is not valid if `sttResultMode` equals `complete`.
+        </description>
         <optional>true</optional>
         <rewriteAllowed>true</rewriteAllowed>
         <expressionMode>AttributeFree</expressionMode>
@@ -396,7 +576,11 @@
 
       <parameter>
         <name>keywordsToBeSpotted</name>
-        <description>This parameter specifies a list (array) of strings to be spotted. (Default is an empty list)</description>
+        <description>
+        This parameter specifies a list (array) of strings to be spotted. (Default is an empty list)
+        
+        **Note:** This parameter is not valid if `sttResultMode` equals `complete`.
+        </description>
         <optional>true</optional>
         <rewriteAllowed>true</rewriteAllowed>
         <expressionMode>AttributeFree</expressionMode>
@@ -425,8 +609,12 @@
       </parameter>
       
       <parameter>
-        <name>waitTimeBeforeSTTServiceConnectionRetry</name>
-        <description>This parameter specifies the time (in seconds) to wait before retrying a connection attempt to the Watson STT service. It should be >= 1.0 (Default is 3.0)</description>
+        <name>maxConnectionRetryDelay</name>
+        <description>
+        The maximum wait time in seconds before a connection re-try is made. The re-try 
+        delay of connection to the STT service increases exponentially starting from 2 seconds but not exceeding 
+        'maxConnectionRetryDelay'. It must be greater 1.0 (Default is 60.0)
+        </description>
         <optional>true</optional>
         <rewriteAllowed>true</rewriteAllowed>
         <expressionMode>AttributeFree</expressionMode>
@@ -435,18 +623,8 @@
       </parameter>
 
       <parameter>
-        <name>maxAllowedConnectionAttempts</name>
-        <description>This parameter specifies the maximum number of attempts to make a Websocket connection to the STT service. It should be >= 1 (Default is 10)</description>
-        <optional>true</optional>
-        <rewriteAllowed>true</rewriteAllowed>
-        <expressionMode>AttributeFree</expressionMode>
-        <type>int32</type>
-        <cardinality>1</cardinality>
-      </parameter>
-
-      <parameter>
         <name>sttLiveMetricsUpdateNeeded</name>
-        <description>This parameter specifies whether live update for this operator's custom metrics is needed. (Default is true)</description>
+        <description>This parameter specifies whether live update for this operator's metrics `nFullAudioConversationsReceived` and `nFullAudioConversationsTranscribed` is needed. (Default is true)</description>
         <optional>true</optional>
         <rewriteAllowed>true</rewriteAllowed>
         <expressionMode>AttributeFree</expressionMode>
@@ -457,45 +635,48 @@
     </parameters>
     <inputPorts>
       <inputPortSet>
-      	<description>
-      	This port brings the audio data into this operator for transcription.
-      	
-      	Attributes on this input port:
-		* **speech** (required, rstring/blob) - In the case of file based input (.wav, .mp3 etc. for batch workload), the expected value will be an absolute path of a file as an rstring. In the case of RAW audio data (received from a network switch for real-time workload), the expected input is of type blob.
-		* **conversationId** (optional, rstring) - An rstring conversationId field for identifying the origin of the audio data that is being sent for transcription (either an audio filename or a call center specific call identifier).
+        <description>
+        This port brings the audio data into this operator for transcription.
         
-		All the extra input attributes will be forwarded if matching output attributes are found.  	
-      	</description>
-        <tupleMutationAllowed>true</tupleMutationAllowed>
+        Attributes on this input port:
+        * **speech** (required, rstring/blob) - In the case of file based input (.wav, .mp3 etc. for batch workload), the expected value will be an absolute path of a file as an rstring. In the case of RAW audio data (received from a network switch for real-time workload), the expected input is of type blob.
+        
+        A window punctuation marker or a empty speech blob may be used to mark the end of an conversation. 
+        When the end of conversation is encountered, 
+        the STT engine delivers all results of the current conversation and flushes all buffers.
+        All the extra input attributes will be forwarded if matching output attributes are found.
+        </description>
+        <tupleMutationAllowed>false</tupleMutationAllowed>
         <windowingMode>NonWindowed</windowingMode>
         <windowPunctuationInputMode>Oblivious</windowPunctuationInputMode>
-      	<cardinality>1</cardinality>
-      	<optional>false</optional>
+        <cardinality>1</cardinality>
+        <optional>false</optional>
       </inputPortSet>
       
       <inputPortSet>
-      	<description>
-      	This port brings an unexpired IAM access token (generated by using your 
-        service instance's API key) into this operator that is needed to access the Watson STT service.
-      	
-      	Attributes on this input port:
-		* **access_token** (required, rstring) - An rstring access token required for securing the access to the STT service.
+        <description>
+        This port brings an unexpired IAM access token (generated by using your 
+        service instance's API key) into this operator that is needed to access the Watson STT service. This input port 
+        should be used in a different thread than port 0.
         
-		All the extra attributes found in this input port will be ignored.  	
-      	</description>
-        <tupleMutationAllowed>true</tupleMutationAllowed>
+        Attributes on this input port: 
+        * **access_token** (required, rstring) - An rstring access token required for securing the access to the STT service. 
+        
+        All the extra attributes found in this input port will be ignored.
+        </description>
+        <tupleMutationAllowed>false</tupleMutationAllowed>
         <windowingMode>NonWindowed</windowingMode>
         <windowPunctuationInputMode>Oblivious</windowPunctuationInputMode>
-      	<controlPort>true</controlPort>
-      	<cardinality>1</cardinality>
-      	<optional>false</optional>
+          <controlPort>true</controlPort>
+          <cardinality>1</cardinality>
+          <optional>false</optional>
       </inputPortSet>
     </inputPorts>
     <outputPorts>
       <outputPortSet>
-      	<description>
-      	This port produces the output tuples that carry the result of the speech to text transcription.
-      	
+        <description>
+        This port produces the output tuples that carry the result of the speech to text transcription.
+        
         An output tuple is created for every utterance that is observed from the incoming audio data. 
         An utterance is a group of transcribed words meant to approximate a sentence. 
         This means there is a one to many relationship between an incoming tuple and outgoing tuples 
@@ -503,11 +684,12 @@
         Intermediate utterances are sent out on this output port only when the sttResultMode
         operator parameter is set to a value of either 1 or 2. If it is set to 3, then only the
         fully transcribed text for the entire audio data will be sent on this output port after
-        the given audio is completely transcribed. 
+        the given audio is completely transcribed. The port emits a window punctuation marker when a conversation 
+        has finished.
         **There are multiple available output functions**, and output attributes can also be 
-        assigned values with any SPL expression that evaluates to the proper type.      	
-      	</description>
-        <expressionMode>Expression</expressionMode> 
+        assigned values with any SPL expression that evaluates to the proper type.
+        </description>
+        <expressionMode>Expression</expressionMode>
         <autoAssignment>true</autoAssignment>
         <completeAssignment>false</completeAssignment>
         <rewriteAllowed>true</rewriteAllowed>
@@ -515,12 +697,13 @@
             <default>AsIs</default>
             <type>STTGatewayFunctions</type>
         </outputFunctions> 
-        <windowPunctuationOutputMode>Preserving</windowPunctuationOutputMode>
-        <windowPunctuationInputPort>0</windowPunctuationInputPort>
+        <windowPunctuationOutputMode>Generating</windowPunctuationOutputMode>
+        <finalPunctuationPortScope>
+        </finalPunctuationPortScope>
         <tupleMutationAllowed>true</tupleMutationAllowed>
         <cardinality>1</cardinality>
         <optional>false</optional>
-      </outputPortSet>          
+      </outputPortSet>
     </outputPorts>
   </cppOperatorModel>
 </operatorModel>

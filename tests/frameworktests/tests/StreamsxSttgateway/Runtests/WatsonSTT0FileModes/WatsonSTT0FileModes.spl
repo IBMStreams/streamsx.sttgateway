@@ -1,0 +1,129 @@
+use com.ibm.streamsx.sttgateway.watson::IAMAccessTokenGenerator;
+use com.ibm.streamsx.sttgateway.watson::IAMAccessToken;
+use com.ibm.streamsx.sttgateway.watson::WatsonSTT;
+use com.ibm.streamsx.testframe::FileSink1;
+
+composite WatsonSTT0FileModes {
+	param
+		expression<rstring> $apiKey :      getSubmissionTimeValue("apiKey", "invalid");
+		expression<rstring> $audioDir:     getSubmissionTimeValue("audioDir");
+		
+		expression<rstring> $sttBaseLanguageModel : getSubmissionTimeValue("sttBaseLanguageModel", "en-US_NarrowbandModel");
+		expression<rstring> $contentType : getSubmissionTimeValue("contentType", "audio/wav");
+		expression<int32> $maxUtteranceAlternatives : (int32)getSubmissionTimeValue("maxUtteranceAlternatives", "1");	
+		expression<rstring> $iamTokenURL : getSubmissionTimeValue("iamTokenURL", "https://iam.cloud.ibm.com/identity/token");
+		expression<rstring> $uri : getSubmissionTimeValue("uri");
+		
+		
+		expression<list<rstring>> $filesList :
+				["01-call-center-10sec.wav", "02-call-center-25sec.wav", "03-call-center-28sec.wav",
+				"04-empty-audio.wav", "05-gettysburg-address-2min.wav", "07-ibm-earnings-2min.wav",
+				"08-ibm-watson-ai-3min.wav", "10-invalid-audio.wav", "12-jfk-speech-12sec.wav"];
+				
+	type
+		STTResult = rstring conversationId, int32 utteranceNumber,
+			rstring utteranceText, boolean finalizedUtterance,
+			rstring sttErrorMessage,
+			//<*Mode1 *Mode2>float64 confidence,
+			//<*Mode1 *Mode2>list<rstring> utteranceAlternatives,
+			//<*Mode1 *Mode2>list<list<rstring>> wordAlternatives,
+			//<*Mode1 *Mode2>list<list<float64>> wordAlternativesConfidences,
+			//<*Mode1 *Mode2>list<float64> wordAlternativesStartTimes,
+			//<*Mode1 *Mode2>list<float64> wordAlternativesEndTimes,
+			//<*Mode1 *Mode2>list<rstring> utteranceWords,
+			//<*Mode1 *Mode2>list<float64> utteranceWordsConfidences,
+			//<*Mode1 *Mode2>list<float64> utteranceWordsStartTimes,
+			//<*Mode1 *Mode2>list<float64> utteranceWordsEndTimes,
+			//<*Mode1 *Mode2>float64 utteranceStartTime,
+			//<*Mode1 *Mode2>float64 utteranceEndTime,
+			//<*Mode1 *Mode2>list<int32> utteranceWordsSpeakers,
+			//<*Mode1 *Mode2>list<float64> utteranceWordsSpeakersConfidences,
+			//<*Mode1 *Mode2>map<rstring, list<map<rstring, float64>>> keywordsSpottingResults,
+			boolean transcriptionCompleted,
+			uint64 myseq;
+		
+	graph
+		
+		stream<rstring speech, uint64 myseq> FileNameStream as O = Beacon() {
+			param
+				iterations: size($filesList);
+				//<!*TokenDelay>initDelay: 5.0;
+			output O:
+				speech = $audioDir + "/" + $filesList[IterationCount()],
+				myseq = IterationCount();
+			config
+				//<fused*>placement : partitionColocation("somePartitionColocationId");
+				//<unFused*>placement : partitionIsolation;
+		}
+		
+		stream<I> FileNameStreamPunct as O = Punctor(FileNameStream as I) {
+			param
+				punctuate : true;
+				position: after;
+			config
+				//<fused*>placement : partitionColocation("somePartitionColocationId");
+				//<unFused*>placement : partitionIsolation;
+		}
+		
+		stream<IAMAccessToken> IAMAccessTokenStream = IAMAccessTokenGenerator() {
+			param
+				appConfigName: "";
+				apiKey: $apiKey;
+				iamTokenURL: $iamTokenURL;
+				//<*TokenDelay>initDelay: 10.0;
+			config
+				//<fused*>placement : partitionColocation("somePartitionColocationId");
+				//<unFused*>placement : partitionIsolation;
+		}
+
+		stream<STTResult> STTResultStream as O = WatsonSTT(FileNameStreamPunct as I; IAMAccessTokenStream) {
+			param
+				uri: $uri;
+				baseLanguageModel: $sttBaseLanguageModel;
+				contentType: $contentType;
+				//<*Mode1 *Mode2>sttResultMode: partial;
+				//<*Mode3>sttResultMode: complete;
+				//<*Mode1>nonFinalUtterancesNeeded: true;
+				//<*Mode2>nonFinalUtterancesNeeded: false;
+			output O:
+				conversationId = speech,
+				//<*Mode1 *Mode2>utteranceNumber = getUtteranceNumber(),
+				utteranceText = getUtteranceText(),
+				//<*Mode1 *Mode2>finalizedUtterance = isFinalizedUtterance(),
+				//<*Mode1 *Mode2>confidence = getConfidence(),
+				//<*Mode1 *Mode2>transcriptionCompleted = isTranscriptionCompleted(),
+				// n-best utterance alternative hypotheses.
+				//<*Mode1 *Mode2>utteranceAlternatives = getUtteranceAlternatives(),
+				// Confusion networks (a.k.a. Consensus)
+				//<*Mode1 *Mode2>wordAlternatives = getWordAlternatives(),
+				//<*Mode1 *Mode2>wordAlternativesConfidences = getWordAlternativesConfidences(),
+				//<*Mode1 *Mode2>wordAlternativesStartTimes = getWordAlternativesStartTimes(),
+				//<*Mode1 *Mode2>wordAlternativesEndTimes = getWordAlternativesEndTimes(),
+				//<*Mode1 *Mode2>utteranceWords = getUtteranceWords(),
+				//<*Mode1 *Mode2>utteranceWordsConfidences = getUtteranceWordsConfidences(),
+				//<*Mode1 *Mode2>utteranceWordsStartTimes = getUtteranceWordsStartTimes(),
+				//<*Mode1 *Mode2>utteranceWordsEndTimes = getUtteranceWordsEndTimes(),
+				//<*Mode1 *Mode2>utteranceStartTime = getUtteranceStartTime(),
+				//<*Mode1 *Mode2>utteranceEndTime = getUtteranceEndTime(),
+				// Speaker label a.k.a. Speaker id
+				//<*Mode1 *Mode2>utteranceWordsSpeakers = getUtteranceWordsSpeakers(),
+				//<*Mode1 *Mode2>utteranceWordsSpeakersConfidences = getUtteranceWordsSpeakersConfidences(),
+				// Results from keywords spotting (matching) in an utterance.
+				//<*Mode1 *Mode2>keywordsSpottingResults = getKeywordsSpottingResults(),
+				sttErrorMessage = getSTTErrorMessage();
+			config
+				//<fused*>placement : partitionColocation("somePartitionColocationId");
+				//<unFused*>placement : partitionIsolation;
+				//<*Queue*>threadedPort : queue(I, Sys.Wait, 100);
+			
+		}
+		
+		() as Sink = FileSink1(STTResultStream) {
+			config
+				//<fused*>placement : partitionColocation("somePartitionColocationId");
+				//<unFused*>placement : partitionIsolation;
+		}
+
+	config
+		restartable: false;
+}

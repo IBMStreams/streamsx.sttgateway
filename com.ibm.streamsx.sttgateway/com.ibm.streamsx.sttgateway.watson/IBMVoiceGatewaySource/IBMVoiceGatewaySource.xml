@@ -25,7 +25,7 @@
       downstream operators. At the end of the any given call, 
       IBM Voice Gateway will close the two WebSocket connections it 
       opened into this operator.
-            
+      
       This operator can be configured with a Websocket server port number which is optional. If the user of this
       operator doesn't specify a Websocket server port number, then a default port number of 443 will be used.
       
@@ -46,19 +46,31 @@
       <metrics>
         <metric>
           <name>nVoiceCallsProcessed</name>
-          <description>Number of voice calls processed by this operator instance.</description>
-          <kind>Gauge</kind>
+          <description>
+          Number of voice calls processed by this operator instance.
+          
+          *NOTE:* This metric is only updated if parameter `vgwLiveMetricsUpdateNeeded` is true.
+          </description>
+          <kind>Counter</kind>
         </metric>
 
         <metric>
           <name>nSpeechDataBytesReceived</name>
-          <description>Total number of speech data bytes received by this operator instance.</description>
-          <kind>Gauge</kind>
+          <description>
+          Total number of speech data bytes received by this operator instance.
+          
+          *NOTE:* This metric is only updated if parameter `vgwLiveMetricsUpdateNeeded` is true.
+          </description>
+          <kind>Counter</kind>
         </metric>
         
         <metric>
           <name>nOutputTuplesSent</name>
-          <description>Number of output tuples sent by this operator instance.</description>
+          <description>
+          Number of output tuples sent by this operator instance.
+          
+          *NOTE:* This metric is only updated if parameter `vgwLiveMetricsUpdateNeeded` is true.
+          </description>
           <kind>Gauge</kind>
         </metric>
       </metrics>
@@ -98,49 +110,38 @@
             <description>Returns an rstring value with details about the caller's phone number.</description>
             <prototype><![CDATA[rstring getCallerPhoneNumber()]]></prototype>
           </function>
-		</customOutputFunction>
+        </customOutputFunction>
       </customOutputFunctions>
       
       <libraryDependencies>
         <library>
-          <cmn:description>Boost Library</cmn:description>
+          <cmn:description>Boost Library common/Websocket include and Boost system</cmn:description>
           <cmn:managedLibrary>
             <cmn:lib>boost_system</cmn:lib>
-            <cmn:libPath>../../impl/lib</cmn:libPath>
-            <!--<cmn:includePath>../../impl/include</cmn:includePath>-->
+            <cmn:libPath>../../lib</cmn:libPath>
+            <cmn:includePath>../../include</cmn:includePath>
           </cmn:managedLibrary>
         </library>
-         
+        
         <library>
-          <cmn:description>Boost Library</cmn:description>
+          <cmn:description>Boost Library chrono</cmn:description>
           <cmn:managedLibrary>
             <cmn:lib>boost_chrono</cmn:lib>
-            <cmn:libPath>../../impl/lib</cmn:libPath>
-            <!--<cmn:includePath>../../impl/include</cmn:includePath>-->
+            <cmn:libPath>../../lib</cmn:libPath>
           </cmn:managedLibrary>
         </library>
-                
+        
         <library>
-          <cmn:description>Boost Library</cmn:description>
+          <cmn:description>Boost Library random</cmn:description>
           <cmn:managedLibrary>
             <cmn:lib>boost_random</cmn:lib>
-            <cmn:libPath>../../impl/lib</cmn:libPath>
-            <!--<cmn:includePath>../../impl/include</cmn:includePath>-->
+            <cmn:libPath>../../lib</cmn:libPath>
           </cmn:managedLibrary>
-        </library>       
-
-         <library>
-          <cmn:description>Boost Library</cmn:description>
-          <cmn:managedLibrary>
-            <cmn:lib>boost_thread</cmn:lib>
-            <cmn:libPath>../../impl/lib</cmn:libPath>
-            <!--<cmn:includePath>../../impl/include</cmn:includePath>-->
-          </cmn:managedLibrary>
-        </library> 
+        </library>
       </libraryDependencies>
       
       <providesSingleThreadedContext>Never</providesSingleThreadedContext>
-    </context>  
+    </context>
     
     <parameters>
       <allowAny>false</allowAny>
@@ -250,25 +251,25 @@
     </inputPorts>
     <outputPorts>
       <outputPortSet>
-      	<description>
-      	This port produces the output tuples that carry the binary speech data received from 
-      	the IBM Voice Gateway. The schema for this port must have its first attribute named 
-      	as speech with a blob data type to hold the speech data. Remaining attributes can be 
-      	of any type based on the needs of the application. Such speech data being sent in 
-      	these output tuples can represent multiple fragments of a full conversation 
-      	happening in a live voice call. This operator is capable of sending out speech data
-		from multiple calls that can all happen at the very same time between different 
-		pairs of speakers. IBM Voice Gateway will always send the speech data in two voice
-		channels i.e. one channel will carry the speech data of a customer and the other
-		channel will carry the speech data of an agent. Please refer to the custom 
-		output functions provided by this operator to query such voice call meta data
-		information and assign that meta data values to other optional attributes in this
-		output port. 
-      	
+        <description>
+        This port produces the output tuples that carry the binary speech data received from 
+        the IBM Voice Gateway. The schema for this port must have its first attribute named 
+        as speech with a blob data type to hold the speech data. Remaining attributes can be 
+        of any type based on the needs of the application. Such speech data being sent in 
+        these output tuples can represent multiple fragments of a full conversation 
+        happening in a live voice call. This operator is capable of sending out speech data
+        from multiple calls that can all happen at the very same time between different 
+        pairs of speakers. IBM Voice Gateway will always send the speech data in two voice
+        channels i.e. one channel will carry the speech data of a customer and the other
+        channel will carry the speech data of an agent. Please refer to the custom 
+        output functions provided by this operator to query such voice call meta data
+        information and assign that meta data values to other optional attributes in this
+        output port. 
+        
         **There are multiple available output functions**, and output attributes can also be 
-        assigned values with any SPL expression that evaluates to the proper type.      	
-      	</description>
-        <expressionMode>Expression</expressionMode> 
+        assigned values with any SPL expression that evaluates to the proper type. 
+        </description>
+        <expressionMode>Expression</expressionMode>
         <autoAssignment>false</autoAssignment>
         <completeAssignment>false</completeAssignment>
         <rewriteAllowed>true</rewriteAllowed>
@@ -283,20 +284,20 @@
       </outputPortSet> 
       
       <outputPortSet>
-      	<description>
-      	This port produces periodic output tuples to give an indication about the end of a 
-      	specific speaker (i.e. channel) in a voice call that was in progress moments ago for 
-      	the given IBM Voice Gateway session id. The schema for this port must have these 
-      	three attributes with their correct data types as shown here. 
-      	rstring vgwSessionId, boolean isCustomerSpeechData, int32 vgwVoiceChannelNumber
-      	This source operator will set the appropriate values for these attributes to 
-      	indicate which particular speaker (i.e. voice channel number) of a given voice call 
-      	(i.e. session id) just ended the conversation. This tuple also has an attribute 
-      	(i.e. isCustomerSpeechData) to tell whether that recently ended voice channel
-      	carried the speech data of a customer or an agent. Downstream operators can make 
-      	use of this "End Of Voice Call" signal as they see fit.
-      	</description>
-        <expressionMode>Expression</expressionMode> 
+        <description>
+        This port produces periodic output tuples to give an indication about the end of a 
+        specific speaker (i.e. channel) in a voice call that was in progress moments ago for 
+        the given IBM Voice Gateway session id. The schema for this port must have these 
+        three attributes with their correct data types as shown here. 
+        rstring vgwSessionId, boolean isCustomerSpeechData, int32 vgwVoiceChannelNumber
+        This source operator will set the appropriate values for these attributes to 
+        indicate which particular speaker (i.e. voice channel number) of a given voice call 
+        (i.e. session id) just ended the conversation. This tuple also has an attribute 
+        (i.e. isCustomerSpeechData) to tell whether that recently ended voice channel
+        carried the speech data of a customer or an agent. Downstream operators can make 
+        use of this "End Of Voice Call" signal as they see fit.
+        </description>
+        <expressionMode>Expression</expressionMode>
         <autoAssignment>false</autoAssignment>
         <completeAssignment>false</completeAssignment>
         <rewriteAllowed>true</rewriteAllowed>
@@ -304,7 +305,7 @@
         <tupleMutationAllowed>false</tupleMutationAllowed>
         <cardinality>1</cardinality>
         <optional>false</optional>
-      </outputPortSet>          
+      </outputPortSet>
     </outputPorts>
   </cppOperatorModel>
 </operatorModel>

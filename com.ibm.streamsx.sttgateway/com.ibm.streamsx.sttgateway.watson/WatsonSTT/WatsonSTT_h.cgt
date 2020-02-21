@@ -13,170 +13,74 @@ Last modified on: Jun/11/2019
 */
 
 /* Additional includes go here */
-#include <websocketpp/config/asio_client.hpp>
-#include <websocketpp/client.hpp>
-#include <iostream>
-#include <fstream>
-#include <iterator>
-#include <algorithm>
-#include <vector>
-// Operator metrics related include files.
-#include <SPL/Runtime/Common/Metric.h>
-#include <SPL/Runtime/Operator/OperatorMetrics.h>
+#include <WatsonSTTImpl.hpp>
 
 <%SPL::CodeGen::headerPrologue($model);%>
 
-#define NO_AUDIO_DATA_SENT_TO_STT 0
-#define AUDIO_BLOB_FRAGMENTS_BEING_SENT_TO_STT 1
-#define FULL_AUDIO_DATA_SENT_TO_STT 2
-
-class MY_OPERATOR : public MY_BASE_OPERATOR {
-public:
-	// Websocket related type definitions.
-	typedef websocketpp::client<websocketpp::config::asio_tls_client> client;
-	// Pull out the type of messages sent by our config
-	typedef websocketpp::config::asio_tls_client::message_type::ptr message_ptr;
-	typedef websocketpp::lib::shared_ptr<boost::asio::ssl::context> context_ptr;
-
-	// Operator related member variables
-	std::string operatorPhysicalName;
-	SPL::int32 udpChannelNumber;
-	
-	// Websocket operations related member variables.
-	bool wsConnectionEstablished;
-	bool makeNewWebsocketConnection;
-	bool websocketConnectionErrorOccurred;
-	SPL::int32 numberOfWebsocketConnectionAttempts;
-	bool websocketLoggingNeeded;
-	client *wsClient;
-	websocketpp::connection_hdl wsHandle;
-	
-	// STT operations related member variables.
-	std::vector<std::string> audioFiles;
-	std::vector<unsigned char *> audioBytes;
-	std::vector<uint64_t> audioSize;
-	std::vector<OPort0Type *> oTupleList;
-	SPL::Mutex sttMutex1;
-	SPL::uint32 numberOfAudioBlobFragmentsReceivedInCurrentConversation;
-	SPL::uint64 numberOfFullAudioConversationsReceived;
-	SPL::uint64 numberOfFullAudioConversationsTranscribed;
-	SPL::int32 statusOfAudioDataTransmissionToSTT;
-	std::string transcriptionResult;
-	bool transcriptionErrorOccurred;
-	bool sttResultTupleWaitingToBeSent;
-	SPL::float64 cpuYieldTimeInAudioSenderThread;
-	SPL::float64 waitTimeBeforeSTTServiceConnectionRetry;
-	SPL::int32 maxAllowedConnectionAttempts;
-	bool sttLiveMetricsUpdateNeeded;
-	std::string uri;
-	std::string accessToken;
-	std::string baseLanguageModel;
-	std::string contentType;
-	SPL::int32 sttResultMode;
-	bool sttRequestLogging;
-	std::string baseModelVersion;
-	std::string customizationId;
-	SPL::float64 customizationWeight;
-	std::string acousticCustomizationId;
-	bool filterProfanity;
-	bool sttJsonResponseDebugging;
-	SPL::int32 maxUtteranceAlternatives;
-	SPL::float64 wordAlternativesThreshold;
-	bool wordConfidenceNeeded;
-	bool wordTimestampNeeded;
-	bool identifySpeakers;
-	SPL::list<SPL::int32> utteranceWordsSpeakers;
-	SPL::list<SPL::float64> utteranceWordsSpeakersConfidences;
-	SPL::list<SPL::float64> utteranceWordsStartTimes;
-	bool smartFormattingNeeded;
-	SPL::float64 keywordsSpottingThreshold;
-	SPL::list<SPL::rstring> keywordsToBeSpotted;
-	bool audioInputAsBlob;
-	
-	// Custom metrics for this operator.
-	Metric *nWebsocketConnectionAttemptsMetric;
-	Metric *nFullAudioConversationsReceivedMetric;
-	Metric *nFullAudioConversationsTranscribedMetric;
-	Metric *nSTTResultModeMetric;
+/*
+ * Make this operator a composition of the MY_BASE_OPERATOR and the implementation class: WatsonSTTImpl
+ * Make the MY_OPERATOR class as slim as possible to have the most of the implementation in a pure c++ file
+ * So we can take the advantages of c++ editor
+ */
+class MY_OPERATOR : public MY_BASE_OPERATOR, public com::ibm::streams::sttgateway::WatsonSTTImpl<MY_OPERATOR, MY_BASE_OPERATOR::OPort0Type> {
 
 public:
+	// Alias for the type of the implementation class
+	typedef com::ibm::streams::sttgateway::WatsonSTTImpl<MY_OPERATOR, OPort0Type> Impl;
+	typedef com::ibm::streams::sttgateway::WatsonSTTConfig Conf;
+	
 	// Constructor
 	MY_OPERATOR();
 	
 	// Destructor
-	virtual ~MY_OPERATOR(); 
+	virtual ~MY_OPERATOR();
 	
 	// Notify port readiness
-	void allPortsReady(); 
+	void allPortsReady();
 	
 	// Notify pending shutdown
-	void prepareToShutdown(); 
+	void prepareToShutdown();
 	
-	// Processing for source and threaded operators   
-	void process(uint32_t idx);
-	
-	// Tuple processing for mutating ports 
-	void process(Tuple & tuple, uint32_t port);
-	
-	// Tuple processing for non-mutating ports
+	// Tuple processing for non-mutating ports 0 and 1
 	void process(Tuple const & tuple, uint32_t port);
 	
 	// Punctuation processing
 	void process(Punctuation const & punct, uint32_t port);
 	
-	// All the public methods below used to be static methods with
-	// a static keyword at the beginning of every prototype 
-	// declaration. On Aug/28/2018, I removed the need for them to be static.
-	//
-	// Websocket connection open event handler
-	void on_open(client* c, websocketpp::connection_hdl hdl);
+	// Processing for websocket client threads
+	void process(uint32_t idx);
+
+	//Create a output tuple and auto assign values from an input tuple
+	OPort0Type* createOutTupleAndAutoAssign(IPort0Type const& inTuple);
 	
-	// Websocket message reception event handler
-	void on_message(client* c, websocketpp::connection_hdl hdl, message_ptr msg);
+	// append the error message to the error attribute of the output tuple
+	void appendErrorAttribute(OPort0Type * tuple, std::string const & errorMessage);
 	
-	// Websocket connection close event handler
-	void on_close(client* c, websocketpp::connection_hdl hdl);
+	// Assign result attributes except speaker results and transcription complete to output tuple
+	void setResultAttributes(
+			OPort0Type * tuple,
+			int32_t utteranceNumber_,
+			std::string const & utteranceText_,
+			bool final_,
+			SPL::float64 confidence_,
+			SPL::list<SPL::rstring> const & utteranceAlternatives_,
+			SPL::list<SPL::list<SPL::rstring>> const & wordAlternatives_,
+			SPL::list<SPL::list<SPL::float64>> const & wordAlternativesConfidences_,
+			SPL::list<SPL::float64> const & wordAlternativesStartTimes_,
+			SPL::list<SPL::float64> const & wordAlternativesEndTimes_,
+			SPL::list<SPL::rstring> const & utteranceWords_,
+			SPL::list<SPL::float64> const & utteranceWordsConfidences_,
+			SPL::list<SPL::float64> const & utteranceWordsEndTimes_,
+			SPL::float64 utteranceStartTime_,
+			SPL::float64 utteranceEndTime_,
+			SPL::map<SPL::rstring, SPL::list<SPL::map<SPL::rstring, SPL::float64>>> const & keywordsSpottingResults_
+	);
 	
-	// Websocket TLS binding event handler
-	context_ptr on_tls_init(client* c, websocketpp::connection_hdl);
+	// Assign speaker result to output tuple
+	void setSpeakerResultAttributes(OPort0Type * tuple);
 	
-	// Webscoket connection failure event handler
-	void on_fail(client* c, websocketpp::connection_hdl hdl);
-	
-	// Websocket initialization thread method
-	void ws_init();  
-	
-	// Websocket audio blob sender thread method
-	void ws_audio_blob_sender();
-	
-	// Utility to method to retrieve the operator's self (this) pointer
-	MY_OPERATOR* myOp(MY_OPERATOR*);
-		
-private:
-	// These are the output attribute assignment functions
-	SPL::int32 getUtteranceNumber(int32_t const & utteranceNumber);
-	SPL::rstring getUtteranceText(std::string const & utteranceText);
-	SPL::boolean isFinalizedUtterance(bool const & finalizedUtterance);
-	SPL::float32 getConfidence(float const & confidence);
-	SPL::rstring getFullTranscriptionText(std::string const & fullText);
-	SPL::rstring getSTTErrorMessage(std::string const & errorMessage);
-	SPL::boolean isTranscriptionCompleted(bool const & transcriptionCompleted);
-	SPL::list<SPL::rstring> getUtteranceAlternatives(SPL::list<SPL::rstring> const & utteranceAlternatives);
-	SPL::list<SPL::list<SPL::rstring>> getWordAlternatives(SPL::list<SPL::list<SPL::rstring>> const & wordAlternatives);
-	SPL::list<SPL::list<SPL::float64>> getWordAlternativesConfidences(SPL::list<SPL::list<SPL::float64>> const & wordAlternativesConfidences);
-	SPL::list<SPL::float64> getWordAlternativesStartTimes(SPL::list<SPL::float64> const & wordAlternativesStartTimes);
-	SPL::list<SPL::float64> getWordAlternativesEndTimes(SPL::list<SPL::float64> const & wordAlternativesEndTimes);
-	SPL::list<SPL::rstring> getUtteranceWords(SPL::list<SPL::rstring> const & utteranceWords);
-	SPL::list<SPL::float64> getUtteranceWordsConfidences(SPL::list<SPL::float64> const & utteranceWordsConfidences);
-	SPL::list<SPL::float64> getUtteranceWordsStartTimes(SPL::list<SPL::float64> const & utteranceWordsStartTimes);
-	SPL::list<SPL::float64> getUtteranceWordsEndTimes(SPL::list<SPL::float64> const & utteranceWordsEndTimes);
-	SPL::float64 getUtteranceStartTime(SPL::float64 const & utteranceStartTime);
-	SPL::float64 getUtteranceEndTime(SPL::float64 const & utteranceEndTime);
-	SPL::list<SPL::int32> getUtteranceWordsSpeakers();
-	SPL::list<SPL::float64> getUtteranceWordsSpeakersConfidences();
-	SPL::map<SPL::rstring, SPL::list<SPL::map<SPL::rstring, SPL::float64>>> 
-		getKeywordsSpottingResults(SPL::map<SPL::rstring, 
-		SPL::list<SPL::map<SPL::rstring, SPL::float64>>> const & keywordsSpottingResults);
-}; 
+	// Assign transcription complete attribute to output tuple
+	void setTranscriptionCompleteAttribute(OPort0Type * tuple);
+};
 
 <%SPL::CodeGen::headerEpilogue($model);%>

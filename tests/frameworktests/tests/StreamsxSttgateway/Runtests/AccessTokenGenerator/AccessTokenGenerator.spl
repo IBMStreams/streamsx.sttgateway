@@ -1,0 +1,48 @@
+use com.ibm.streamsx.sttgateway.watson::IAMAccessTokenGenerator;
+use com.ibm.streamsx.sttgateway.watson::IAMAccessToken;
+use com.ibm.streamsx.testframe::FileSink1;
+
+composite AccessTokenGenerator {
+	//<!appConf* paramsAccessToken>param
+		//<!appConf* paramsAccessToken>expression<rstring> $apiKey :      getSubmissionTimeValue("apiKey", "valid");
+		//<!appConf* paramsAccessToken>expression<rstring> $iamTokenURL : getSubmissionTimeValue("iamTokenURL", "http://localhost:8097/access");
+		//<!appConf* paramsAccessToken>expression<float64> $failureRetryDelay : (float64)getSubmissionTimeValue("failureRetryDelay", "10.0");
+		//<!appConf* paramsAccessToken>expression<int64>   $guardTime : (int64)getSubmissionTimeValue("guardTime", "5");
+	//<paramsAccessToken>param expression<rstring> $accessToken: getSubmissionTimeValue("accessToken", "maccasdasdfadfdfsdgfdfs fdggg g 123");
+	graph
+		stream<IAMAccessToken> IAMAccessTokenStream = IAMAccessTokenGenerator() {
+			//<!appConf* paramsAccessToken>param
+			//<appConfSpecial>param
+				//<!appConf* paramsAccessToken>appConfigName: "";
+				//<appConfSpecial>appConfigName: "specialSttConnection";
+				//<!appConf* paramsAccessToken>apiKey: $apiKey;
+				//<!appConf* paramsAccessToken>iamTokenURL: $iamTokenURL;
+				//<!appConf* paramsAccessToken>failureRetryDelay: $failureRetryDelay;
+				//<!appConf* paramsAccessToken>guardTime : $guardTime;
+				//<!appConf* paramsAccessToken>maxRetryDelay : 66.0;
+				//<!appConf* paramsAccessToken>defaultExpiresIn : 3666l;
+			//<paramsAccessToken>param accessToken: $accessToken; appConfigName: "";
+		}
+		
+		stream<IAMAccessToken, tuple<timestamp time>> IAMAccessTokenStream2 as O = Custom(IAMAccessTokenStream as I) {
+			logic
+				state : mutable int32 count = 0;
+				onTuple I: {
+					mutable O otuple = {};
+					assignFrom(otuple, I);
+					otuple.time = getTimestamp();
+					submit(otuple, O);
+					++count;
+					//<paramsAccessToken>int32 noTuples = 1;
+					//<!paramsAccessToken>int32 noTuples = 4;
+					if (count >= noTuples)
+						submit(Sys.WindowMarker, O);
+					block(5.0);
+				}
+		}
+		
+		() as Sink = FileSink1(IAMAccessTokenStream2) { }
+
+	config
+		restartable: false;
+}
