@@ -14,6 +14,7 @@
 #include <iostream>
 #include <string>
 #include <stdexcept>
+#include <sstream>
 
 
 namespace com { namespace ibm { namespace streams { namespace sttgateway {
@@ -41,40 +42,54 @@ template<>               bool isType<ArrayLabel>  (const rapidjson::Value& membe
 
 class DecoderCommons {
 protected:
-	DecoderCommons(std::string const & inp, bool completeResults_);
-
-	//Input string to decode
-	const std::string & json;
-
+	// Input string pointer: points during work to input string
+	const std::string * json;
+	// Document after parsing
 	rapidjson::Document jsonDoc;
-	bool completeResults;
-
+	// Configuration values
+	const WatsonSTTConfig & configuration;
+	// static log aspect
 	static const char* const WATSON_DECODER;
 
+	// ctor
+	DecoderCommons(const WatsonSTTConfig & config) :
+		json(nullptr), jsonDoc(), configuration(config) {
+	}
+	// start decoding initialize json and jsonDoc
+	void doWorkStart(std::string const & inp) {
+		json = & inp;
+		jsonDoc.Parse(json->c_str());
+	}
+	// stop working
+	void doWorkEnd() {
+		json = nullptr;
+	}
+	// get a required member
 	template<char* JSONTYPE>
-	const rapidjson::Value* getRequiredMember(const rapidjson::Value& value, const char* memberName, const char* parentName){
+	const rapidjson::Value& getRequiredMember(const rapidjson::Value& value, const char* memberName, const char* parentName){
 		if ( ! value.HasMember(memberName)) {
-			std::stringstream ss("member "); ss << memberName << " is required in " << parentName << " json=" << json;
+			std::stringstream ss("member "); ss << memberName << " is required in " << parentName << " json=" << *json;
 			throw DecoderException(ss.str());
 		}
 		SPLAPPTRC(L_TRACE, memberName << " found", WATSON_DECODER);
 		const rapidjson::Value& member = value[memberName];
 		if ( ! isType<JSONTYPE>(member)) {
-			std::stringstream ss(memberName); ss << " is not a " << JSONTYPE << " in " << parentName << "json=" << json;
+			std::stringstream ss; ss << memberName << " is not a " << JSONTYPE << " in " << parentName << " json=" << *json;
 			throw DecoderException(ss.str());
 		}
 		SPLAPPTRC(L_TRACE, memberName << " is " << JSONTYPE, WATSON_DECODER);
-		return &member;
+		return member;
 	}
 
+	// get an option member; return nullptr if not there
 	template<char* JSONTYPE>
 	const rapidjson::Value* getOptionalMember(const rapidjson::Value& value, const char* memberName, const char* parentName){
 		if ( ! value.HasMember(memberName))
-			return NULL;
+			return nullptr;
 		SPLAPPTRC(L_TRACE, memberName << " found", WATSON_DECODER);
 		const rapidjson::Value& member = value[memberName];
 		if ( ! isType<JSONTYPE>(member)) {
-			std::stringstream ss(memberName); ss << " is not a " << JSONTYPE << " in " << parentName << "json=" << json;
+			std::stringstream ss; ss << memberName << " is not a " << JSONTYPE << " in " << parentName << " json=" << *json;
 			throw DecoderException(ss.str());
 		}
 		SPLAPPTRC(L_TRACE, memberName << " is " << JSONTYPE, WATSON_DECODER);
@@ -83,13 +98,6 @@ protected:
 };
 
 const char* const DecoderCommons::WATSON_DECODER = "WatsonDecoder";
-
-DecoderCommons::DecoderCommons(std::string const & inp, bool completeResults_) :
-		json(inp),
-		jsonDoc(),
-		completeResults(completeResults_) {
-	jsonDoc.Parse(json.c_str());
-}
 
 }}}}
 #endif /* COM_IBM_STREAMS_STTGATEWAY_DECODER_COMMONS_H_ */

@@ -159,7 +159,7 @@ https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-websocke
 	my $nonFinalUtterancesNeeded = $model->getParameterByName("nonFinalUtterancesNeeded");
 	if ($nonFinalUtterancesNeeded) {
 		if ($sttResultMode eq "complete") {
-			SPL::CodeGen::warnln("Parmaeter nonFinalUtterancesNeeded is ignored if sttResultMode equals complete", $model->getContext()->getSourceLocation());
+			SPL::CodeGen::warnln("Parameter nonFinalUtterancesNeeded is ignored if sttResultMode equals complete", $model->getContext()->getSourceLocation());
 		}
 	}
 	$nonFinalUtterancesNeeded = $nonFinalUtterancesNeeded ? $nonFinalUtterancesNeeded->getValueAt(0)->getCppExpression() : 0;

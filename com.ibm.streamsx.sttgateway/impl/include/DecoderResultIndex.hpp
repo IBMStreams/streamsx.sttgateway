@@ -12,18 +12,20 @@ namespace com { namespace ibm { namespace streams { namespace sttgateway {
 
 class DecoderResultIndex : public virtual DecoderCommons {
 private:
-	const rapidjson::Value* value_;
+	const rapidjson::Value* resultIndexValue;
 
 public:
-	DecoderResultIndex(std::string const & inp) : DecoderCommons(inp), value_(nullptr) { }
+	bool hasResult() { return resultIndexValue != nullptr; }
 
-	bool hasResult() { return value_ != nullptr; }
-
-	SPL::int32 getResult() { return value_->GetInt(); }
+	SPL::int32 getResult() { return resultIndexValue->GetInt(); }
 
 protected:
+	DecoderResultIndex(const WatsonSTTConfig & config) :
+		DecoderCommons(config), resultIndexValue(nullptr) {
+	}
+
 	void doWork() {
-		value_ = getOptionalMember<NumberLabel>(jsonDoc, "result_index", "universe");
+		resultIndexValue = getOptionalMember<NumberLabel>(jsonDoc, "result_index", "universe");
 	}
 };
 

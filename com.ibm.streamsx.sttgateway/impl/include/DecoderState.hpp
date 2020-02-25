@@ -12,21 +12,28 @@ namespace com { namespace ibm { namespace streams { namespace sttgateway {
 
 class DecoderState : public virtual DecoderCommons {
 private:
-	const rapidjson::Value* value_;
+	const rapidjson::Value* stateValue;
 	bool isListening_;
 
 public:
-	DecoderState(std::string const & inp, bool completeResults_) : DecoderCommons(inp, completeResults_), value_(nullptr), isListening_(false) { }
-
-	bool hasResult() { return value_ != nullptr; }
+	bool hasResult() { return stateValue != nullptr; }
 
 	bool isLitsening() { return isListening_; }
 
 protected:
+	DecoderState(const WatsonSTTConfig & config) :
+		DecoderCommons(config),
+		stateValue(nullptr), isListening_(false) {
+	}
+
 	void doWork() {
-		value_ = getOptionalMember<StringLabel>(jsonDoc, "state", "universe");
-		std::string statevar = value_->GetString();
-		isListening_ = statevar == "listening";
+		stateValue = getOptionalMember<StringLabel>(jsonDoc, "state", "universe");
+		if (stateValue) {
+			std::string statevar = stateValue->GetString();
+			isListening_ = statevar == "listening";
+		} else {
+			isListening_ = false;
+		}
 	}
 };
 

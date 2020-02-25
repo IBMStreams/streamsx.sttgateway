@@ -19,16 +19,17 @@ public:
 	bool getResult(size_t index) { return finals_[index]; }
 
 protected:
-	DecoderFinal(std::string const & inp, bool completeResults_) : DecoderCommons(inp, completeResults_), finals_() { }
+	DecoderFinal(const WatsonSTTConfig & config) :
+		DecoderCommons(config), finals_() {
+	}
 
-	void doWork(const rapidjson::Value& result, const char* parentName, rapidjson::SizeType index) {
-		/*std::stringstream ppname;
-		ppname << parentName << "[" << index << "]";*/
-		/*if (not result.IsObject()) {
-			std::stringstream ss; ss << "result is not an Object. " << ppname << " in " << " json=" << json;
-			throw DecoderException(ss.str());
-		}*/
-		finals_.push_back(getRequiredMember<BooleanLabel>(result, "final", parentName));
+	void reset() {
+		finals_.clear();
+	}
+
+	void doWork(const rapidjson::Value & result, const std::string & parentName) {
+		const rapidjson::Value & final = getRequiredMember<BooleanLabel>(result, "final", parentName.c_str());
+		finals_.push_back(final.GetBool());
 	}
 };
 

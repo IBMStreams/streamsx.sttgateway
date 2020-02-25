@@ -6,51 +6,70 @@
 #ifndef COM_IBM_STREAMS_STTGATEWAY_DECODER_RESULTS_H_
 #define COM_IBM_STREAMS_STTGATEWAY_DECODER_RESULTS_H_
 
-#include "DecoderCommons.hpp"
+#include "DecoderFinal.hpp"
+#include "DecoderAlternatives.hpp"
+#include "DecoderKeywordResults.hpp"
+#include "DecoderWordAlternatives.hpp"
 #include <vector>
 
 namespace com { namespace ibm { namespace streams { namespace sttgateway {
 
-class DecoderResults : public DecoderFinal, public DecoderAlternatives {
+class DecoderResults : public DecoderFinal, public DecoderAlternatives, public DecoderKeywordsResult, public DecoderWordAlternatives {
 private:
-	rapidjson::SizeType size_;
+	rapidjson::SizeType resultsSize;
 
 public:
-	rapidjson::SizeType getSize() { return size_; }
+	bool hasResult() { return resultsSize != 0; }
+
+	rapidjson::SizeType getSize() { return resultsSize; }
 
 protected:
-	DecoderResults(std::string const & inp, bool completeResults_) : DecoderFinal(inp, completeResults_), DecoderAlternatives(inp, completeResults_),
-			size_(0) { }
+	DecoderResults(const WatsonSTTConfig & config):
+			DecoderCommons(config),
+			DecoderFinal(config),
+			DecoderAlternatives(config),
+			DecoderKeywordsResult(config),
+			DecoderWordAlternatives(config),
+			resultsSize(0) {
+	}
+
+	void reset() {
+		DecoderWordAlternatives::reset();
+		DecoderKeywordsResult::reset();
+		DecoderAlternatives::reset();
+		DecoderFinal::reset();
+		resultsSize = 0;
+	}
 
 	void doWork() {
-		const rapidjson::Value * value_ = getOptionalMember<ArrayLabel>(jsonDoc, "result", "universe");
-		if (value_) {
-			size_ = value_->Size();
-			if (not completeResults) {
-				if (size_ > 1) {
-					SPLAPPTRC(L_ERROR, "We expect partial results but dimension of results is " << size_, WATSON_DECODER);
+		const rapidjson::Value * results = getOptionalMember<ArrayLabel>(jsonDoc, "results", "universe");
+		if (results) {
+			resultsSize = results->Size();
+			if (configuration.sttResultMode != WatsonSTTConfig::complete) {
+				if (resultsSize > 1) {
+					SPLAPPTRC(L_ERROR, "We expect partial results but dimension of results is " << resultsSize, WATSON_DECODER);
 				}
 			}
-			for (rapidjson::SizeType i = 0; i < size_; i++) {
+			for (rapidjson::SizeType i = 0; i < resultsSize; i++) {
 				std::stringstream ppname;
-				ppname << "result[" << i << "]";
-				DecoderFinal::doWork(value_[i], ppname.str().c_str(), i);
-				DecoderAlternatives::doWork(value_[i], ppname.str().c_str(), i);
+				ppname << "results[" << i << "]";
+				const rapidjson::Value & result = (*results)[i];
+				if (not result.IsObject()) {
+					std::stringstream ss; ss << "Result is not an Object. " << ppname << " in json=" << *json;
+					throw DecoderException(ss.str());
+				}
+				DecoderFinal::doWork(result, ppname.str().c_str());
+				bool final = DecoderFinal::getResult(i);
+				if (final || (configuration.sttResultMode == WatsonSTTConfig::partial)) {
+					DecoderAlternatives::doWork(result, ppname.str().c_str(), i, final);
+				}
+				if (final) {
+					DecoderWordAlternatives::doWork(result, ppname.str().c_str(), i);
+					DecoderKeywordsResult::doWork(result, ppname.str().c_str(), i);
+				}
 			}
 		} else {
-			size_ = 0;
-		}
-		value_ = getOptionalMember<ArrayLabel>(jsonDoc, "speaker_labels", "universe");
-		size_ = value_->GetArray().Size();
-		for (size_t i = 0; i < size_; i++) {
-			rapidjson::Value const & speaker = value_[i];
-			if (not speaker.IsObject()) {
-				std::stringstream ss; ss << "Speaker is not an Object. Index:" << i << " in " << " json=" << json;
-				throw DecoderException(ss.str());
-			}
-			from_.pushBack(SPL::float64(getRequiredMember<NumberLabel>(speaker, "from", "speaker")));
-			speaker_.pushBack(SPL::int32(getRequiredMember<IntegerLabel>(speaker, "speaker", "speaker")));
-			confidence_.pushBack(SPL::float64(getRequiredMember<NumberLabel>(speaker, "confidence", "speaker")));
+			resultsSize = 0;
 		}
 	}
 };

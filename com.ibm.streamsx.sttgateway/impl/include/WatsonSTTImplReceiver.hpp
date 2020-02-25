@@ -13,6 +13,7 @@
 
 #include <string>
 #include <atomic>
+#include <typeinfo>
 
 // This operator heavily relies on the Websocket++ header only library.
 // https://docs.websocketpp.org/index.html
@@ -35,7 +36,9 @@
 #include <SPL/Runtime/Common/Metric.h>
 #include <SPL/Runtime/Utility/Mutex.h>
 
-#include <WatsonSTTConfig.hpp>
+#include "WatsonSTTConfig.hpp"
+#include "Decoder.hpp"
+
 //#include <SttGatewayResource.h>
 
 namespace com { namespace ibm { namespace streams { namespace sttgateway {
@@ -156,6 +159,7 @@ private:
 	SPL::list<SPL::int32> utteranceWordsSpeakers;
 	SPL::list<SPL::float64> utteranceWordsSpeakersConfidences;
 	SPL::list<SPL::float64> utteranceWordsStartTimes;
+	Decoder dec;
 
 private:
 	// Custom metrics for this operator.
@@ -203,6 +207,7 @@ WatsonSTTImplReceiver<OP, OT>::WatsonSTTImplReceiver(OP & splOperator_,Config co
 		utteranceWordsSpeakers{},
 		utteranceWordsSpeakersConfidences{},
 		utteranceWordsStartTimes{},
+		dec(*this),
 
 		// Custom metrics for this operator are already defined in the operator model XML file.
 		// Hence, there is no need to explicitly create them here.
@@ -374,17 +379,17 @@ void WatsonSTTImplReceiver<OP, OT>::ws_init() {
 			wsClient->run();
 			SPLAPPTRC(L_INFO, traceIntro << "-->RE10 (after run)", "ws_receiver");
 		} catch (const std::exception & e) {
-			SPLAPPTRC(L_ERROR, traceIntro << "-->RE11 std::exception: " << e.what(), "ws_receiver");
-			setWsState(WsState::error);
+			SPLAPPTRC(L_ERROR, traceIntro << "-->RE11 " << typeid(e).name() << ": "<< e.what(), "ws_receiver");
+			setWsState(WsState::crashed);
 			//SPL::Functions::Utility::abort(__FILE__, __LINE__);
 		} catch (const websocketpp::lib::error_code & e) {
 			//websocketpp::lib::error_code is a class -> catching by reference makes sense
 			SPLAPPTRC(L_ERROR, traceIntro << "-->RE12 websocketpp::lib::error_code: " << e.message(), "ws_receiver");
-			setWsState(WsState::error);
+			setWsState(WsState::crashed);
 			//SPL::Functions::Utility::abort(__FILE__, __LINE__);
 		} catch (...) {
 			SPLAPPTRC(L_ERROR, traceIntro << "-->RE13 Other exception in WatsonSTT operator's Websocket initializtion.", "ws_receiver");
-			setWsState(WsState::error);
+			setWsState(WsState::crashed);
 			//SPL::Functions::Utility::abort(__FILE__, __LINE__);
 		}
 		// finally delete recentOTuple
@@ -581,6 +586,8 @@ void WatsonSTTImplReceiver<OP, OT>::on_message(client* c, websocketpp::connectio
 
 	const std::string & payload_ = msg->get_payload();
 	SPLAPPTRC(L_TRACE, traceIntro << "-->on_message payload_: " << payload_, "ws_receiver");
+	bool completeResults = Config::sttResultMode == Config::complete;
+	dec.doWork(payload_);
 	const bool stateListeningFound_ = payload_.find("\"state\": \"listening\"") != std::string::npos;
 	// STT error will have the following message format.
 	// {"error": "unable to transcode data stream audio/wav -> audio/x-float-array "}
