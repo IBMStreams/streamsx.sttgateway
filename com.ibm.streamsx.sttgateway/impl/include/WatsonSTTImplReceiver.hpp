@@ -14,6 +14,7 @@
 #include <string>
 #include <atomic>
 #include <typeinfo>
+#include <unordered_map>
 
 // This operator heavily relies on the Websocket++ header only library.
 // https://docs.websocketpp.org/index.html
@@ -152,6 +153,8 @@ private:
 
 	// Decoder class for json decoding
 	Decoder dec;
+	// list of the words start times used for the speaker label consistency check
+	SPL::list<SPL::float64> myUtteranceWordsStartTimes;
 	// Custom metrics for this operator.
 	SPL::Metric * const nWebsocketConnectionAttemptsCurrentMetric;
 	SPL::Metric * const nFullAudioConversationsTranscribedMetric;
@@ -186,6 +189,7 @@ WatsonSTTImplReceiver<OP, OT>::WatsonSTTImplReceiver(OP & splOperator_,Config co
 		nFullAudioConversationsTranscribed{0},
 		nFullAudioConversationsFailed{0},
 		dec(*this),
+		myUtteranceWordsStartTimes(),
 
 		// Custom metrics for this operator are already defined in the operator model XML file.
 		// Hence, there is no need to explicitly create them here.
@@ -555,7 +559,10 @@ void WatsonSTTImplReceiver<OP, OT>::on_message(client* c, websocketpp::connectio
 		++numFound;
 	if (speakerResultFound_)
 		++numFound;
-	if (numFound > 1) {
+	// in general we expect only one of the results state, error, utterance or speaker
+	// the result index may be there along with utterance and is not checked here
+	// in sttResultMode 3 (complete result) utterance and speaker may be in one responmse message
+	if ((numFound > 2) || ((numFound == 2) && (not utteranceResultFound_ || not speakerResultFound_))) {
 		std::stringstream message;
 		message << traceIntro << "-->RE82 Unexpected decoding results - stateFound_ : " << stateFound_ << " sttErrorFound_: "
 				<< sttErrorFound_ << " utteranceResultFound_: " << utteranceResultFound_ << " speakerResultFound_: "
@@ -696,6 +703,11 @@ void WatsonSTTImplReceiver<OP, OT>::on_message(client* c, websocketpp::connectio
 					myfinal = dec.DecoderFinal::getResult(0);
 				}
 			}
+			// prepare speaker label consistency check
+			if (Config::identifySpeakers) {
+				//myUtteranceWordsStartTimes.clear();
+				myUtteranceWordsStartTimes = dec.DecoderAlternatives::getUtteranceWordsStartTimes();
+			}
 			splOperator.setResultAttributes(
 					myRecentOTuple,
 					dec.DecoderResultIndex::getResult(),
@@ -719,7 +731,7 @@ void WatsonSTTImplReceiver<OP, OT>::on_message(client* c, websocketpp::connectio
 					dec.DecoderWordAlternatives::getWordAlternativesEndTimes(),
 					dec.DecoderKeywordsResult::getKeywordsSpottingResults()
 			);
-			if (Config::identifySpeakers) {
+			if (Config::identifySpeakers && myfinal) {
 				SPLAPPTRC(L_DEBUG, traceIntro << "-->RE35 queue utterance results until speaker labels are available", "ws_receiver");
 				oTupleUsedForSubmission = myRecentOTuple;
 			} else {
@@ -732,7 +744,7 @@ void WatsonSTTImplReceiver<OP, OT>::on_message(client* c, websocketpp::connectio
 					"-->no recent output tuple available but non finalized fullTranscriptionCompleted_. payload_: " + payload_);
 		}
 
-		return;
+		// fall through to speaker label decoder if utterance and speakers are in one response (complete result)
 	}
 
 	// speaker results found
@@ -742,11 +754,43 @@ void WatsonSTTImplReceiver<OP, OT>::on_message(client* c, websocketpp::connectio
 		} else {
 			if (oTupleUsedForSubmission) {
 				SPLAPPTRC(L_DEBUG, traceIntro << "-->RE38 send queued utterance results tuple with speaker info", "ws_receiver");
+				// speaker consistency check
+				rapidjson::SizeType spkSize = dec.DecoderSpeakerLabels::getSize();
+				const SPL::list<SPL::float64> & spkFrom = dec.DecoderSpeakerLabels::getFrom();
+				const SPL::list<SPL::int32> &   spkSpk  = dec.DecoderSpeakerLabels::getSpeaker();
+				const SPL::list<SPL::float64> & spkCfd  = dec.DecoderSpeakerLabels::getConfidence();
+				std::unordered_map<SPL::float64, rapidjson::SizeType> spkIndexMap;
+				for (rapidjson::SizeType i = 0; i < spkSize; i++) {
+					spkIndexMap.insert(std::pair<const SPL::float64, rapidjson::SizeType>(spkFrom[i], i));
+				}
+				SPL::list<SPL::float64> spkFromNew;
+				SPL::list<SPL::int32>   spkSpkNew;
+				SPL::list<SPL::float64> spkCfdNew;
+				for (rapidjson::SizeType i = 0; i < myUtteranceWordsStartTimes.size(); i++) {
+					SPL::float64 startt = myUtteranceWordsStartTimes[i];
+					auto it = spkIndexMap.find(startt);
+					if (it != spkIndexMap.end()) {
+						rapidjson::SizeType idx = it->second;
+						std::cout << "Insert time " << startt << " idx=" << idx << std::endl;
+						spkFromNew.push_back(spkFrom[idx]);
+						spkSpkNew.push_back(spkSpk[idx]);
+						spkCfdNew.push_back(spkCfd[idx]);
+					} else {
+						std::cout << "not found " << startt << std::endl;
+						spkFromNew.push_back(startt);
+						spkSpkNew.push_back(-1);
+						spkCfdNew.push_back(-1.0);
+					}
+				}
+
 				splOperator.setSpeakerResultAttributes(
 						oTupleUsedForSubmission,
-						dec.DecoderSpeakerLabels::getSpeaker(),
-						dec.DecoderSpeakerLabels::getConfidence(),
-						dec.DecoderSpeakerLabels::getFrom()
+						//dec.DecoderSpeakerLabels::getSpeaker(),
+						//dec.DecoderSpeakerLabels::getConfidence(),
+						//dec.DecoderSpeakerLabels::getFrom()
+						spkSpkNew,
+						spkCfdNew,
+						spkFromNew
 				);
 				splOperator.submit(*oTupleUsedForSubmission, 0);
 				oTupleUsedForSubmission = nullptr;

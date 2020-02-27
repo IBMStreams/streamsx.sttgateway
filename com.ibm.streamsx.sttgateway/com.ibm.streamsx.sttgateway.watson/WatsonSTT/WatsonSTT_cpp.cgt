@@ -115,38 +115,19 @@ https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-websocke
 		my $op = $attribute->getAssignmentOutputFunctionName(); 
 
 		if ($op eq "getUtteranceWordsConfidences") {
-			if ($sttResultMode eq "complete") {
-				SPL::CodeGen::exitln("In sttResultMode complete, Output Function $op is not allowed", $model->getContext()->getSourceLocation());
-			}
 			$wordConfidenceNeeded = 1;
 		} elsif (($op eq "getUtteranceWordsStartTimes") || ($op eq "getUtteranceWordsEndTimes")) {
-			if ($sttResultMode eq "complete") {
-				SPL::CodeGen::exitln("In sttResultMode complete, Output Function $op is not allowed", $model->getContext()->getSourceLocation());
-			}
 			$wordTimestampNeeded = 1;
 		} elsif (($op eq "getUtteranceStartTime") || ($op eq "getUtteranceEndTime")) {
-			if ($sttResultMode eq "complete") {
-				SPL::CodeGen::exitln("In sttResultMode complete, Output Function $op is not allowed", $model->getContext()->getSourceLocation());
-			}
 			$wordTimestampNeeded = 1;
 		} elsif ($op eq "getUtteranceWordsSpeakers") {
-			if ($sttResultMode eq "complete") {
-				SPL::CodeGen::exitln("In sttResultMode complete, Output Function $op is not allowed", $model->getContext()->getSourceLocation());
-			}
 			$identifySpeakers = 1;
+			$wordTimestampNeeded = 1; # timestamps are required for the speaker label check
 		} elsif ($op eq "getUtteranceWordsSpeakersConfidences") {
-			if ($sttResultMode eq "complete") {
-				SPL::CodeGen::exitln("In sttResultMode complete, Output Function $op is not allowed", $model->getContext()->getSourceLocation());
-			}
-			$identifySpeakers
-		} elsif (($op eq "getUtteranceNumber") || ($op eq "isFinalizedUtterance") || ($op eq "getConfidence") || 
-				($op eq "isTranscriptionCompleted") || ($op eq "getUtteranceAlternatives") ||
-				($op eq "getWordAlternatives") || ($op eq "getWordAlternativesConfidences") ||
-				($op eq "getWordAlternativesStartTimes") || ($op eq "getWordAlternativesEndTimes") ||
-				($op eq "getUtteranceWords") || ($op eq "getUtteranceWordsConfidences") ||
-				($op eq "getUtteranceWordsStartTimes") || ($op eq "getUtteranceWordsEndTimes") ||
-				($op eq "getUtteranceWordsSpeakers") || ($op eq "getUtteranceWordsSpeakersConfidences") ||
-				($op eq "getKeywordsSpottingResults")) {
+			$identifySpeakers = 1;
+			$wordTimestampNeeded = 1;
+		} elsif (($op eq "getUtteranceNumber") || ($op eq "isFinalizedUtterance") ||
+				($op eq "getConfidence") || ($op eq "getUtteranceAlternatives")) {
 			if ($sttResultMode eq "complete") {
 				SPL::CodeGen::exitln("In sttResultMode complete, Output Function $op is not allowed", $model->getContext()->getSourceLocation());
 			}
@@ -203,9 +184,6 @@ https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-websocke
 	$maxUtteranceAlternatives = $maxUtteranceAlternatives ? $maxUtteranceAlternatives->getValueAt(0)->getCppExpression() : 1;
 
 	my $wordAlternativesThreshold = $model->getParameterByName("wordAlternativesThreshold");
-	if (($sttResultMode eq "complete") && $wordAlternativesThreshold) {
-		SPL::CodeGen::exitln("In sttResultMode complete, parameter wordAlternativesThreshold is not allowed", $model->getContext()->getSourceLocation());
-	}
 	# Default: 0.0 to distable the wordAlternatives feature (a.k.a Confusion Networks).
 	$wordAlternativesThreshold = $wordAlternativesThreshold ? $wordAlternativesThreshold->getValueAt(0)->getCppExpression() : 0.0;
 
@@ -213,16 +191,10 @@ https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-websocke
 	$smartFormattingNeeded = $smartFormattingNeeded ? $smartFormattingNeeded->getValueAt(0)->getCppExpression() : 0;
 
 	my $keywordsSpottingThreshold = $model->getParameterByName("keywordsSpottingThreshold");
-	if (($sttResultMode eq "complete") && $keywordsSpottingThreshold) {
-		SPL::CodeGen::exitln("In sttResultMode complete, parameter keywordsSpottingThreshold is not allowed", $model->getContext()->getSourceLocation());
-	}
 	# Default: 0.0 to distable the keywords spotting feature.
 	$keywordsSpottingThreshold = $keywordsSpottingThreshold ? $keywordsSpottingThreshold->getValueAt(0)->getCppExpression() : 0.0;
 	
 	my $keywordsToBeSpotted = $model->getParameterByName("keywordsToBeSpotted");
-	if (($sttResultMode eq "complete") && $keywordsToBeSpotted) {
-		SPL::CodeGen::exitln("In sttResultMode complete, parameter keywordsToBeSpotted is not allowed", $model->getContext()->getSourceLocation());
-	}
 	$keywordsToBeSpotted = $keywordsToBeSpotted ? $keywordsToBeSpotted->getValueAt(0)->getCppExpression() : "SPL::list<SPL::rstring>{}";
 
 	my $websocketLoggingNeeded = $model->getParameterByName("websocketLoggingNeeded");

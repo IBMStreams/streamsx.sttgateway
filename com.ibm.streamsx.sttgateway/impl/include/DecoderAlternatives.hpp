@@ -138,7 +138,9 @@ void DecoderAlternatives::doWorkTimestamps(const rapidjson::Value& alternative, 
 			} else {
 				//std::cout << "ts index: " << i << timestamp[0].GetString() << "," << timestamp[1].GetDouble() << "," << timestamp[2].GetDouble() << std::endl;
 
-				//utteranceWords.pushBack(timestamp[0].GetString());
+				// take words from timestamps because these are available also for non final utterances
+				// confidences are not available for non final utterances
+				utteranceWords.pushBack(SPL::rstring(timestamp[0].GetString()));
 				utteranceWordsStartTimes.pushBack(timestamp[1].GetDouble());
 				utteranceWordsEndTimes.pushBack(timestamp[2].GetDouble());
 
@@ -165,7 +167,7 @@ void DecoderAlternatives::doWorkWordConfidence(const rapidjson::Value& alternati
 			if (wordConfidence.Size() != 2) {
 				throw DecoderException("wordConfidence size is not 2 " + ppname.str() + " in json:" + *json);
 			} else {
-				utteranceWords.pushBack(SPL::rstring(wordConfidence[0].GetString()));
+				//utteranceWords.pushBack(SPL::rstring(wordConfidence[0].GetString()));
 				utteranceWordsConfidences.pushBack(wordConfidence[1].GetDouble());
 			}
 		}
