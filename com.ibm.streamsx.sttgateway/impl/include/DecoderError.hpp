@@ -15,9 +15,8 @@ private:
 	const rapidjson::Value* errorValue;
 
 public:
-	bool hasResult() { return errorValue != nullptr; }
-
-	std::string getResult() { return std::string(errorValue->GetString()); }
+	bool hasResult() const noexcept { return errorValue != nullptr; }
+	std::string getResult() const   { return std::string(errorValue->GetString()); }
 
 protected:
 	DecoderError(const WatsonSTTConfig & config) :

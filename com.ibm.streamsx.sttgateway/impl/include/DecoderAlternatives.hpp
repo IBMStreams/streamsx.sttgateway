@@ -21,23 +21,27 @@ private:
 	SPL::list<SPL::float64> utteranceWordsConfidences;
 	SPL::list<SPL::float64> utteranceWordsStartTimes;
 	SPL::list<SPL::float64> utteranceWordsEndTimes;
+	SPL::float64 utteranceStartTime;
+	SPL::float64 utteranceEndTime;
 
 public:
-	bool hasResult() { return alternativesSize != 0; }
-	SPL::rstring            getUtteranceText() { return utteranceText; }
-	SPL::list<SPL::rstring> getUtteranceAlternatives() { return utteranceAlternatives; }
-	SPL::float64            getConfidence() { return confidence; }
-	SPL::list<SPL::rstring> getUtteranceWords() { return utteranceWords; }
-	SPL::list<SPL::float64> getUtteranceWordsConfidences() { return utteranceWordsConfidences; }
-	SPL::list<SPL::float64> getUtteranceWordsStartTimes() { return utteranceWordsStartTimes; }
-	SPL::list<SPL::float64> getUtteranceWordsEndTimes() { return utteranceWordsEndTimes; }
+	bool                            hasResult() const noexcept                    { return alternativesSize != 0; }
+	const SPL::rstring &            getUtteranceText() const noexcept             { return utteranceText; }
+	const SPL::list<SPL::rstring> & getUtteranceAlternatives() const noexcept     { return utteranceAlternatives; }
+	const SPL::float64 &            getConfidence() const noexcept                { return confidence; }
+	const SPL::list<SPL::rstring> & getUtteranceWords() const noexcept            { return utteranceWords; }
+	const SPL::list<SPL::float64> & getUtteranceWordsConfidences() const noexcept { return utteranceWordsConfidences; }
+	const SPL::list<SPL::float64> & getUtteranceWordsStartTimes() const noexcept  { return utteranceWordsStartTimes; }
+	const SPL::list<SPL::float64> & getUtteranceWordsEndTimes() const noexcept    { return utteranceWordsEndTimes; }
+	const SPL::float64 &            getUtteranceStartTime() const noexcept        { return utteranceStartTime; }
+	const SPL::float64 &            getUtteranceEndTime() const noexcept          { return utteranceEndTime; }
 
 protected:
 	DecoderAlternatives(const WatsonSTTConfig & config) :
 		DecoderCommons(config),
 		alternativesSize(0), utteranceText(), utteranceAlternatives(), confidence(0.0),
 		utteranceWords(), utteranceWordsStartTimes(),
-		utteranceWordsEndTimes() {
+		utteranceWordsEndTimes(), utteranceStartTime(0.0), utteranceEndTime(0.0) {
 	}
 
 	void reset() {
@@ -49,6 +53,8 @@ protected:
 		utteranceWordsConfidences.clear();
 		utteranceWordsStartTimes.clear();
 		utteranceWordsEndTimes.clear();
+		utteranceStartTime = 0.0;
+		utteranceEndTime = 0.0;
 	}
 
 	void doWork(const rapidjson::Value& result, const std::string & parentName, rapidjson::SizeType resultIndex, bool final);
@@ -58,7 +64,13 @@ private:
 	void doWorkWordConfidence(const rapidjson::Value& result, const std::string & parentName, rapidjson::SizeType resultIndex);
 };
 
-
+// Decode confidence: not delivered in sttResultMode == WatsonSTTConfig::complete
+//		and only for the first alternative in the first result
+// Decode utteranceText: concatenate all first alternatives in all results
+// Decode alternatives: decode only in mode sttResultMode != WatsonSTTConfig::complete
+//						and for the first result! no concatenation
+// Decode timestamps: concatenate all results of the first alternative
+// Decode word confidences: concatenate all final results of the first alternative
 void DecoderAlternatives::doWork(const rapidjson::Value& result, const std::string & parentName, rapidjson::SizeType resultIndex, bool final) {
 	const rapidjson::Value & alternatives = getRequiredMember<ArrayLabel>(result, "alternatives", parentName.c_str());
 	alternativesSize = alternatives.Size();
@@ -124,10 +136,16 @@ void DecoderAlternatives::doWorkTimestamps(const rapidjson::Value& alternative, 
 			if (timestamp.Size() != 3) {
 				throw DecoderException("timestamp size is not 3 " + ppname.str() + " json:" + *json);
 			} else {
-				std::cout << "ts index: " << i << timestamp[0].GetString() << "," << timestamp[1].GetDouble() << "," << timestamp[2].GetDouble() << std::endl;
+				//std::cout << "ts index: " << i << timestamp[0].GetString() << "," << timestamp[1].GetDouble() << "," << timestamp[2].GetDouble() << std::endl;
+
 				//utteranceWords.pushBack(timestamp[0].GetString());
 				utteranceWordsStartTimes.pushBack(timestamp[1].GetDouble());
 				utteranceWordsEndTimes.pushBack(timestamp[2].GetDouble());
+
+				// set start time from the very first word and set floating end time
+				if ((resultIndex == 0) && (i==0))
+					utteranceStartTime = timestamp[1].GetDouble();
+				utteranceEndTime = timestamp[2].GetDouble();
 			}
 		}
 	}

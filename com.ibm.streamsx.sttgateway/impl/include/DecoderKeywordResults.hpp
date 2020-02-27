@@ -12,12 +12,14 @@
 namespace com { namespace ibm { namespace streams { namespace sttgateway {
 
 class DecoderKeywordsResult : public virtual DecoderCommons {
+public:
+	typedef SPL::map<SPL::rstring, SPL::list<SPL::map<SPL::rstring, SPL::float64> > > resultMapType;
 private:
-	SPL::map<SPL::rstring, SPL::list<SPL::map<SPL::rstring, SPL::float64> > > kwmaplist;
+	resultMapType kwmaplist;
 
 public:
-	bool hasResult() { return kwmaplist.size() > 0; }
-	SPL::map<SPL::rstring, SPL::list<SPL::map<SPL::rstring, SPL::float64> > > getKeywordsSpottingResults() { return kwmaplist; }
+	bool                  hasResult() const noexcept                  { return kwmaplist.size() > 0; }
+	const resultMapType & getKeywordsSpottingResults() const noexcept { return kwmaplist; }
 
 protected:
 	DecoderKeywordsResult(const WatsonSTTConfig & config) :
@@ -64,7 +66,7 @@ void DecoderKeywordsResult::doWork(const rapidjson::Value& result, const std::st
 				innerMap.insert(SPL::map<SPL::rstring, SPL::float64>::value_type(SPL::rstring("confidence"), confidence.GetDouble()));
 				innerList.push_back(innerMap);
 			}
-			kwmaplist.insert(SPL::map<SPL::rstring, SPL::list<SPL::map<SPL::rstring, SPL::float64> > >::value_type(kw, innerList));
+			kwmaplist.insert(resultMapType::value_type(kw, innerList));
 		}
 	}
 }

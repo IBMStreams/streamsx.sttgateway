@@ -217,7 +217,7 @@ public composite AudioFileWatsonSTT {
 					if (sttErrorMessage == "") {
 						otuple.line = "conversationId=" + conversationId + " myseq=" + (rstring)myseq + "\n" +
 							"transcriptionCompleted=" + (rstring)transcriptionCompleted +
-							" finalizedUtterance=" + (rstring)finalizedUtterance +
+							" finalizedUtterance=" + (rstring)finalizedUtterance + " utteranceNumber=" + (rstring)utteranceNumber +
 							" confidence=" + (rstring)confidence + " utteranceStartTime=" + (rstring)utteranceStartTime +
 							" utteranceEndTime=" + (rstring)utteranceEndTime + "\n" +
 							utteranceText + "\n";

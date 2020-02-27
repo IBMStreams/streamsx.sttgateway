@@ -16,7 +16,7 @@ private:
 	std::vector<bool> finals_;
 
 public:
-	bool getResult(size_t index) { return finals_[index]; }
+	bool getResult(size_t index) const noexcept { return finals_[index]; }
 
 protected:
 	DecoderFinal(const WatsonSTTConfig & config) :

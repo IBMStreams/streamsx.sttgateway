@@ -15,9 +15,16 @@ private:
 	const rapidjson::Value* resultIndexValue;
 
 public:
-	bool hasResult() { return resultIndexValue != nullptr; }
+	bool hasResult() const noexcept { return resultIndexValue != nullptr; }
 
-	SPL::int32 getResult() { return resultIndexValue->GetInt(); }
+	// calling this function is always secure
+	// return -1 if no index was received in doWork
+	SPL::int32 getResult() const {
+		if (resultIndexValue)
+			return resultIndexValue->GetInt();
+		else
+			return -1;
+	}
 
 protected:
 	DecoderResultIndex(const WatsonSTTConfig & config) :

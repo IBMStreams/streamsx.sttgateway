@@ -404,20 +404,26 @@ void MY_OPERATOR::appendErrorAttribute(OPort0Type * tuple, std::string const & e
 void MY_OPERATOR::setResultAttributes(
 		OPort0Type * tuple,
 		int32_t utteranceNumber_,
-		std::string const & utteranceText_,
 		bool final_,
+		// utterance
 		SPL::float64 confidence_,
-		SPL::list<SPL::rstring> const & utteranceAlternatives_,
-		SPL::list<SPL::list<SPL::rstring>> const & wordAlternatives_,
-		SPL::list<SPL::list<SPL::float64>> const & wordAlternativesConfidences_,
-		SPL::list<SPL::float64> const & wordAlternativesStartTimes_,
-		SPL::list<SPL::float64> const & wordAlternativesEndTimes_,
-		SPL::list<SPL::rstring> const & utteranceWords_,
-		SPL::list<SPL::float64> const & utteranceWordsConfidences_,
-		SPL::list<SPL::float64> const & utteranceWordsEndTimes_,
 		SPL::float64 utteranceStartTime_,
 		SPL::float64 utteranceEndTime_,
-		SPL::map<SPL::rstring, SPL::list<SPL::map<SPL::rstring, SPL::float64>>> const & keywordsSpottingResults_
+		const SPL::rstring & utteranceText_,
+		// alternatives
+		const SPL::list<SPL::rstring> & utteranceAlternatives_,
+		// utterance words
+		const SPL::list<SPL::rstring> & utteranceWords_,
+		const SPL::list<SPL::float64> & utteranceWordsConfidences_,
+		const SPL::list<SPL::float64> & utteranceWordsStartTimes_,
+		const SPL::list<SPL::float64> & utteranceWordsEndTimes_,
+		// confusion network
+		const SPL::list<SPL::list<SPL::rstring>> & wordAlternatives_,
+		const SPL::list<SPL::list<SPL::float64>> & wordAlternativesConfidences_,
+		const SPL::list<SPL::float64> & wordAlternativesStartTimes_,
+		const SPL::list<SPL::float64> & wordAlternativesEndTimes_,
+		// keyword spotting
+		const SPL::map<SPL::rstring, SPL::list<SPL::map<SPL::rstring, SPL::float64>>> & keywordsSpottingResults_
 ) {
 <% 
 	my $oport = $model->getOutputPortAt(0); 
@@ -453,17 +459,13 @@ void MY_OPERATOR::setResultAttributes(
 <%		} elsif ($operation eq "getUtteranceWordsConfidences") { %>
 			tuple->set_<%=$name%>(utteranceWordsConfidences_);
 <%		} elsif ($operation eq "getUtteranceWordsStartTimes") { %>
-			tuple->set_<%=$name%>(Impl::<%=$operation%>());
+			tuple->set_<%=$name%>(utteranceWordsStartTimes_);
 <%		} elsif ($operation eq "getUtteranceWordsEndTimes") { %>
 			tuple->set_<%=$name%>(utteranceWordsEndTimes_);
 <%		} elsif ($operation eq "getUtteranceStartTime") { %>
 			tuple->set_<%=$name%>(utteranceStartTime_);
 <%		} elsif ($operation eq "getUtteranceEndTime") { %>
 			tuple->set_<%=$name%>(utteranceEndTime_);
-<%		} elsif ($operation eq "getUtteranceWordsSpeakers") { %>
-			tuple->set_<%=$name%>(Impl::<%=$operation%>());
-<%		} elsif ($operation eq "getUtteranceWordsSpeakersConfidences") { %>
-			tuple->set_<%=$name%>(Impl::<%=$operation%>());
 <%		} elsif ($operation eq "getKeywordsSpottingResults") { %>
 			tuple->set_<%=$name%>(keywordsSpottingResults_);
 <%
@@ -473,7 +475,12 @@ void MY_OPERATOR::setResultAttributes(
 }
 
 // Assign speaker result to output tuple
-void MY_OPERATOR::setSpeakerResultAttributes(OPort0Type * tuple) {
+void MY_OPERATOR::setSpeakerResultAttributes(
+		OPort0Type * tuple,
+		const SPL::list<SPL::int32> & getUtteranceWordsSpeakers_,
+		const SPL::list<SPL::float64> & getUtteranceWordsSpeakersConfidences_,
+		const SPL::list<SPL::float64> & getUtteranceWordsSpeakersStartTime_
+) {
 <% 
 	my $oport = $model->getOutputPortAt(0);
 	foreach my $attribute (@{$oport->getAttributes()}) {
@@ -483,9 +490,11 @@ void MY_OPERATOR::setSpeakerResultAttributes(OPort0Type * tuple) {
 
 		if ($operation eq "getUtteranceWordsSpeakers") {
 %>
-			tuple->set_<%=$name%>(Impl::<%=$operation%>());
+			tuple->set_<%=$name%>(getUtteranceWordsSpeakers_);
 <%		} elsif ($operation eq "getUtteranceWordsSpeakersConfidences") { %>
-			tuple->set_<%=$name%>(Impl::<%=$operation%>());
+			tuple->set_<%=$name%>(getUtteranceWordsSpeakersConfidences_);
+<%		} elsif ($operation eq "getUtteranceWordsSpeakers") { %>
+			tuple->set_<%=$name%>(getUtteranceWordsSpeakers_);
 <%
 		}
 	}

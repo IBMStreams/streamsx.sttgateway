@@ -13,7 +13,20 @@
 #include "DecoderSpeakerLabels.hpp"
 
 namespace com { namespace ibm { namespace streams { namespace sttgateway {
-
+/*
+ * Decoder class to convert the received json documents into the required structures
+ *
+ * Construct the decoder with a reference to the actual configuration structure
+ * Decoder(const WatsonSTTConfig &)
+ *
+ * Function
+ * doWork(const std::string)
+ * parses the json document and builds recursively the output fields
+ *
+ * Get the results with the various getter functions like:
+ * DecoderAlternatives::getUtteranceText()
+ * The results are available until the doWork is called.
+ */
 class Decoder : public DecoderState, public DecoderError, public DecoderResults, public DecoderResultIndex,  public DecoderSpeakerLabels {
 public:
 	Decoder(const WatsonSTTConfig & config):
@@ -26,7 +39,7 @@ public:
 	}
 
 	// Cleans, set the pointer to inp and decode
-	void doWork(std::string const & inp) {
+	void doWork(const std::string & inp) {
 
 		DecoderResults::reset();
 		DecoderSpeakerLabels::reset();
@@ -35,9 +48,10 @@ public:
 		DecoderError::doWork();
 		DecoderState::doWork();
 		DecoderResults::doWork();
+		DecoderResultIndex::doWork();
 		DecoderSpeakerLabels::doWork();
 
-		SPLAPPTRC(L_TRACE, configuration.traceIntro << "-->dec stateListening: " << isLitsening(), WATSON_DECODER);
+		SPLAPPTRC(L_TRACE, configuration.traceIntro << "-->dec stateListening: " << isListening(), WATSON_DECODER);
 		if (DecoderError::hasResult())
 			SPLAPPTRC(L_TRACE, configuration.traceIntro << "-->dec error: " << DecoderError::getResult(), WATSON_DECODER);
 		if (DecoderResultIndex::hasResult())

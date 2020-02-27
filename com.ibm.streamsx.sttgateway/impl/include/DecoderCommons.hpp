@@ -61,12 +61,12 @@ protected:
 		jsonDoc.Parse(json->c_str());
 	}
 	// stop working
-	void doWorkEnd() {
+	void doWorkEnd() noexcept {
 		json = nullptr;
 	}
 	// get a required member
 	template<char* JSONTYPE>
-	const rapidjson::Value& getRequiredMember(const rapidjson::Value& value, const char* memberName, const char* parentName){
+	const rapidjson::Value& getRequiredMember(const rapidjson::Value& value, const char* memberName, const char* parentName) const {
 		if ( ! value.HasMember(memberName)) {
 			std::stringstream ss("member "); ss << memberName << " is required in " << parentName << " json=" << *json;
 			throw DecoderException(ss.str());
@@ -83,7 +83,7 @@ protected:
 
 	// get an option member; return nullptr if not there
 	template<char* JSONTYPE>
-	const rapidjson::Value* getOptionalMember(const rapidjson::Value& value, const char* memberName, const char* parentName){
+	const rapidjson::Value* getOptionalMember(const rapidjson::Value& value, const char* memberName, const char* parentName) const {
 		if ( ! value.HasMember(memberName))
 			return nullptr;
 		SPLAPPTRC(L_TRACE, memberName << " found", WATSON_DECODER);

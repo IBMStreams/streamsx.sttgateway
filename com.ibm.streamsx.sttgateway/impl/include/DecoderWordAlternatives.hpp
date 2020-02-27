@@ -20,11 +20,11 @@ private:
 	SPL::list<SPL::list<SPL::float64> > wordConfidences;
 
 public:
-	bool hasResult() { return alternativesSize != 0; }
-	SPL::list<SPL::float64> getWordAlternativesStartTimes() { return startTimes; }
-	SPL::list<SPL::float64> getWordAlternativesEndTimes() { return endTimes; }
-	SPL::list<SPL::list<SPL::rstring> > getWordAlternatives() { return wordAlternatives; }
-	SPL::list<SPL::list<SPL::float64> > getWordAlternativesConfidences() { return wordConfidences; }
+	bool                                        hasResult() const noexcept                      { return alternativesSize != 0; }
+	const SPL::list<SPL::float64> &             getWordAlternativesStartTimes() const noexcept  { return startTimes; }
+	const SPL::list<SPL::float64> &             getWordAlternativesEndTimes() const noexcept    { return endTimes; }
+	const SPL::list<SPL::list<SPL::rstring> > & getWordAlternatives() const noexcept            { return wordAlternatives; }
+	const SPL::list<SPL::list<SPL::float64> > & getWordAlternativesConfidences() const noexcept { return wordConfidences; }
 
 protected:
 	DecoderWordAlternatives(const WatsonSTTConfig & config) :
@@ -61,8 +61,10 @@ void DecoderWordAlternatives::doWork(const rapidjson::Value& result, const std::
 
 		const rapidjson::Value & startTime_ = getRequiredMember<NumberLabel>(wordAlternative_, "start_time", ppname.str().c_str());
 		startTimes.pushBack(startTime_.GetDouble());
+
 		const rapidjson::Value & endTime_ = getRequiredMember<NumberLabel>(wordAlternative_, "end_time", ppname.str().c_str());
 		endTimes.push_back(endTime_.GetDouble());
+
 		const rapidjson::Value & alternatives_ = getRequiredMember<ArrayLabel>(wordAlternative_, "alternatives", ppname.str().c_str());
 		SPL::list<SPL::rstring> words_;
 		SPL::list<SPL::float64> confidences_;

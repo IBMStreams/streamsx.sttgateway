@@ -16,9 +16,8 @@ private:
 	bool isListening_;
 
 public:
-	bool hasResult() { return stateValue != nullptr; }
-
-	bool isLitsening() { return isListening_; }
+	bool hasResult() const noexcept   { return stateValue != nullptr; }
+	bool isListening() const noexcept { return isListening_; }
 
 protected:
 	DecoderState(const WatsonSTTConfig & config) :

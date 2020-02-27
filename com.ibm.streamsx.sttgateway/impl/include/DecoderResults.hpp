@@ -41,6 +41,11 @@ protected:
 		resultsSize = 0;
 	}
 
+	// Decode: final, Alternatives, Keyword results and word alternatives
+	// final -> vector of resultsSize of all result finals
+	// alternatives -> decoding for final results and in mode WatsonSTTConfig::partial
+	// DecoderKeywordsResult -> decoding for final results only and concatenate all results
+	// DecoderWordAlternatives -> decoding for final results only and concatenate all results
 	void doWork() {
 		const rapidjson::Value * results = getOptionalMember<ArrayLabel>(jsonDoc, "results", "universe");
 		if (results) {

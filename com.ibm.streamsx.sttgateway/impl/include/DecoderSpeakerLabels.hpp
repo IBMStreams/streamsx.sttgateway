@@ -19,22 +19,18 @@ private:
 	SPL::list<SPL::float64> confidence_;
 
 public:
+	bool                            hasResult() const noexcept  { return size_ > 0; }
+	rapidjson::SizeType             getSize() const noexcept    { return size_; }
+	const SPL::list<SPL::float64> & getFrom() const noexcept    { return from_; }
+	const SPL::list<SPL::int32> &   getSpeaker() const noexcept { return speaker_; }
+	const SPL::list<SPL::float64> & getConfidence() const noexcept { return confidence_; }
+
+protected:
 	DecoderSpeakerLabels(const WatsonSTTConfig & config) :
 			DecoderCommons(config),
 			size_(0), from_(), speaker_(), confidence_() {
 	}
 
-	bool hasResult() { return size_ > 0; }
-
-	rapidjson::SizeType getSize() { return size_; }
-
-	SPL::list<SPL::float64> getFrom() { return from_; }
-
-	SPL::list<SPL::int32>   getSpeaker() { return speaker_; }
-
-	SPL::list<SPL::float64> getConfidence() { return confidence_; }
-
-protected:
 	void reset() {
 		size_ = 0;
 		from_.clear();
