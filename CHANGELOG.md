@@ -1,5 +1,15 @@
 # Changes
 
+## v2.1.0
+* WatsonSTT: Reimplemented JSON decoder of the receiver task contains corrections
+* WatsonSTT: The output functions: getWordAlternatives, getWordAlternativesConfidences,
+getWordAlternativesStartTimes, getWordAlternativesEndTimes, getUtteranceWords, getUtteranceWordsConfidences, getUtteranceWordsEndTimes,
+ getUtteranceStartTime, getUtteranceWordsSpeakers, getUtteranceWordsSpeakersConfidences and getKeywordsSpottingResults are also available in sttResultMode complete
+* WatsonSTT: Speaker label consistency check. Speaker label statrt times are checked against the start times of the utterance words list
+* WatsonSTT: The results are send out immediately. Send the final tuple of a conversation only if function isTranscriptionCompleted was requested
+* WatsonSTT: remove paramter sttJsonResponseDebugging
+* Restore samples VoiceGatewayToStreamsToWatsonSTT, VoiceGatewayToStreamsToWatsonS2T and stt_results_http_receiver
+
 ## v2.0.0:
 * Many changes in implementation and many corrections
 * WatsonSTT move implementation to implementation class
