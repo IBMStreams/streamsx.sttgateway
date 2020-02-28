@@ -781,13 +781,11 @@ void WatsonSTTImplReceiver<OP, OT>::on_message(client* c, websocketpp::connectio
 					auto it = spkIndexMap.find(startt);
 					if (it != spkIndexMap.end()) {
 						rapidjson::SizeType idx = it->second;
-						std::cout << "Insert time " << startt << " idx=" << idx << std::endl;
 						spkFromNew.push_back(spkFrom[idx]);
 						spkSpkNew.push_back(spkSpk[idx]);
 						spkCfdNew.push_back(spkCfd[idx]);
 					} else {
 						SPLAPPTRC(L_ERROR, traceIntro << "-->RE40 No speaker label at: " << startt << " insert -1. payload_: " << payload_, "ws_receiver");
-						std::cout << "not found " << startt << std::endl;
 						spkFromNew.push_back(startt);
 						spkSpkNew.push_back(-1);
 						spkCfdNew.push_back(-1.0);
