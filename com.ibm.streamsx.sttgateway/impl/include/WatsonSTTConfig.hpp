@@ -35,7 +35,6 @@ struct WatsonSTTConfig {
 	SPL::float64 customizationWeight;
 	const std::string acousticCustomizationId;
 	const bool filterProfanity;
-	const bool sttJsonResponseDebugging;
 	const SPL::int32 maxUtteranceAlternatives;
 	const SPL::float64 wordAlternativesThreshold;
 	const bool wordConfidenceNeeded;
@@ -44,6 +43,7 @@ struct WatsonSTTConfig {
 	const bool smartFormattingNeeded;
 	SPL::float64 keywordsSpottingThreshold;
 	const SPL::list<SPL::rstring> keywordsToBeSpotted;
+	const bool isTranscriptionCompletedRequested;
 
 	// Some definitions
 	//This time becomes effective, when the connectionAttemptsThreshold limit is exceeded

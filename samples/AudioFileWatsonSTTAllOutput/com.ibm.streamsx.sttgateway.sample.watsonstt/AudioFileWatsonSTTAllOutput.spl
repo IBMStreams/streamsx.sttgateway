@@ -65,17 +65,16 @@ use com.ibm.streamsx.sttgateway.watson::*;
  * @param	sttBaseLanguageModel	base language model; Default: en-US_NarrowbandModel
  * @param	contentType	content type; Default audio/wav
  * @param	baseModelVersion	base model version
- * @param	customizationId	"customizationId"
+ * @param	customizationId	customizationId
  * @param	acousticCustomizationId	acousticCustomizationId
  * @param	customizationWeight	customizationWeight; Default 0.30
  * @param	sttBatchSize	stt batch size
  * @param	maxUtteranceAlternatives	maxUtteranceAlternatives; Default 1
  * @param	sttRequestLogging	sttRequestLogging; Default false
  * @param	filterProfanity	filterProfanity; Default false
- * @param	sttJsonResponseDebugging	sttJsonResponseDebugging; Default false
- * @param	wordAlternativesThreshold	"wordAlternativesThreshold; Default 0.0
+ * @param	wordAlternativesThreshold	wordAlternativesThreshold; Default 0.0
  * @param	smartFormattingNeeded	smartFormattingNeeded; Default false
- * @param	keywordsSpottingThreshold	"keywordsSpottingThreshold; Default 0.0
+ * @param	keywordsSpottingThreshold	keywordsSpottingThreshold; Default 0.0
  * @param	keywordsToBeSpotted	keywordsToBeSpotted
  * @param	websocketLoggingNeeded	websocketLoggingNeeded; Default false
  * @param	cpuYieldTimeInAudioSenderThread	cpuYieldTimeInAudioSenderThread; Default 0.001
@@ -113,8 +112,6 @@ public composite AudioFileWatsonSTTAllOutput {
 			(boolean)getSubmissionTimeValue("sttRequestLogging", "false");
 		expression<boolean> $filterProfanity : 
 			(boolean)getSubmissionTimeValue("filterProfanity", "false");
-		expression<boolean> $sttJsonResponseDebugging : 
-			(boolean)getSubmissionTimeValue("sttJsonResponseDebugging", "false");
 		expression<float64> $wordAlternativesThreshold : 
 			(float64)getSubmissionTimeValue("wordAlternativesThreshold", "0.0");
 		expression<boolean> $smartFormattingNeeded : 
@@ -147,6 +144,8 @@ public composite AudioFileWatsonSTTAllOutput {
 			boolean transcriptionCompleted,
 			rstring sttErrorMessage,
 			float64 confidence,
+			float64 utteranceStartTime,
+			float64 utteranceEndTime,
 			rstring utteranceText,
 			list<rstring> utteranceAlternatives, 
 			list<list<rstring>> wordAlternatives,
@@ -157,8 +156,6 @@ public composite AudioFileWatsonSTTAllOutput {
 			list<float64> utteranceWordsConfidences,
 			list<float64> utteranceWordsStartTimes,
 			list<float64> utteranceWordsEndTimes,
-			float64 utteranceStartTime,
-			float64 utteranceEndTime,
 			list<int32> utteranceWordsSpeakers,
 			list<float64> utteranceWordsSpeakersConfidences,
 			map<rstring, list<map<rstring, float64>>> keywordsSpottingResults,
@@ -258,7 +255,6 @@ public composite AudioFileWatsonSTTAllOutput {
 				contentType: $contentType;
 				sttRequestLogging: $sttRequestLogging;
 				filterProfanity: $filterProfanity;
-				sttJsonResponseDebugging: $sttJsonResponseDebugging;
 				maxUtteranceAlternatives: $maxUtteranceAlternatives;
 				wordAlternativesThreshold: $wordAlternativesThreshold;
 				smartFormattingNeeded: $smartFormattingNeeded;

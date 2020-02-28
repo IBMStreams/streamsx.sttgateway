@@ -182,7 +182,7 @@ public composite AudioFileWatsonSTT {
 				/*maxUtteranceAlternatives: 4;
 				wordAlternativesThreshold: 0.7;
 				keywordsSpottingThreshold: 0.2;
-				keywordsToBeSpotted: ["Abraham", "Lincoln", "November", "nation", "freedom"];*/
+				keywordsToBeSpotted: ["Abraham", "Lincoln", "November", "nation", "freedom", "bill", "pay"];*/
 			output O:
 				conversationId = speech,
 				utteranceNumber = getUtteranceNumber(),
@@ -217,7 +217,7 @@ public composite AudioFileWatsonSTT {
 					if (sttErrorMessage == "") {
 						otuple.line = "conversationId=" + conversationId + " myseq=" + (rstring)myseq + "\n" +
 							"transcriptionCompleted=" + (rstring)transcriptionCompleted +
-							" finalizedUtterance=" + (rstring)finalizedUtterance +
+							" finalizedUtterance=" + (rstring)finalizedUtterance + " utteranceNumber=" + (rstring)utteranceNumber +
 							" confidence=" + (rstring)confidence + " utteranceStartTime=" + (rstring)utteranceStartTime +
 							" utteranceEndTime=" + (rstring)utteranceEndTime + "\n" +
 							utteranceText + "\n";

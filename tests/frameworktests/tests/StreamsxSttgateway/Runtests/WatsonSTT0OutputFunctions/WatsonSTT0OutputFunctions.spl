@@ -93,7 +93,6 @@ composite WatsonSTT0OutputFunctions {
 				uri: $uri;
 				baseLanguageModel: $sttBaseLanguageModel;
 				contentType: $contentType;
-				sttJsonResponseDebugging: true;
 				//<*_alt*>maxUtteranceAlternatives: 5;
 				//<*_cfn*>wordAlternativesThreshold: 0.97;
 				//<complete>sttResultMode: complete;

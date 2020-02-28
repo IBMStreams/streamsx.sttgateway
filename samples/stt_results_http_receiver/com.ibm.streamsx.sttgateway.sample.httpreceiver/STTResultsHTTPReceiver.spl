@@ -1,0 +1,67 @@
+/*
+==============================================
+# Licensed Materials - Property of IBM
+# Copyright IBM Corp. 2019
+==============================================
+*/
+
+/*
+==============================================
+First created on: Nov/11/2019
+Last modified on: Nov/11/2019
+
+This is a simple test application that can be 
+used to receive the STT/S2T results that are 
+streamed to an HTTP endpoint. Such streaming of
+the STT/S2T results will happen from these
+two example applications available inside the
+samples directory of the streamsx.sttgateway toolkit.
+
+1) VoiceGatewayToStreamsToWatsonS2T
+2) VoiceGatewayToStreamsToWatsonSTT
+==============================================
+*/
+namespace com.ibm.streamsx.sttgateway.sample.httpreceiver;
+
+// We will need the streamsx.inetserver toolkit v4.3.1 or higher.
+use com.ibm.streamsx.inet.rest::*;
+
+/**
+ * This is a simple test application that can be used to receive the STT/S2T results that are streamed
+ * to an HTTP endpoint. Such streaming of the STT/S2T results will happen from these two example applications 
+ * available inside the samples directory of the streamsx.sttgateway toolkit:
+ * 		1) VoiceGatewayToStreamsToWatsonS2T
+ * 		2) VoiceGatewayToStreamsToWatsonSTT
+ * 
+ * This application will receive JSON data via HTTP and by default write it to stdout. This application can be built 
+ * using the Makefile available in this project directory. 
+ * The Makefile of this sample assumes that the actual version of the streamsx.inetserver toolkit 
+ * is installed under $(HOME)/toolkits/com.ibm.streamsx.inetserver
+ * 
+ * If you have installed the inetserver toolkit in a different location, provide the environment variable 
+ * STREAMS_INET_SERVER_TOOLKIT with the path to that location.
+ * 
+ * your correct streamsx.inetserver toolkit directory. After this application is built, it can be run either as a 
+ * standalone application or as an IBM Streams distributed application.
+ * 
+ * A client can send JSON data via a REST call or via HTTP POST to this operator's URL that is shown below:
+ * 		http://<YOUR_MACHINE_NAME>:<YOUR_HTTP_PORT>/sttresults/Receiver/ports/output/0/inject
+ */
+public composite STTResultsHTTPReceiver {
+	graph
+		(stream<rstring jsonString> JSONData) as Receiver = HTTPJSONInjection() {
+			param
+				context: "sttresults";
+				port: (int32)getSubmissionTimeValue("httpPort", "9080");
+		}
+		
+		// Display it on stdout.
+		() as MySink1 = FileSink(JSONData as JD) {
+			param
+				file: getSubmissionTimeValue("resultFileName", "/dev/stdout");
+				flush: 1u;
+			
+			config
+				threadedPort: queue(JD, Sys.Wait);
+		}
+}

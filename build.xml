@@ -17,6 +17,7 @@
 
 	<property name="websocket.version"  value="0.8.1"/>
 	<property name="boost.version"      value="1.69.0"/>
+	<property name="rapidjson.version"  value="1.1.0"/>
 
 	<exec executable="bash" outputproperty="boost.version.name" failonerror="true">
 		<arg value="-c"/>
@@ -27,7 +28,8 @@
 	<property name="boost.archive"      value="https://dl.bintray.com/boostorg/release"/>
 	<property name="boost.str"          value="boost"/>
 	<property name="websocket.str"      value="websocketpp"/>
-
+	<property name="rapidjson.str"      value="rapidjson"/>
+	
 	<property name="toolkit.dir"        value="com.ibm.streamsx.sttgateway"/>
 	<property name="impl.dir"           location="${toolkit.dir}/impl" />
 	<!-- Directories for external libs -->
@@ -46,13 +48,14 @@
 
 	<property name="samples.dir"        value="samples"/>
 	<property name="samples.doc.dir"    value="samples/${doc.string}/spldoc"/>
-	<property name="demo.dir"           value="demos"/>
 
 	<property name="test.dir"           location="tests/frameworktests"/>
 
 	<property name="release.dir"        location="releases"/>
 	<property name="release.info.file"  value="${toolkit.dir}/build.info"/>
 
+	<property name="rapidjson.lib"      value="${ext.dir}/${rapidjson.str}/${rapidjson.str}-${rapidjson.version}.tar.gz"/>
+	
 	<available property="websocket.src.dir.exists" file="${ext.dir}/${websocket.str}-${websocket.version}/${websocket.str}" type="dir"/>
 	<available property="boost.exists" file="${ext.dir}/boost-install-files/${boost.str}_${boost.version.name}" type="dir"/>
 
@@ -64,7 +67,6 @@
 	<target name="init">
 		<echo message="Toolkit Version: ${tkinfo.identity.version} boost.version: ${boost.version} websocket.version: ${websocket.version}"/>
 		<mkdir dir="${lib.dir}"/>
-		<mkdir dir="${ext.dir}"/>
 	</target>
 
 	<target name="all" depends="toolkit,spldoc"
@@ -141,7 +143,9 @@
 
 	<target name="download-clean"
 		description="Clean up downloaded library sources and the libraries build artifacts from ext directory">
-		<delete dir="${ext.dir}"/>
+		<delete includeemptydirs="true">
+			<fileset dir="${ext.dir}" excludes="${rapidjson.str}/*"/>
+		</delete>
 	</target>
 
 	<target name="requirements" depends="download-websocket,download-boost"
@@ -163,6 +167,16 @@
 			<arg value="--with-system"/>
 			<arg value="-j${no.cpus}"/>
 		</exec>
+		<echo>Copying ${rapidjson.str} ${rapidjson.version}</echo>
+		<untar src="${rapidjson.lib}"
+			dest="${inc.dir}/${rapidjson.str}"
+			compression="gzip"
+			overwrite="false">
+			<patternset>
+				<include name="**/include/**/*"/>
+			</patternset>
+			<cutdirsmapper dirs="3"/>
+		</untar>
 	</target>
 
 	<target name="requirements-clean"
@@ -201,7 +215,8 @@
 		description="Build all samples">
 		<subant genericantfile="${basedir}/build.xml">
 			<target name="build-sample-target"/>
-			<dirset dir="samples" includes="*" excludes="${doc.string},audio-files"/>
+			<!-- stt_results_http_receiver VoiceGatewayToStreamsToWatsonS2T are excluded because they need further dependencies -->
+			<dirset dir="samples" includes="*" excludes="${doc.string},audio-files,stt_results_http_receiver,VoiceGatewayToStreamsToWatsonS2T,VoiceDataSimulator"/>
 		</subant>
 	</target>
 	
@@ -209,11 +224,18 @@
 		description="Clean up all samples index and samples code">
 		<subant genericantfile="${basedir}/build.xml">
 			<target name="clean-sample-target"/>
-			<dirset dir="samples" includes="*" excludes="${doc.string},audio-files"/>
+			<dirset dir="samples" includes="*" excludes="${doc.string},audio-files,VoiceDataSimulator"/>
 		</subant>
 	</target>
 
-	<target name="spldoc-samples" depends="samples"
+	<target name="samples-toolkit-xml" depends="toolkit">
+		<subant genericantfile="${basedir}/build.xml">
+			<target name="build-sample-toolkit-xml-target"/>
+			<dirset dir="samples" includes="*" excludes="${doc.string},audio-files,VoiceDataSimulator"/>
+		</subant>
+	</target>
+
+	<target name="spldoc-samples" depends="samples-toolkit-xml"
 		description="Generate the spldoc for all samples">
 		<echo message="All samples spldoc to: ${samples.doc.dir}"/>
 		<exec executable="bash" outputproperty="samples.list" failonerror="true">
@@ -244,6 +266,14 @@
 		</exec>
 	</target>
 	
+	<target name="build-sample-toolkit-xml-target">
+		<echo message="Sample to build: ${basedir}"/>
+		<exec executable="${spl-mt}" failonerror="true" dir="${basedir}">
+			<arg value="-i"/>
+			<arg value="${basedir}"/>
+		</exec>
+	</target>
+
 	<target name="clean-sample-target">
 		<echo message="Sample to clean: ${basedir}"/>
 		<exec executable="make" failonerror="true" dir="${basedir}">
@@ -322,14 +352,6 @@
 		</exec>
 		<checksum file="${releasefilename}"/>
 		<checksum algorithm="sha1" file="${releasefilename}"/>
-		<echo message="Make demo archive"/>
-		<delete file="${release.dir}/${ant.project.name}-${tkinfo.identity.version}-demos.tgz"/>
-		<tar compression="gzip" longfile="gnu"
-			destfile="${release.dir}/${ant.project.name}-${tkinfo.identity.version}-demos.tgz"
-			basedir="${basedir}"
-			includes="${demo.dir}/** README.md LICENSE"
-			excludes="**/.toolkitList **/.git*"
-		/>
 	</target>
 	
 	<!-- Extract the git commit hash and make release info file -->

@@ -153,7 +153,7 @@ If you are planning to ingest the speech data from live voice calls, then you ca
 In addition to the code snippet shown above to invoke the IBMVoiceGatewaySource operator, one must do additional logic to allocate a dedicated WatsonSTT operator instance for each voice channel in a given call. A demo application is available for this toolkit has that logic which can be reused in any other application. That particular example can be compiled and launched to ingest speech data from the IBM Voice Gateway for seven concurrent voice calls and send it to the WatsonSTT operator running with most of the default STT options to use the STT service on public cloud as shown below.
 
 ```
-cd   streamsx.sttgateway/demos/VoiceGatewayToStreamsToWatsonSTT
+cd   streamsx.sttgateway/samples/VoiceGatewayToStreamsToWatsonSTT
 make
 st  submitjob  -d  <YOUR_STREAMS_DOMAIN>  -i  <YOUR_STREAMS_INSTANCE>  output/com.ibm.streamsx.sttgateway.sample.watsonstt.VoiceGatewayToStreamsToWatsonSTT.sab -P tlsPort=9443  -P numberOfSTTEngines=14  -P sttApiKey=<YOUR_WATSON_STT_SERVICE_API_KEY>  -P contentType="audio/mulaw;rate=8000"
 ```
@@ -162,7 +162,7 @@ st  submitjob  -d  <YOUR_STREAMS_DOMAIN>  -i  <YOUR_STREAMS_INSTANCE>  output/co
 For those customers who are using the speech to text engine embedded in the com.ibm.streams.speech2text.watson::WatsonS2T operator, the following example is available as a reference application to exploit that operator in a real-time voice call analytics scenario. It can be compiled and executed as shown below. You have to replace the hardcoded paths and IP addresses to suit your environment.
 
 ```
-cd   streamsx.sttgateway/demos/VoiceGatewayToStreamsToWatsonS2T
+cd   streamsx.sttgateway/samples/VoiceGatewayToStreamsToWatsonS2T
 make
 st submitjob -P tlsPort=9443 -P vgwSessionLoggingNeeded=false -P numberOfS2TEngines=4 -P WatsonS2TConfigFile=/home/streamsadmin/toolkit.speech2text-v2.12.0/model/en_US.8kHz.general.diarization.low_latency.pset -P WatsonS2TModelFile=$HOME/toolkit.speech2text-v2.12.0/model/en_US.8kHz.general.pkg -P ipv6Available=false -P writeTranscriptionResultsToFiles=true -P sendTranscriptionResultsToHttpEndpoint=true -P httpEndpointForSendingTranscriptionResults=http://172.30.105.11:9080/sttresults/Receiver/ports/output/0/inject output/com.ibm.streamsx.sttgateway.sample.watsons2t.VoiceGatewayToStreamsToWatsonS2T.sab
 ```
