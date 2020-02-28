@@ -260,7 +260,6 @@ WatsonSTTImpl<OP, OT>::WatsonSTTImpl(OP & splOperator_,Conf config_)
 	<< "\ncustomizationWeight                     = " << Conf::customizationWeight
 	<< "\nacousticCustomizationId                 = " << Conf::acousticCustomizationId
 	<< "\nfilterProfanity                         = " << Conf::filterProfanity
-	<< "\nsttJsonResponseDebugging                = " << Conf::sttJsonResponseDebugging
 	<< "\nmaxUtteranceAlternatives                = " << Conf::maxUtteranceAlternatives
 	<< "\nwordAlternativesThreshold               = " << Conf::wordAlternativesThreshold
 	<< "\nwordConfidenceNeeded                    = " << Conf::wordConfidenceNeeded

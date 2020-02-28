@@ -26,6 +26,10 @@ if [[ $TTRO_variantCase == 'stt_results_http_receiver' ]]; then
 	fi
 fi
 
+if [[ $TTRO_variantCase == 'VoiceDataSimulator' ]]; then
+	setSkip "sample is not an spl sample"
+fi
+
 function testStep {
 	local save="$PWD"
 	cd "$TTPR_SreamsxSttgatewaySamplesPath/$TTRO_variantCase"

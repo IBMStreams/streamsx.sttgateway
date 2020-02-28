@@ -9,28 +9,6 @@
 ==============================================
 First created on: Sep/25/2019
 Last modified on: Nov/06/2019
-
-This example demonstrates the integration of the following three products to
-achieve Real-Time Speech-To-Text transcription to get the text ready for
-any further analytics.
-
-1) IBM Voice Gateway
-2) IBM Streams
-3) IBM Watson Speech To Text (on Cloud Pak for Data or on IBM public cloud)
-
-These three products will work in the following sequence:
-
-Your Telephony SIPREC-->IBM Voice Gateway-->IBM Streams-->IBM Watson STT
-
-You can build this example from command line via the make command by using the
-Makefile available in the top-level directory of this example. It will be
-necessary to export the STREAMS_STTGATEWAY_TOOLKIT environment variable by
-pointing it to the full path of your 
-streamsx.sttgateway/com.ibm.streamsx.sttgateway directory.
-
-If you want to build this example inside the Streams Studio, there are certain
-build configuration settings needed. Please refer to the streamsx.sttgateway
-toolkit documentation to learn more about those Streams Studio configuration settings.
 ==============================================
 */
 namespace com.ibm.streamsx.sttgateway.sample.watsonstt;
@@ -48,17 +26,19 @@ use com.ibm.streamsx.json::*;
 // outside of those composites in order for the compiler to
 // resolve this type correctly.
 // 
-// This STT result type contains many attributes to
-// demonstrate all the basic and very advanced features of 
-// the Watson STT service. Not all real-life applications will need 
-// all these attributes. You can decide to include or omit these
-// attributes based on the specific STT features your application will need. 
-// Trimming the unused attributes will also help in 
-// reducing the STT processing overhead and in turn 
-// help in receiving the STT results faster.
-// Read the streamsx.sttgateway toolkit documentation to learn about
-// what features are available, how they work and how different attributes are 
-// related to those features.
+/**
+ * This STT result type contains many attributes to 
+ * demonstrate all the basic and very advanced features of 
+ * the Watson STT service. Not all real-life applications will need 
+ * all these attributes. You can decide to include or omit these 
+ * attributes based on the specific STT features your application will need. 
+ * Trimming the unused attributes will also help in 
+ * reducing the STT processing overhead and in turn 
+ * help in receiving the STT results faster. 
+ * Read the streamsx.sttgateway toolkit documentation to learn about 
+ * what features are available, how they work and how different attributes are 
+ * related to those features.
+ *  */
 type STTResult_t = rstring vgwSessionId, boolean isCustomerSpeechData, 
 	int32 vgwVoiceChannelNumber, 
 	rstring callerPhoneNumber, rstring agentPhoneNumber,
@@ -83,19 +63,127 @@ type STTResult_t = rstring vgwSessionId, boolean isCustomerSpeechData,
 	list<float64> utteranceWordsSpeakersConfidences,
 	map<rstring, list<map<rstring, float64>>> keywordsSpottingResults;
 
-// This is the main composite for this application.
+/**
+ * This example demonstrates the integration of the following three products to 
+ * achieve Real-Time Speech-To-Text transcription to get the text ready for 
+ * any further analytics.
+ * 
+ * 		1) IBM Voice Gateway 
+ * 		2) IBM Streams 
+ * 		3) IBM Watson Speech To Text (on Cloud Pak for Data or on IBM public cloud) 
+ * 
+ * These three products will work in the following sequence:
+ * 
+ * 		Your Telephony SIPREC-->IBM Voice Gateway-->IBM Streams-->IBM Watson STT
+ * You can build this example from command line via the make command by using the 
+ * Makefile available in the top-level directory of this example. It will be 
+ * necessary to export the STREAMS_STTGATEWAY_TOOLKIT environment variable by 
+ * pointing it to the full path of your 
+ * streamsx.sttgateway/com.ibm.streamsx.sttgateway directory. 
+ * 
+ * If you want to build this example inside the Streams Studio, there are certain 
+ * build configuration settings needed. Please refer to the streamsx.sttgateway 
+ * toolkit documentation to learn more about those Streams Studio configuration settings. 
+ * 
+ * @param	tlsPort	TLS port on which this application will listen for communicating with the IBM Voice Gateway.
+ * 
+ * @param	nonTlsEndpointNeeded	User can optionally specify whether they want a non-TLS endpoint.
+ * 
+ * @param	nonTlsPort	Non-TLS (Plain) port on which this application will (optionally) listen for communicating with the IBM Voice Gateway.
+ * 
+ * @param	certificateFileName	Server side certificate (.pem) file for the WebSocket server.
+ *  It is necessary for the users to create a Root CA signed 
+ *  server side certificate file and point to that file at the time of
+ *  starting this application. If the user doesn't point to this file
+ *  at the time of starting the application, then the application will
+ *  look for a default file named ws-server.pem inside the etc sub-directory
+ *  of the application. This certificate will be presented to the
+ *  IBM Voice Gateway for validation when it establishes a WebSocket 
+ *  connection with this application. For doing quick tests, you may save
+ *  time and effort needed in getting a proper Root CA signed certificate 
+ *  by going with a simpler option of creating your own self-signed 
+ *  certificate. Please ensure that using a self-signed certificate is 
+ *  allowed in your environment. We have provided a set of instructions to
+ *  create a self signed certificate. Please refer to the following
+ *  file in the etc sub-directory of this application:
+ *  etc/creating-a-self-signed-certificate.txt
+ * 
+ * @param	vgwLiveMetricsUpdateNeeded	Is live metrics needed for the IBMVoiceGatewaySource operator?
+ * 
+ * @param	vgwWebsocketLoggingNeeded	Is WebSocket library low level logging needed?
+ * 
+ * @param	vgwSessionLoggingNeeded	Is IBM Voice Gateway message exchange logging needed for debugging?
+ * 
+ * @param	sttApiKey	IBM Watson STT related submission time values are defined below.
+ *  IMPORTANT: The WatsonSTT operator uses Websocket to communicate with the 
+ *  Watson STT cloud service. For the STT service on IBM Public Cloud, 
+ *  one must use the unexpired IAM access token (generated by using your 
+ *  IBM Public cloud STT service instance's API key). 
+ *  So, user must provide here his/her API key. We have some logic below that 
+ *  will use the user provided API key to generate the IAM access token and 
+ *  send that to the WatsonSTT operator.
+ *  There is additional logic available below to keep refreshing that
+ *  IAM access token periodically in order for it to stay unexpired.
+ *  You should leave this submission time value empty when not using STT on IBM public cloud.
+ *  https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-websockets#WSopen
+ * 
+ * @param	sttIAMTokenURL	Specify either the public cloud IAM Token fetch/refresh URL.
+ * 
+ * @param	sttOnCP4DAccessToken	Specify the access token refresh interval in minutes.
+ * 
+ * @param	numberOfSTTEngines	Number of stt engines
+ * 
+ * @param	initDelayBeforeSendingDataToSttEngines	Time in seconds to wait before sending data to the STT engines.
+ * 
+ * @param	vgwStaleSessionPurgeInterval	Time interval in seconds during which the VGW source operator below should
+ *  do memory cleanup of any Voice Gateway sessions that end abruptly in the
+ *  middle of a voice call.
+ * 
+ * @param	ipv6Available	Is ipv6 protocol stack available in the Streams machine where the
+ *  IBMVoiceGatewaySource operator is going to run?
+ *  Most of the Linux machines will have ipv6. In that case,
+ *  you can keep the following line as it is.
+ *  If you don't have ipv6 in your environment, you can set the
+ *  following submission time value to false.
+ * 
+ * @param	sttUri	sttUri default wss://stream.watsonplatform.net/speech-to-text/api/v1/recognize
+ * 
+ * @param	sttBaseLanguageModel	sttBaseLanguageModel
+ * 
+ * @param	contentType	contentType
+ * 
+ * @param	nonFinalUtterancesNeeded	nonFinalUtterancesNeeded
+ * 
+ * @param	baseModelVersion	baseModelVersion
+ * 
+ * @param	customizationId	customizationId
+ * 
+ * @param	acousticCustomizationId	acousticCustomizationId
+ * 
+ * @param	customizationWeight	customizationWeight
+ * 
+ * @param	maxUtteranceAlternatives	maxUtteranceAlternatives
+ * 
+ * @param	sttRequestLogging	sttRequestLogging
+ * 
+ * @param	filterProfanity	filterProfanity
+ * 
+ * @param	wordAlternativesThreshold	wordAlternativesThreshold
+ * @param	smartFormattingNeeded	smartFormattingNeeded
+ * @param	keywordsSpottingThreshold	keywordsSpottingThreshold
+ * @param	keywordsToBeSpotted	keywordsToBeSpotted
+ * @param	sttWebsocketLoggingNeeded	sttWebsocketLoggingNeeded
+ * @param	cpuYieldTimeInAudioSenderThread	cpuYieldTimeInAudioSenderThread
+ * @param	waitTimeBeforeSTTServiceConnectionRetry	waitTimeBeforeSTTServiceConnectionRetry
+ * @param	connectionAttemptsThreshold	connectionAttemptsThreshold
+ * @param	sttLiveMetricsUpdateNeeded	sttLiveMetricsUpdateNeeded
+ * 
+ */
 public composite VoiceGatewayToStreamsToWatsonSTT {
 	param
 		// IBM Voice Gateway related submission time values are defined below.
-		// TLS port on which this application will listen for
-		// communicating with the IBM Voice Gateway.
-		expression<uint32> $tlsPort : 
-			(uint32)getSubmissionTimeValue("tlsPort", "443");
-		// User can optionally specify whether they want a non-TLS endpoint.
-		expression<boolean> $nonTlsEndpointNeeded : 
-			(boolean)getSubmissionTimeValue("nonTlsEndpointNeeded", "false");
-		// Non-TLS (Plain) port on which this application will
-		// (optionally) listen for communicating with the IBM Voice Gateway.
+		expression<uint32> $tlsPort : (uint32)getSubmissionTimeValue("tlsPort", "443");
+		expression<boolean> $nonTlsEndpointNeeded : (boolean)getSubmissionTimeValue("nonTlsEndpointNeeded", "false");
 		expression<uint32> $nonTlsPort : 
 			(uint32)getSubmissionTimeValue("nonTlsPort", "80");
 		// Server side certificate (.pem) file for the WebSocket server.
@@ -187,16 +275,8 @@ public composite VoiceGatewayToStreamsToWatsonSTT {
 			(boolean)getSubmissionTimeValue("sttRequestLogging", "false");
 		expression<boolean> $filterProfanity : 
 			(boolean)getSubmissionTimeValue("filterProfanity", "false");
-		expression<boolean> $sttJsonResponseDebugging : 
-			(boolean)getSubmissionTimeValue("sttJsonResponseDebugging", "false");
 		expression<float64> $wordAlternativesThreshold : 
 			(float64)getSubmissionTimeValue("wordAlternativesThreshold", "0.0");
-		expression<boolean> $wordConfidenceNeeded : 
-			(boolean)getSubmissionTimeValue("wordConfidenceNeeded", "false");
-		expression<boolean> $wordTimestampNeeded : 
-			(boolean)getSubmissionTimeValue("wordTimestampNeeded", "false");
-		expression<boolean> $identifySpeakers : 
-			(boolean)getSubmissionTimeValue("identifySpeakers", "false");
 		expression<boolean> $smartFormattingNeeded : 
 			(boolean)getSubmissionTimeValue("smartFormattingNeeded", "false");
 		expression<float64> $keywordsSpottingThreshold : 
@@ -653,7 +733,7 @@ public composite VoiceGatewayToStreamsToWatsonSTT {
 // Following is a composite where we are going to perform the
 // logic to invoke the WatsonSTT operator for doing the
 // Speech To Text transcription.
-public composite IBMWatsonSpeechToText(input AudioBlobContent, AccessToken;
+composite IBMWatsonSpeechToText(input AudioBlobContent, AccessToken;
 	output STTResult) {
 	param
 		expression<rstring> $sttUri : getSubmissionTimeValue("sttUri",
@@ -678,8 +758,6 @@ public composite IBMWatsonSpeechToText(input AudioBlobContent, AccessToken;
 			(boolean)getSubmissionTimeValue("sttRequestLogging", "false");
 		expression<boolean> $filterProfanity : 
 			(boolean)getSubmissionTimeValue("filterProfanity", "false");
-		expression<boolean> $sttJsonResponseDebugging : 
-			(boolean)getSubmissionTimeValue("sttJsonResponseDebugging", "false");
 		expression<float64> $wordAlternativesThreshold : 
 			(float64)getSubmissionTimeValue("wordAlternativesThreshold", "0.0");
 		expression<boolean> $smartFormattingNeeded : 
@@ -731,7 +809,6 @@ public composite IBMWatsonSpeechToText(input AudioBlobContent, AccessToken;
 				nonFinalUtterancesNeeded: $nonFinalUtterancesNeeded;
 				sttRequestLogging: $sttRequestLogging;
 				filterProfanity: $filterProfanity;
-				sttJsonResponseDebugging: $sttJsonResponseDebugging;
 				maxUtteranceAlternatives: $maxUtteranceAlternatives;
 				wordAlternativesThreshold: $wordAlternativesThreshold;
 				smartFormattingNeeded: $smartFormattingNeeded;
@@ -801,7 +878,7 @@ public composite IBMWatsonSpeechToText(input AudioBlobContent, AccessToken;
 // STT result of a given voice call in specific ways such as
 // storing in files, message queues, databases or make it 
 // accessible from a web application.
-public composite STTResultProcessor(input MyTranscriptionResult) {
+composite STTResultProcessor(input MyTranscriptionResult) {
 	param
 		// This submission time value decides whether to write the
 		// transcription results to files or not.
@@ -958,7 +1035,7 @@ public composite STTResultProcessor(input MyTranscriptionResult) {
 //
 // This function creates a new list with all the UDP channel numbers in it. 
 // That means, all such channels are idle at this time. 
-public list<int32> prepareIdleUdpChannelsList(int32 sttEngineCount) {
+list<int32> prepareIdleUdpChannelsList(int32 sttEngineCount) {
 	mutable list<int32> myList = [];
 	
 	for(int32 idx in range(sttEngineCount)) {
@@ -971,7 +1048,7 @@ public list<int32> prepareIdleUdpChannelsList(int32 sttEngineCount) {
 // This function takes the idle UDP channels list as an input and
 // returns an idle UDP channel number from the top of the list.
 // If all are busy at this time, it will return -1.
-public int32 getAnIdleUdpChannel(mutable list<int32> myList) {
+int32 getAnIdleUdpChannel(mutable list<int32> myList) {
 	if (size(myList) > 0) {
 		// Get the channel number available at the very top of the list.
 		int32 channelNumber = myList[0];

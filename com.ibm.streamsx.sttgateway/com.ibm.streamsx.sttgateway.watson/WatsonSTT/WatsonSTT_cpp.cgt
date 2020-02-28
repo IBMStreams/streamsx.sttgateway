@@ -176,9 +176,6 @@ https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-websocke
 	my $filterProfanity = $model->getParameterByName("filterProfanity");
 	$filterProfanity = $filterProfanity ? $filterProfanity->getValueAt(0)->getCppExpression() : 0;
 
-	my $sttJsonResponseDebugging = $model->getParameterByName("sttJsonResponseDebugging");
-	$sttJsonResponseDebugging = $sttJsonResponseDebugging ? $sttJsonResponseDebugging->getValueAt(0)->getCppExpression() : 0;
-
 	my $maxUtteranceAlternatives = $model->getParameterByName("maxUtteranceAlternatives");
 	if (($sttResultMode eq "complete") && $maxUtteranceAlternatives) {
 		SPL::CodeGen::exitln("In sttResultMode complete, parameter maxUtteranceAlternatives is not allowed", $model->getContext()->getSourceLocation());
@@ -243,7 +240,6 @@ MY_OPERATOR::MY_OPERATOR()
 						<%=$customizationWeight%>,
 						<%=$acousticCustomizationId%>,
 						<%=$filterProfanity%>,
-						<%=$sttJsonResponseDebugging%>,
 						<%=$maxUtteranceAlternatives%>,
 						<%=$wordAlternativesThreshold%>,
 						<%=$wordConfidenceNeeded%>,

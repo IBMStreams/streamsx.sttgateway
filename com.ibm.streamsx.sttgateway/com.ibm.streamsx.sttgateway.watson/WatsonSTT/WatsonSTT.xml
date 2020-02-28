@@ -497,16 +497,6 @@
       </parameter>
 
       <parameter>
-        <name>sttJsonResponseDebugging</name>
-        <description>This parameter is used for debugging the STT JSON response message. Mostly for IBM internal use. (Default is false)</description>
-        <optional>true</optional>
-        <rewriteAllowed>true</rewriteAllowed>
-        <expressionMode>AttributeFree</expressionMode>
-        <type>boolean</type>
-        <cardinality>1</cardinality>
-      </parameter>
-      
-      <parameter>
         <name>maxUtteranceAlternatives</name>
         <description>
         This parameter indicates the required number of n-best alternative hypotheses for the transcription results. (Default is 1)

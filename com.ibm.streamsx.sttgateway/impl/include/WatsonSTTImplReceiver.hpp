@@ -485,9 +485,6 @@ void WatsonSTTImplReceiver<OP, OT>::on_open(client* c, websocketpp::connection_h
 
 	msg += std::string("}");
 
-	if (sttJsonResponseDebugging == true) {
-		std::cout << traceIntro << "-->RE7 Websocket STT recognition request start message=" << msg << std::endl;
-	}
 	c->send(hdl,msg,websocketpp::frame::opcode::text);
 	// Store this handle to be used from process and shutdown methods of this operator.
 	wsHandle = hdl;
