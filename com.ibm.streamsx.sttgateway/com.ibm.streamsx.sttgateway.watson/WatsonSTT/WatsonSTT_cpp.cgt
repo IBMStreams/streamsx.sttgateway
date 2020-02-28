@@ -108,6 +108,7 @@ https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-websocke
 	my $wordTimestampNeeded = 0;
 	my $wordConfidenceNeeded = 0;
 	my $identifySpeakers = 0;
+	my $isTranscriptionCompletedRequested = 0;
 	my $oport = $model->getOutputPortAt(0); 
 	foreach my $attribute (@{$oport->getAttributes()}) {
 		my $name = $attribute->getName(); 
@@ -126,6 +127,8 @@ https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-websocke
 		} elsif ($op eq "getUtteranceWordsSpeakersConfidences") {
 			$identifySpeakers = 1;
 			$wordTimestampNeeded = 1;
+		} elsif ($op eq "isTranscriptionCompleted") {
+			$isTranscriptionCompletedRequested = 1;
 		} elsif (($op eq "getUtteranceNumber") || ($op eq "isFinalizedUtterance") ||
 				($op eq "getConfidence") || ($op eq "getUtteranceAlternatives")) {
 			if ($sttResultMode eq "complete") {
@@ -133,7 +136,7 @@ https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-websocke
 			}
 		}
 	}
-	print "// wordConfidenceNeeded=$wordConfidenceNeeded wordTimestampNeeded=$wordTimestampNeeded identifySpeakers=$identifySpeakers\n";
+	print "// wordConfidenceNeeded=$wordConfidenceNeeded wordTimestampNeeded=$wordTimestampNeeded identifySpeakers=$identifySpeakers isTranscriptionCompletedRequested=$isTranscriptionCompletedRequested\n";
 
 	# Following are the operator parameters.
 	
@@ -248,7 +251,8 @@ MY_OPERATOR::MY_OPERATOR()
 						<%=$identifySpeakers%>,
 						<%=$smartFormattingNeeded%>,
 						<%=$keywordsSpottingThreshold%>,
-						<%=$keywordsToBeSpotted%>
+						<%=$keywordsToBeSpotted%>,
+						<%=$isTranscriptionCompletedRequested%>
 					}
 				)
 {}

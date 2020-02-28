@@ -49,7 +49,7 @@ type IAMAccessToken = rstring access_token, rstring refresh_token,
  * transcription to happen.
  * 
  * This operator has 2 operation modes: 
- * * If parameter *accessToken* is non empty, the operator emits **one output tuple** with the access token and the operator 
+ * * If parameter *accessToken* is nonempty, the operator emits **one output tuple** with the access token and the operator 
  * thread ends.
  * * If parameter *accessToken* is empty, the operator connects to the IAM authorization service specified by parameter 
  * `iamTokenURL` and requests an access token by using the provided `apiKey`. The received access token is submitted to 
@@ -82,14 +82,14 @@ type IAMAccessToken = rstring access_token, rstring refresh_token,
  * from IAM authentication service. The stream must be of type [com.ibm.streamsx.sttgateway.watson::IAMAccessToken]. 
  * The output generates a tuple once a initial or refreshed access token is available.
  * 
- * @param	accessToken	If parameter *accessToken* is non empty, the operator emits **one output tuple** with the 
+ * @param	accessToken	If parameter *accessToken* is nonempty, the operator emits **one output tuple** with the 
  * access token and the operator thread ends. If parameter *accessToken* is empty, the operator connects to the 
  * IAM authorization service specified by parameter `iamTokenURL` and requests an access token by using the provided `apiKey`. 
  * If the application configuration with name *appConfigName* and property *accessToken* exists, this parameter is overwritten. 
  * Type: *rstring*; Default: *""*
  * 
  * @param	appConfigName	The name of the application configuration to look for connection parameters. If this parameter 
- * is non empty, the properties from this application configuration overwrite the operator parameters. An empty string 
+ * is nonempty, the properties from this application configuration overwrite the operator parameters. An empty string 
  * disables the lookup in the Application Configuration. This may be used if all non default parameters are supplied in the operator 
  * invocation. 
  * Type: *rstring*; Default: *sttConnection*
@@ -180,7 +180,7 @@ public composite IAMAccessTokenGenerator(output IamAccessTokenStream) {
 						if (err == 0)
 							accessToken = prop;
 					}
-					// If accessToken is non empty, emit the access token and end the thread
+					// If accessToken is nonempty, emit the access token and end the thread
 					if (accessToken != "") {
 						printStringLn("IamAccessTokenStream: accessToken is configured, emit and end!");
 						O otuple = {access_token=accessToken, refresh_token="", scope="", expiration=0l, token_type="", expires_in=0l};

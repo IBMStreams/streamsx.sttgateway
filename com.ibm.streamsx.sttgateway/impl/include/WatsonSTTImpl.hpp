@@ -269,6 +269,7 @@ WatsonSTTImpl<OP, OT>::WatsonSTTImpl(OP & splOperator_,Conf config_)
 	<< "\nsmartFormattingNeeded                   = " << Conf::smartFormattingNeeded
 	<< "\nkeywordsSpottingThreshold               = " << Conf::keywordsSpottingThreshold
 	<< "\nkeywordsToBeSpotted                     = " << Conf::keywordsToBeSpotted
+	<< "\nisTranscriptionCompletedRequested       = " << Conf::isTranscriptionCompletedRequested
 	<< "\nconnectionState.wsState.is_lock_free()  = " << Rec::wsState.is_lock_free()
 	<< "\nrecentOTuple.is_lock_free()             = " << Rec::recentOTuple.is_lock_free()
 	<< "\n----------------------------------------------------------------" << std::endl;

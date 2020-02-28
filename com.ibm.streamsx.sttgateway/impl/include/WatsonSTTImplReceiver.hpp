@@ -611,7 +611,7 @@ void WatsonSTTImplReceiver<OP, OT>::on_message(client* c, websocketpp::connectio
 
 		// send out the error with the non finalized output if any
 		if (oTupleUsedForSubmission) {
-			SPLAPPTRC(L_TRACE, traceIntro << "-->RE26 send a non finalized oTupleUsedForSubmission", "ws_receiver");
+			SPLAPPTRC(L_DEBUG, traceIntro << "-->RE26 send a non finalized oTupleUsedForSubmission", "ws_receiver");
 			splOperator.appendErrorAttribute(oTupleUsedForSubmission, sttErrorString_);
 			splOperator.submit(*oTupleUsedForSubmission, 0);
 			oTupleUsedForSubmission = nullptr;
@@ -653,23 +653,26 @@ void WatsonSTTImplReceiver<OP, OT>::on_message(client* c, websocketpp::connectio
 			splOperator.submit(*oTupleUsedForSubmission, 0);
 			oTupleUsedForSubmission = nullptr;
 		}
-		OT * myRecentOTuple = recentOTuple.load(); // load atomic
-		if (myRecentOTuple) {
-			SPLAPPTRC(L_TRACE, traceIntro << "-->RE 30 set transcription completed tuple.", "ws_receiver");
-			// clean the previous set values in the output tuple
-			splOperator.setResultAttributes(myRecentOTuple, -1, false, -1.0, 0.0, 0.0, "", SPL::list<SPL::rstring>(),
-			SPL::list<SPL::rstring>(), SPL::list<SPL::float64>(), SPL::list<SPL::float64>(), SPL::list<SPL::float64>(),
-			SPL::list<SPL::list<SPL::rstring> >(), SPL::list<SPL::list<SPL::float64> >(),
-			SPL::list<SPL::float64>(), SPL::list<SPL::float64>(),
-			SPL::map<SPL::rstring, SPL::list<SPL::map<SPL::rstring, SPL::float64> > >());
-			if (Config::identifySpeakers)
-				splOperator.setSpeakerResultAttributes(myRecentOTuple, SPL::list<SPL::int32>(), SPL::list<SPL::float64>(), SPL::list<SPL::float64>());
-			// set required output values
-			splOperator.setTranscriptionCompleteAttribute(myRecentOTuple);
-			splOperator.submit(*myRecentOTuple, 0);
-		} else {
-			SPLAPPTRC(L_ERROR, traceIntro << "-->RE 31 no recent output tuple available but non finalized fullTranscriptionCompleted_. payload_: " << payload_, "ws_receiver");
+		if (Config::isTranscriptionCompletedRequested) {
+			OT * myRecentOTuple = recentOTuple.load(); // load atomic
+			if (myRecentOTuple) {
+				SPLAPPTRC(L_DEBUG, traceIntro << "-->RE 30 send transcription completed tuple.", "ws_receiver");
+				// clean the previous set values in the output tuple
+				splOperator.setResultAttributes(myRecentOTuple, -1, false, -1.0, 0.0, 0.0, "", SPL::list<SPL::rstring>(),
+				SPL::list<SPL::rstring>(), SPL::list<SPL::float64>(), SPL::list<SPL::float64>(), SPL::list<SPL::float64>(),
+				SPL::list<SPL::list<SPL::rstring> >(), SPL::list<SPL::list<SPL::float64> >(),
+				SPL::list<SPL::float64>(), SPL::list<SPL::float64>(),
+				SPL::map<SPL::rstring, SPL::list<SPL::map<SPL::rstring, SPL::float64> > >());
+				if (Config::identifySpeakers)
+					splOperator.setSpeakerResultAttributes(myRecentOTuple, SPL::list<SPL::int32>(), SPL::list<SPL::float64>(), SPL::list<SPL::float64>());
+				// set required output values
+				splOperator.setTranscriptionCompleteAttribute(myRecentOTuple);
+				splOperator.submit(*myRecentOTuple, 0);
+			} else {
+				SPLAPPTRC(L_ERROR, traceIntro << "-->RE 31 no recent output tuple available but non finalized fullTranscriptionCompleted_. payload_: " << payload_, "ws_receiver");
+			}
 		}
+		SPLAPPTRC(L_DEBUG, traceIntro << "-->RE 30a send window punctuation marker.", "ws_receiver");
 		// delete the recentOTuple if end of conversation was reached
 		// flag transcriptionFinalized
 		recentOTuple.store(nullptr);
@@ -754,7 +757,9 @@ void WatsonSTTImplReceiver<OP, OT>::on_message(client* c, websocketpp::connectio
 		} else {
 			if (oTupleUsedForSubmission) {
 				SPLAPPTRC(L_DEBUG, traceIntro << "-->RE38 send queued utterance results tuple with speaker info", "ws_receiver");
-				// speaker consistency check
+				// speaker consistency check - check the from time of the speaker labels against the from time of the words list
+				// this test guarantees that for each word in word list, a speaker label is correctly assigned
+				// if a speaker label is missing for a specific from time, the value -1 is assigned
 				rapidjson::SizeType spkSize = dec.DecoderSpeakerLabels::getSize();
 				const SPL::list<SPL::float64> & spkFrom = dec.DecoderSpeakerLabels::getFrom();
 				const SPL::list<SPL::int32> &   spkSpk  = dec.DecoderSpeakerLabels::getSpeaker();
@@ -763,10 +768,15 @@ void WatsonSTTImplReceiver<OP, OT>::on_message(client* c, websocketpp::connectio
 				for (rapidjson::SizeType i = 0; i < spkSize; i++) {
 					spkIndexMap.insert(std::pair<const SPL::float64, rapidjson::SizeType>(spkFrom[i], i));
 				}
-				SPL::list<SPL::float64> spkFromNew;
-				SPL::list<SPL::int32>   spkSpkNew;
-				SPL::list<SPL::float64> spkCfdNew;
-				for (rapidjson::SizeType i = 0; i < myUtteranceWordsStartTimes.size(); i++) {
+				auto wordListSize = myUtteranceWordsStartTimes.size();
+				if (spkSize != wordListSize) {
+					SPLAPPTRC(L_ERROR, traceIntro << "-->RE41 Word list size " << wordListSize <<
+							" and spaker list size " << spkSize << " are not equal. payload_: " << payload_, "ws_receiver");
+				}
+				SPL::list<SPL::float64> spkFromNew; spkFromNew.reserve(wordListSize);
+				SPL::list<SPL::int32>   spkSpkNew;  spkSpkNew.reserve(wordListSize);
+				SPL::list<SPL::float64> spkCfdNew;  spkCfdNew.reserve(wordListSize);
+				for (rapidjson::SizeType i = 0; i < wordListSize; i++) {
 					SPL::float64 startt = myUtteranceWordsStartTimes[i];
 					auto it = spkIndexMap.find(startt);
 					if (it != spkIndexMap.end()) {
@@ -776,18 +786,16 @@ void WatsonSTTImplReceiver<OP, OT>::on_message(client* c, websocketpp::connectio
 						spkSpkNew.push_back(spkSpk[idx]);
 						spkCfdNew.push_back(spkCfd[idx]);
 					} else {
+						SPLAPPTRC(L_ERROR, traceIntro << "-->RE40 No speaker label at: " << startt << " insert -1. payload_: " << payload_, "ws_receiver");
 						std::cout << "not found " << startt << std::endl;
 						spkFromNew.push_back(startt);
 						spkSpkNew.push_back(-1);
 						spkCfdNew.push_back(-1.0);
 					}
 				}
-
+				// assign speaker labels to output tuple
 				splOperator.setSpeakerResultAttributes(
 						oTupleUsedForSubmission,
-						//dec.DecoderSpeakerLabels::getSpeaker(),
-						//dec.DecoderSpeakerLabels::getConfidence(),
-						//dec.DecoderSpeakerLabels::getFrom()
 						spkSpkNew,
 						spkCfdNew,
 						spkFromNew
@@ -800,10 +808,6 @@ void WatsonSTTImplReceiver<OP, OT>::on_message(client* c, websocketpp::connectio
 		}
 		return;
 	}
-
-	// none : must not happen
-	SPLAPPTRC(L_ERROR, traceIntro << "-->RE40 no payload to process. payload_:" << payload_, "ws_receiver");
-
 } // End of the on_message method.
 
 // Whenever our existing Websocket connection to the Watson STT service is closed,

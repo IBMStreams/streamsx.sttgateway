@@ -31,7 +31,7 @@
         * partial: to get partial utterances,
         * complete (default) to get the full text after transcribing the entire audio.
       The setting of this this parameter influences the validity of output functions and parameters. In `sttResultMode` 
-      `partial` the the parameter `nonFinalUtterancesNeeded` controls the output of non final utterances.
+      `partial` the parameter `nonFinalUtterancesNeeded` controls the output of non final utterances.
       
       Requirements: 
       * Intel RHEL6 or RHEL7 hosts installed with IBM Streams. 
@@ -194,7 +194,10 @@
             <description>
             Returns a boolean value to indicate whether the full transcription/conversation is completed. 
             
-            **Note:** This function is not available if `sttResult` mode equals `complete`.
+            **Note:** If this function is requested, the operator emits at conversation end a tuple with this flag equal 
+            true. All other output functions deliver the default value for the final tuple of an conversation. If this 
+            function is not requested, the operator does not send a final tuple for the conversation. The operator sends in any 
+            case a window punctuation marker at the end of an conversation.
             </description>
             <prototype><![CDATA[boolean isTranscriptionCompleted()]]></prototype>
           </function>
@@ -204,6 +207,7 @@
             List will have the very best guess first followed by the next best ones in that order. 
             
             **Note:** This function is not available if `sttResult` mode equals `complete`.
+            **Note:** n-best alternative hypotheses are available only for final `utterances`.
             </description>
             <prototype><![CDATA[list<rstring> getUtteranceAlternatives()]]></prototype>
           </function>
@@ -211,7 +215,7 @@
             <description>
             Returns a nested list of word alternatives (Confusion Networks). 
             
-            **Note:** This function is not available if `sttResult` mode equals `complete`.
+            **Note:** word alternatives are available only for final `utterances`.
             </description>
             <prototype><![CDATA[list<list<rstring>> getWordAlternatives()]]></prototype>
           </function>
@@ -219,7 +223,7 @@
             <description>
             Returns a nested list of word alternatives confidences (Confusion Networks). 
             
-            **Note:** This function is not available if `sttResult` mode equals `complete`.
+            **Note:** word alternative confidences are available only for final `utterances`.
             </description>
             <prototype><![CDATA[list<list<float64>> getWordAlternativesConfidences()]]></prototype>
           </function>
@@ -227,7 +231,7 @@
             <description>
             Returns a list of word alternatives start times (Confusion Networks). 
             
-            **Note:** This function is not available if `sttResult` mode equals `complete`.
+            **Note:** word alternative start times are available only for final `utterances`.
             </description>
             <prototype><![CDATA[list<float64> getWordAlternativesStartTimes()]]></prototype>
           </function>
@@ -235,15 +239,13 @@
             <description>
             Returns a list of word alternatives end times (Confusion Networks). 
             
-            **Note:** This function is not available if `sttResult` mode equals `complete`.
+            **Note:** word alternative end times are available only for final `utterances`.
             </description>
             <prototype><![CDATA[list<float64> getWordAlternativesEndTimes()]]></prototype>
           </function>
           <function>
             <description>
             Returns a list of words in an utterance result. 
-            
-            **Note:** This function is not available if `sttResult` mode equals `complete`.
             </description>
             <prototype><![CDATA[list<rstring> getUtteranceWords()]]></prototype>
           </function>
@@ -251,47 +253,42 @@
             <description>
             Returns a list of confidences of the words in an utterance result. 
             
-            **Note:** This function is not available if `sttResult` mode equals `complete`.
+            **Note:** word confidences are available only for final `utterances`.
             </description>
             <prototype><![CDATA[list<float64> getUtteranceWordsConfidences()]]></prototype>
           </function>
           <function>
             <description>
             Returns a list of start times of the words in an utterance result relative to the start of the audio. 
-            
-            **Note:** This function is not available if `sttResult` mode equals `complete`.
             </description>
             <prototype><![CDATA[list<float64> getUtteranceWordsStartTimes()]]></prototype>
           </function>
           <function>
             <description>
             Returns a list of end times of the words in an utterance result relative to the start of the audio. 
-            
-            **Note:** This function is not available if `sttResult` mode equals `complete`.
             </description>
             <prototype><![CDATA[list<float64> getUtteranceWordsEndTimes()]]></prototype>
           </function>
           <function>
             <description>
             Returns the start time of an utterance relative to the start of the audio. 
-            
-            **Note:** This function is not available if `sttResult` mode equals `complete`.
             </description>
             <prototype><![CDATA[float64 getUtteranceStartTime()]]></prototype>
           </function>
           <function>
             <description>
             Returns the end time of an utterance relative to the start of the audio. 
-            
-            **Note:** This function is not available if `sttResult` mode equals `complete`.
             </description>
             <prototype><![CDATA[float64 getUtteranceEndTime()]]></prototype>
           </function>
           <function>
             <description>
-            Returns a list of speaker ids for the individual words in an utterance result. 
+            Returns a list of speaker ids for the individual words in an utterance result. Each entry in this list corresponds 
+            to the appropriate entry in the utterance words list delivered with function `getUtteranceWords`. In rare cases 
+            the operator delivers a value of -1 for a speaker label. In this case there was no speaker label delivered 
+            from stt service.
             
-            **Note:** This function is not available if `sttResult` mode equals `complete`.
+            **Note:** word speaker labels are available only for final `utterances`.
             </description>
             <prototype><![CDATA[list<int32> getUtteranceWordsSpeakers()]]></prototype>
           </function>
@@ -299,7 +296,7 @@
             <description>
             Returns a list of confidences in identifying the speakers of the individual words in an utterance result. 
             
-            **Note:** This function is not available if `sttResult` mode equals `complete`.
+            **Note:** word speaker label confidences are available only for final `utterances`.
             </description>
             <prototype><![CDATA[list<float64> getUtteranceWordsSpeakersConfidences()]]></prototype>
           </function>
@@ -307,7 +304,7 @@
             <description>
             Returns the STT keywords spotting results as a map of key/value pairs. Read this toolkit's documentation to learn about the map contents. 
             
-            **Note:** This function is not available if `sttResult` mode equals `complete`.
+            **Note:** keyword spotting results are available only for final `utterances`.
             </description>
             <prototype><![CDATA[map<rstring, list<map<rstring, float64>>> getKeywordsSpottingResults()]]></prototype>
           </function>
@@ -397,15 +394,10 @@
         `complete`: (default) to get the full text after transcribing the entire audio. The setting of this If this parameter 
         influences the validity of output functions.
 
-        In sttResultMode `complete` the following parameters are not allowed:
-        `maxUtteranceAlternatives`, `wordAlternativesThreshold`, `keywordsSpottingThreshold`, `keywordsToBeSpotted`, 
+        In sttResultMode `complete` parameter `maxUtteranceAlternatives` is not allowed.
         
         In sttResultMode `complete` the following output functions are not allowed: 
-        `getUtteranceNumber()`, `isFinalizedUtterance()`, `getConfidence()`, `isTranscriptionCompleted()`, `getUtteranceAlternatives()`, 
-        `getWordAlternatives()`, `getWordAlternativesConfidences()`, `getWordAlternativesStartTimes()`, `getWordAlternativesEndTimes()`, 
-        `getUtteranceWords()`, `getUtteranceWordsConfidences()`, `getUtteranceWordsStartTimes()`, `getUtteranceWordsEndTimes()`, 
-        `getUtteranceStartTime()`, `getUtteranceEndTime()`, `getUtteranceWordsSpeakers()`, `getUtteranceWordsSpeakersConfidences()`, 
-        `getKeywordsSpottingResults()`
+        `getUtteranceNumber()`, `isFinalizedUtterance()`, `getConfidence()`, `getUtteranceAlternatives()`, 
         </description>
         <optional>true</optional>
         <rewriteAllowed>false</rewriteAllowed>
@@ -639,7 +631,7 @@
         This port brings the audio data into this operator for transcription.
         
         Attributes on this input port:
-        * **speech** (required, rstring/blob) - In the case of file based input (.wav, .mp3 etc. for batch workload), the expected value will be an absolute path of a file as an rstring. In the case of RAW audio data (received from a network switch for real-time workload), the expected input is of type blob.
+        * **speech** (required, rstring/blob) - In the case of file-based input (.wav, .mp3 etc. for batch workload), the expected value will be an absolute path of a file as an rstring. In the case of RAW audio data (received from a network switch for real-time workload), the expected input is of type blob.
         
         A window punctuation marker or a empty speech blob may be used to mark the end of an conversation. 
         When the end of conversation is encountered, 
@@ -660,7 +652,7 @@
         should be used in a different thread than port 0.
         
         Attributes on this input port: 
-        * **access_token** (required, rstring) - An rstring access token required for securing the access to the STT service. 
+        * **access_token** (required, rstring) - A rstring access token required for securing the access to the STT service. 
         
         All the extra attributes found in this input port will be ignored.
         </description>
@@ -680,12 +672,15 @@
         An output tuple is created for every utterance that is observed from the incoming audio data. 
         An utterance is a group of transcribed words meant to approximate a sentence. 
         This means there is a one to many relationship between an incoming tuple and outgoing tuples 
-        (i.e. a single .wav file may result in 30 output utterances).
-        Intermediate utterances are sent out on this output port only when the sttResultMode
-        operator parameter is set to a value of either 1 or 2. If it is set to 3, then only the
+        (i.e. a single .wav file may result in 30 output utterances). 
+        Intermediate utterances are sent out on this output port only when the sttResultMode equals `partial` and
+        operator parameter `nonFinalUtterancesNeeded` equal true. If sttResultMode equals `complete`, then only the
         fully transcribed text for the entire audio data will be sent on this output port after
-        the given audio is completely transcribed. The port emits a window punctuation marker when a conversation 
-        has finished.
+        the given audio is completely transcribed. 
+        The port emits a window punctuation marker when a conversation has finished. 
+        If sttResultMode equals `partial`, the operator sends out the results immediately without any further delay. 
+        Thus, if output function `isTranscriptionCompleted` is requested, the operator sends additionally 
+        a tuple with empty/default utterance attributes and the transcription complete flag. 
         **There are multiple available output functions**, and output attributes can also be 
         assigned values with any SPL expression that evaluates to the proper type.
         </description>
