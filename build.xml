@@ -25,7 +25,9 @@
 	</exec>
 
 	<property name="websocket.archive"  value="https://github.com/zaphoyd/websocketpp/archive"/>
-	<property name="boost.archive"      value="https://dl.bintray.com/boostorg/release"/>
+	<!-- donwnload not possible any more returns 403 forbidden -->
+	<!-- <property name="boost.archive"      value="https://dl.bintray.com/boostorg/release"/> -->
+	<property name="boost.archive"      value="https://downloads.sourceforge.net/project/boost/boost/1.69.0/boost_1_69_0.tar.gz"/>
 	<property name="boost.str"          value="boost"/>
 	<property name="websocket.str"      value="websocketpp"/>
 	<property name="rapidjson.str"      value="rapidjson"/>
@@ -128,9 +130,11 @@
 	<!-- must examine boost.exists property, otherwise the tar command is always executed -->
 	<!-- download, untar and bootstrap boost lib -->
 	<target name="download-boost-target" depends="init" unless="${boost.exists}">
+		<!-- donwnload not possible any more returns 403 forbidden -->
 		<echo>Download and bootstrap boost ${boost.version}</echo>
 		<mkdir dir="${ext.dir}/boost-install-files"/>
-		<get src="${boost.archive}/${boost.version}/source/boost_${boost.version.name}.tar.gz" dest="${ext.dir}/boost-install-files/boost-${boost.version}.tar.gz" verbose="true" usetimestamp="true"/>
+		<!--<get src="${boost.archive}/${boost.version}/source/boost_${boost.version.name}.tar.gz" dest="${ext.dir}/boost-install-files/boost-${boost.version}.tar.gz" verbose="true" usetimestamp="true"/> -->
+		<get src="${boost.archive}" dest="${ext.dir}/boost-install-files/boost-${boost.version}.tar.gz" verbose="true" usetimestamp="true"/>
 		<!-- use tar command because ant untar target does not set execute permission -->
 		<exec dir="${ext.dir}/boost-install-files" executable="tar">
 			<arg value="xzf"/>
@@ -144,6 +148,8 @@
 	<target name="download-clean"
 		description="Clean up downloaded library sources and the libraries build artifacts from ext directory">
 		<delete includeemptydirs="true">
+			<!-- do not delete the boost archive -->
+			<!-- <fileset dir="${ext.dir}" excludes="${rapidjson.str}/*,boost-install-files/${boost.str}*.tar.gz"/> -->
 			<fileset dir="${ext.dir}" excludes="${rapidjson.str}/*"/>
 		</delete>
 	</target>

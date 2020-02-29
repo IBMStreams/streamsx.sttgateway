@@ -708,6 +708,10 @@ void WatsonSTTImplReceiver<OP, OT>::on_message(client* c, websocketpp::connectio
 				//myUtteranceWordsStartTimes.clear();
 				myUtteranceWordsStartTimes = dec.DecoderAlternatives::getUtteranceWordsStartTimes();
 			}
+			// clean speaker values which are probably set
+			if (Config::identifySpeakers)
+				splOperator.setSpeakerResultAttributes(myRecentOTuple, SPL::list<SPL::int32>(), SPL::list<SPL::float64>(), SPL::list<SPL::float64>());
+			// set utterance result attributes
 			splOperator.setResultAttributes(
 					myRecentOTuple,
 					dec.DecoderResultIndex::getResult(),
@@ -767,8 +771,8 @@ void WatsonSTTImplReceiver<OP, OT>::on_message(client* c, websocketpp::connectio
 				}
 				auto wordListSize = myUtteranceWordsStartTimes.size();
 				if (spkSize != wordListSize) {
-					SPLAPPTRC(L_ERROR, traceIntro << "-->RE41 Word list size " << wordListSize <<
-							" and spaker list size " << spkSize << " are not equal. payload_: " << payload_, "ws_receiver");
+					SPLAPPTRC(L_INFO, traceIntro << "-->RE41 Word list size " << wordListSize <<
+							" and spaker list size " << spkSize << " are not equal.", "ws_receiver");
 				}
 				SPL::list<SPL::float64> spkFromNew; spkFromNew.reserve(wordListSize);
 				SPL::list<SPL::int32>   spkSpkNew;  spkSpkNew.reserve(wordListSize);
