@@ -1,5 +1,9 @@
 # Changes
 
+## v2.1.1
+* Download boost from other repo
+* Correction: Operator WatsonSTT remove previous speaker label attributes from output tuple before utterance attributes
+
 ## v2.1.0
 * WatsonSTT: Reimplemented JSON decoder of the receiver task contains corrections
 * WatsonSTT: The output functions: getWordAlternatives, getWordAlternativesConfidences,
