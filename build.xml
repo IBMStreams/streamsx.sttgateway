@@ -128,9 +128,10 @@
 	<!-- must examine boost.exists property, otherwise the tar command is always executed -->
 	<!-- download, untar and bootstrap boost lib -->
 	<target name="download-boost-target" depends="init" unless="${boost.exists}">
-		<echo>Download and bootstrap boost ${boost.version}</echo>
+		<!-- donwnload not possible any more returns 403 forbidden -->
+		<!-- <echo>Download and bootstrap boost ${boost.version}</echo>
 		<mkdir dir="${ext.dir}/boost-install-files"/>
-		<get src="${boost.archive}/${boost.version}/source/boost_${boost.version.name}.tar.gz" dest="${ext.dir}/boost-install-files/boost-${boost.version}.tar.gz" verbose="true" usetimestamp="true"/>
+		<get src="${boost.archive}/${boost.version}/source/boost_${boost.version.name}.tar.gz" dest="${ext.dir}/boost-install-files/boost-${boost.version}.tar.gz" verbose="true" usetimestamp="true"/> -->
 		<!-- use tar command because ant untar target does not set execute permission -->
 		<exec dir="${ext.dir}/boost-install-files" executable="tar">
 			<arg value="xzf"/>
@@ -144,7 +145,8 @@
 	<target name="download-clean"
 		description="Clean up downloaded library sources and the libraries build artifacts from ext directory">
 		<delete includeemptydirs="true">
-			<fileset dir="${ext.dir}" excludes="${rapidjson.str}/*"/>
+			<!-- do not delete the boost archive -->
+			<fileset dir="${ext.dir}" excludes="${rapidjson.str}/*,boost-install-files/${boost.str}*.tar.gz"/>
 		</delete>
 	</target>
 
