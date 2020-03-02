@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xml:lang="en-us" lang="en-us">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+<meta name="copyright" content="(C) Copyright 2005"/>
+<meta name="DC.rights.owner" content="(C) Copyright 2005"/>
+<meta name="DC.Type" content="reference"/>
+<meta name="DC.Title" content="SPL File STTResultsHTTPReceiver.spl"/>
+<meta name="DC.Format" content="XHTML"/>
+<meta name="DC.Identifier" content="spldoc_compilationunit"/>
+<link rel="stylesheet" type="text/css" href="../../html/commonltr.css"/>
+<link rel="stylesheet" type="text/css" href="../../html/spldoc.css"/>
+<title>SPL File STTResultsHTTPReceiver.spl</title>
+</head>
+<body id="spldoc_compilationunit">
+
+
+<h1 class="title topictitle1">SPL File <tt class="ph tt">STTResultsHTTPReceiver.spl</tt></h1>
+
+<div class="body refbody">
+<div class="section">
+<p class="p">
+<a class="xref" href="../toolkits/toolkits.html">Gateway to the IBM Speech To Text (STT) cloud service samples</a> &gt; <a class="xref" href="tk$stt_results_http_receiver.html">stt_results_http_receiver 1.0.0</a> &gt; <a class="xref" href="ns$com.ibm.streamsx.sttgateway.sample.httpreceiver.html">com.ibm.streamsx.sttgateway.sample.httpreceiver</a> &gt; STTResultsHTTPReceiver.spl</p>
+
+</div>
+
+<div class="section"><h2 class="title sectiontitle splhead-1">Content</h2>
+  
+  <dl class="dl">
+    <dt class="dt dlterm"/>
+<dd class="dd"/>
+
+    
+      <dt class="dt dlterm splhead-2">Operators</dt>
+
+      <dd class="dd">
+<ul class="sl simple">
+<li class="sli"><strong class="ph b"><a class="xref" href="spl$com.ibm.streamsx.sttgateway.sample.httpreceiver$STTResultsHTTPReceiver.html#spldoc_compilationunit__composite_operator__STTResultsHTTPReceiver">STTResultsHTTPReceiver</a></strong>: This is a simple test application that can be used to receive the STT/S2T results that are streamed to an HTTP endpoint.
+</li>
+
+</ul>
+
+      </dd>
+
+    
+  </dl>
+
+</div>
+
+<div class="section"><h2 class="title sectiontitle splhead-1">Composites</h2>
+  
+</div>
+
+<div class="section" id="spldoc_compilationunit__composite_operator__STTResultsHTTPReceiver"><h2 class="title sectiontitle splpart">composite STTResultsHTTPReceiver</h2>
+  
+</div>
+
+<div class="section splgraph">
+  <embed class="image" src="../../image/tk$stt_results_http_receiver/op$com.ibm.streamsx.sttgateway.sample.httpreceiver$STTResultsHTTPReceiver.svg" width="232" height="109"/>
+</div>
+
+<div class="section">
+
+<div class="p">This is a simple test application that can be used to receive the STT/S2T results that are streamed to an HTTP endpoint. Such streaming of the STT/S2T results will happen from these two example applications  available inside the samples directory of the streamsx.sttgateway toolkit:
+<pre class="pre codeblock">
+	1) VoiceGatewayToStreamsToWatsonS2T
+	2) VoiceGatewayToStreamsToWatsonSTT
+</pre>
+
+
+</div>
+
+<p class="p">This application will receive JSON data via HTTP and by default write it to stdout. This application can be built  using the Makefile available in this project directory.  The Makefile of this sample assumes that the actual version of the streamsx.inetserver toolkit  is installed under $(HOME)/toolkits/com.ibm.streamsx.inetserver
+</p>
+
+<p class="p">If you have installed the inetserver toolkit in a different location, provide the environment variable  STREAMS_INET_SERVER_TOOLKIT with the path to that location.
+</p>
+
+<p class="p">your correct streamsx.inetserver toolkit directory. After this application is built, it can be run either as a  standalone application or as an IBM Streams distributed application.
+</p>
+
+<div class="p">A client can send JSON data via a REST call or via HTTP POST to this operator's URL that is shown below:
+<pre class="pre codeblock">
+	http://&lt;YOUR_MACHINE_NAME&gt;:&lt;YOUR_HTTP_PORT&gt;/sttresults/Receiver/ports/output/0/inject
+</pre>
+
+
+</div>
+
+</div>
+
+<div class="section">
+</div>
+
+<div class="section">
+</div>
+
+<div class="section">
+</div>
+
+<div class="section"><h2 class="title sectiontitle splhead-2">SPL Source Code</h2>
+  
+</div>
+
+
+<div class="section">
+   <pre class="pre codeblock">
+
+ public composite STTResultsHTTPReceiver {
+ 	graph
+ 		(stream&lt;rstring jsonString&gt; JSONData) as Receiver = HTTPJSONInjection() {
+ 			param
+ 				context: "sttresults";
+ 				port: (int32)getSubmissionTimeValue("httpPort", "9080");
+ 		}
+ 		
+ 		// Display it on stdout.
+ 		() as MySink1 = FileSink(JSONData as JD) {
+ 			param
+ 				file: getSubmissionTimeValue("resultFileName", "/dev/stdout");
+ 				flush: 1u;
+ 			
+ 			config
+ 				threadedPort: queue(JD, Sys.Wait);
+ 		}
+ }
+
+   </pre>
+
+</div>
+
+</div>
+
+
+</body>
+</html>

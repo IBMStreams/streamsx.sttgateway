@@ -22,7 +22,7 @@
 <div class="body refbody">
 <div class="section">
 <p class="p">
-<a class="xref" href="../toolkits/toolkits.html">Gateway to the IBM Speech To Text (STT) cloud service</a> &gt; <a class="xref" href="tk$com.ibm.streamsx.sttgateway.html">com.ibm.streamsx.sttgateway 2.0.0</a> &gt; <a class="xref" href="ns$com.ibm.streamsx.sttgateway.watson.html">com.ibm.streamsx.sttgateway.watson</a> &gt; WatsonSTT</p>
+<a class="xref" href="../toolkits/toolkits.html">Gateway to the IBM Speech To Text (STT) cloud service</a> &gt; <a class="xref" href="tk$com.ibm.streamsx.sttgateway.html">com.ibm.streamsx.sttgateway 2.1.1</a> &gt; <a class="xref" href="ns$com.ibm.streamsx.sttgateway.watson.html">com.ibm.streamsx.sttgateway.watson</a> &gt; WatsonSTT</p>
 
 </div>
 
@@ -48,7 +48,7 @@
 <li class="li"> complete (default) to get the full text after transcribing the entire audio.</li>
 
 </ul>
-      The setting of this this parameter influences the validity of output functions and parameters. In <tt class="ph tt">sttResultMode</tt>        <tt class="ph tt">partial</tt> the the parameter <tt class="ph tt">nonFinalUtterancesNeeded</tt> controls the output of non final utterances.
+      The setting of this this parameter influences the validity of output functions and parameters. In <tt class="ph tt">sttResultMode</tt>        <tt class="ph tt">partial</tt> the parameter <tt class="ph tt">nonFinalUtterancesNeeded</tt> controls the output of non final utterances.
 </div>
 
 <div class="p">      Requirements: 
@@ -91,14 +91,14 @@
  
   <dt class="dt dlterm">Parameters</dt>
 
-  <dd class="dd">This operator supports 21 parameters.
+  <dd class="dd">This operator supports 20 parameters.
 <p class="p"> Required: 
 <a class="xref" href="#spldoc_operator__parameter__baseLanguageModel">baseLanguageModel</a>, <a class="xref" href="#spldoc_operator__parameter__uri">uri</a>
 
 </p>
 
 <p class="p"> Optional: 
-<a class="xref" href="#spldoc_operator__parameter__acousticCustomizationId">acousticCustomizationId</a>, <a class="xref" href="#spldoc_operator__parameter__baseModelVersion">baseModelVersion</a>, <a class="xref" href="#spldoc_operator__parameter__contentType">contentType</a>, <a class="xref" href="#spldoc_operator__parameter__cpuYieldTimeInAudioSenderThread">cpuYieldTimeInAudioSenderThread</a>, <a class="xref" href="#spldoc_operator__parameter__customizationId">customizationId</a>, <a class="xref" href="#spldoc_operator__parameter__customizationWeight">customizationWeight</a>, <a class="xref" href="#spldoc_operator__parameter__filterProfanity">filterProfanity</a>, <a class="xref" href="#spldoc_operator__parameter__keywordsSpottingThreshold">keywordsSpottingThreshold</a>, <a class="xref" href="#spldoc_operator__parameter__keywordsToBeSpotted">keywordsToBeSpotted</a>, <a class="xref" href="#spldoc_operator__parameter__maxConnectionRetryDelay">maxConnectionRetryDelay</a>, <a class="xref" href="#spldoc_operator__parameter__maxUtteranceAlternatives">maxUtteranceAlternatives</a>, <a class="xref" href="#spldoc_operator__parameter__nonFinalUtterancesNeeded">nonFinalUtterancesNeeded</a>, <a class="xref" href="#spldoc_operator__parameter__smartFormattingNeeded">smartFormattingNeeded</a>, <a class="xref" href="#spldoc_operator__parameter__sttJsonResponseDebugging">sttJsonResponseDebugging</a>, <a class="xref" href="#spldoc_operator__parameter__sttLiveMetricsUpdateNeeded">sttLiveMetricsUpdateNeeded</a>, <a class="xref" href="#spldoc_operator__parameter__sttRequestLogging">sttRequestLogging</a>, <a class="xref" href="#spldoc_operator__parameter__sttResultMode">sttResultMode</a>, <a class="xref" href="#spldoc_operator__parameter__websocketLoggingNeeded">websocketLoggingNeeded</a>, <a class="xref" href="#spldoc_operator__parameter__wordAlternativesThreshold">wordAlternativesThreshold</a>
+<a class="xref" href="#spldoc_operator__parameter__acousticCustomizationId">acousticCustomizationId</a>, <a class="xref" href="#spldoc_operator__parameter__baseModelVersion">baseModelVersion</a>, <a class="xref" href="#spldoc_operator__parameter__contentType">contentType</a>, <a class="xref" href="#spldoc_operator__parameter__cpuYieldTimeInAudioSenderThread">cpuYieldTimeInAudioSenderThread</a>, <a class="xref" href="#spldoc_operator__parameter__customizationId">customizationId</a>, <a class="xref" href="#spldoc_operator__parameter__customizationWeight">customizationWeight</a>, <a class="xref" href="#spldoc_operator__parameter__filterProfanity">filterProfanity</a>, <a class="xref" href="#spldoc_operator__parameter__keywordsSpottingThreshold">keywordsSpottingThreshold</a>, <a class="xref" href="#spldoc_operator__parameter__keywordsToBeSpotted">keywordsToBeSpotted</a>, <a class="xref" href="#spldoc_operator__parameter__maxConnectionRetryDelay">maxConnectionRetryDelay</a>, <a class="xref" href="#spldoc_operator__parameter__maxUtteranceAlternatives">maxUtteranceAlternatives</a>, <a class="xref" href="#spldoc_operator__parameter__nonFinalUtterancesNeeded">nonFinalUtterancesNeeded</a>, <a class="xref" href="#spldoc_operator__parameter__smartFormattingNeeded">smartFormattingNeeded</a>, <a class="xref" href="#spldoc_operator__parameter__sttLiveMetricsUpdateNeeded">sttLiveMetricsUpdateNeeded</a>, <a class="xref" href="#spldoc_operator__parameter__sttRequestLogging">sttRequestLogging</a>, <a class="xref" href="#spldoc_operator__parameter__sttResultMode">sttResultMode</a>, <a class="xref" href="#spldoc_operator__parameter__websocketLoggingNeeded">websocketLoggingNeeded</a>, <a class="xref" href="#spldoc_operator__parameter__wordAlternativesThreshold">wordAlternativesThreshold</a>
 
 </p>
 </dd>
@@ -144,7 +144,7 @@
 
 <div class="p">        Attributes on this input port:
 <ul class="ul">
-<li class="li"> <strong class="ph b">speech</strong> (required, rstring/blob) - In the case of file based input (.wav, .mp3 etc. for batch workload), the expected value will be an absolute path of a file as an rstring. In the case of RAW audio data (received from a network switch for real-time workload), the expected input is of type blob.</li>
+<li class="li"> <strong class="ph b">speech</strong> (required, rstring/blob) - In the case of file-based input (.wav, .mp3 etc. for batch workload), the expected value will be an absolute path of a file as an rstring. In the case of RAW audio data (received from a network switch for real-time workload), the expected input is of type blob.</li>
 
 </ul>
 
@@ -195,7 +195,7 @@
 
 <div class="p">        Attributes on this input port: 
 <ul class="ul">
-<li class="li"> <strong class="ph b">access_token</strong> (required, rstring) - An rstring access token required for securing the access to the STT service. </li>
+<li class="li"> <strong class="ph b">access_token</strong> (required, rstring) - A rstring access token required for securing the access to the STT service. </li>
 
 </ul>
 
@@ -355,7 +355,7 @@
 <p class="p">            Returns a boolean value to indicate whether the full transcription/conversation is completed. 
 </p>
 
-<p class="p">            <strong class="ph b">Note:</strong> This function is not available if <tt class="ph tt">sttResult</tt> mode equals <tt class="ph tt">complete</tt>.
+<p class="p">            <strong class="ph b">Note:</strong> If this function is requested, the operator emits at conversation end a tuple with this flag equal              true. All other output functions deliver the default value for the final tuple of an conversation. If this              function is not requested, the operator does not send a final tuple for the conversation. The operator sends in any              case a window punctuation marker at the end of an conversation.
 </p>
               <p class="p"/>
 
@@ -370,7 +370,7 @@
 <p class="p">            Returns a list of n-best alternative hypotheses for an utterance result.              List will have the very best guess first followed by the next best ones in that order. 
 </p>
 
-<p class="p">            <strong class="ph b">Note:</strong> This function is not available if <tt class="ph tt">sttResult</tt> mode equals <tt class="ph tt">complete</tt>.
+<p class="p">            <strong class="ph b">Note:</strong> This function is not available if <tt class="ph tt">sttResult</tt> mode equals <tt class="ph tt">complete</tt>.             <strong class="ph b">Note:</strong> n-best alternative hypotheses are available only for final <tt class="ph tt">utterances</tt>.
 </p>
               <p class="p"/>
 
@@ -385,7 +385,7 @@
 <p class="p">            Returns a nested list of word alternatives (Confusion Networks). 
 </p>
 
-<p class="p">            <strong class="ph b">Note:</strong> This function is not available if <tt class="ph tt">sttResult</tt> mode equals <tt class="ph tt">complete</tt>.
+<p class="p">            <strong class="ph b">Note:</strong> word alternatives are available only for final <tt class="ph tt">utterances</tt>.
 </p>
               <p class="p"/>
 
@@ -400,7 +400,7 @@
 <p class="p">            Returns a nested list of word alternatives confidences (Confusion Networks). 
 </p>
 
-<p class="p">            <strong class="ph b">Note:</strong> This function is not available if <tt class="ph tt">sttResult</tt> mode equals <tt class="ph tt">complete</tt>.
+<p class="p">            <strong class="ph b">Note:</strong> word alternative confidences are available only for final <tt class="ph tt">utterances</tt>.
 </p>
               <p class="p"/>
 
@@ -415,7 +415,7 @@
 <p class="p">            Returns a list of word alternatives start times (Confusion Networks). 
 </p>
 
-<p class="p">            <strong class="ph b">Note:</strong> This function is not available if <tt class="ph tt">sttResult</tt> mode equals <tt class="ph tt">complete</tt>.
+<p class="p">            <strong class="ph b">Note:</strong> word alternative start times are available only for final <tt class="ph tt">utterances</tt>.
 </p>
               <p class="p"/>
 
@@ -430,7 +430,7 @@
 <p class="p">            Returns a list of word alternatives end times (Confusion Networks). 
 </p>
 
-<p class="p">            <strong class="ph b">Note:</strong> This function is not available if <tt class="ph tt">sttResult</tt> mode equals <tt class="ph tt">complete</tt>.
+<p class="p">            <strong class="ph b">Note:</strong> word alternative end times are available only for final <tt class="ph tt">utterances</tt>.
 </p>
               <p class="p"/>
 
@@ -443,9 +443,6 @@
             <dd class="dd">
 
 <p class="p">            Returns a list of words in an utterance result. 
-</p>
-
-<p class="p">            <strong class="ph b">Note:</strong> This function is not available if <tt class="ph tt">sttResult</tt> mode equals <tt class="ph tt">complete</tt>.
 </p>
               <p class="p"/>
 
@@ -460,7 +457,7 @@
 <p class="p">            Returns a list of confidences of the words in an utterance result. 
 </p>
 
-<p class="p">            <strong class="ph b">Note:</strong> This function is not available if <tt class="ph tt">sttResult</tt> mode equals <tt class="ph tt">complete</tt>.
+<p class="p">            <strong class="ph b">Note:</strong> word confidences are available only for final <tt class="ph tt">utterances</tt>.
 </p>
               <p class="p"/>
 
@@ -474,9 +471,6 @@
 
 <p class="p">            Returns a list of start times of the words in an utterance result relative to the start of the audio. 
 </p>
-
-<p class="p">            <strong class="ph b">Note:</strong> This function is not available if <tt class="ph tt">sttResult</tt> mode equals <tt class="ph tt">complete</tt>.
-</p>
               <p class="p"/>
 
             </dd>
@@ -488,9 +482,6 @@
             <dd class="dd">
 
 <p class="p">            Returns a list of end times of the words in an utterance result relative to the start of the audio. 
-</p>
-
-<p class="p">            <strong class="ph b">Note:</strong> This function is not available if <tt class="ph tt">sttResult</tt> mode equals <tt class="ph tt">complete</tt>.
 </p>
               <p class="p"/>
 
@@ -504,9 +495,6 @@
 
 <p class="p">            Returns the start time of an utterance relative to the start of the audio. 
 </p>
-
-<p class="p">            <strong class="ph b">Note:</strong> This function is not available if <tt class="ph tt">sttResult</tt> mode equals <tt class="ph tt">complete</tt>.
-</p>
               <p class="p"/>
 
             </dd>
@@ -519,9 +507,6 @@
 
 <p class="p">            Returns the end time of an utterance relative to the start of the audio. 
 </p>
-
-<p class="p">            <strong class="ph b">Note:</strong> This function is not available if <tt class="ph tt">sttResult</tt> mode equals <tt class="ph tt">complete</tt>.
-</p>
               <p class="p"/>
 
             </dd>
@@ -532,10 +517,10 @@
 
             <dd class="dd">
 
-<p class="p">            Returns a list of speaker ids for the individual words in an utterance result. 
+<p class="p">            Returns a list of speaker ids for the individual words in an utterance result. Each entry in this list corresponds              to the appropriate entry in the utterance words list delivered with function <tt class="ph tt">getUtteranceWords</tt>. In rare cases              the operator delivers a value of -1 for a speaker label. In this case there was no speaker label delivered              from stt service.
 </p>
 
-<p class="p">            <strong class="ph b">Note:</strong> This function is not available if <tt class="ph tt">sttResult</tt> mode equals <tt class="ph tt">complete</tt>.
+<p class="p">            <strong class="ph b">Note:</strong> word speaker labels are available only for final <tt class="ph tt">utterances</tt>.
 </p>
               <p class="p"/>
 
@@ -550,7 +535,7 @@
 <p class="p">            Returns a list of confidences in identifying the speakers of the individual words in an utterance result. 
 </p>
 
-<p class="p">            <strong class="ph b">Note:</strong> This function is not available if <tt class="ph tt">sttResult</tt> mode equals <tt class="ph tt">complete</tt>.
+<p class="p">            <strong class="ph b">Note:</strong> word speaker label confidences are available only for final <tt class="ph tt">utterances</tt>.
 </p>
               <p class="p"/>
 
@@ -565,7 +550,7 @@
 <p class="p">            Returns the STT keywords spotting results as a map of key/value pairs. Read this toolkit's documentation to learn about the map contents. 
 </p>
 
-<p class="p">            <strong class="ph b">Note:</strong> This function is not available if <tt class="ph tt">sttResult</tt> mode equals <tt class="ph tt">complete</tt>.
+<p class="p">            <strong class="ph b">Note:</strong> keyword spotting results are available only for final <tt class="ph tt">utterances</tt>.
 </p>
               <p class="p"/>
 
@@ -590,7 +575,7 @@
 <p class="p">        This port produces the output tuples that carry the result of the speech to text transcription.
 </p>
 
-<p class="p">        An output tuple is created for every utterance that is observed from the incoming audio data.          An utterance is a group of transcribed words meant to approximate a sentence.          This means there is a one to many relationship between an incoming tuple and outgoing tuples          (i.e. a single .wav file may result in 30 output utterances).         Intermediate utterances are sent out on this output port only when the sttResultMode         operator parameter is set to a value of either 1 or 2. If it is set to 3, then only the         fully transcribed text for the entire audio data will be sent on this output port after         the given audio is completely transcribed. The port emits a window punctuation marker when a conversation          has finished.         <strong class="ph b">There are multiple available output functions</strong>, and output attributes can also be          assigned values with any SPL expression that evaluates to the proper type.
+<p class="p">        An output tuple is created for every utterance that is observed from the incoming audio data.          An utterance is a group of transcribed words meant to approximate a sentence.          This means there is a one to many relationship between an incoming tuple and outgoing tuples          (i.e. a single .wav file may result in 30 output utterances).          Intermediate utterances are sent out on this output port only when the sttResultMode equals <tt class="ph tt">partial</tt> and         operator parameter <tt class="ph tt">nonFinalUtterancesNeeded</tt> equal true. If sttResultMode equals <tt class="ph tt">complete</tt>, then only the         fully transcribed text for the entire audio data will be sent on this output port after         the given audio is completely transcribed.          The port emits a window punctuation marker when a conversation has finished.          If sttResultMode equals <tt class="ph tt">partial</tt>, the operator sends out the results immediately without any further delay.          Thus, if output function <tt class="ph tt">isTranscriptionCompleted</tt> is requested, the operator sends additionally          a tuple with empty/default utterance attributes and the transcription complete flag.          <strong class="ph b">There are multiple available output functions</strong>, and output attributes can also be          assigned values with any SPL expression that evaluates to the proper type.
 </p>
 
     <p class="p"/>
@@ -629,14 +614,14 @@
 
 <div class="section">
 <p class="p splhead-1"><strong class="ph b"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters">Parameters</a></strong></p>
-This operator supports 21 parameters.
+This operator supports 20 parameters.
 <p class="p"> Required: 
 <a class="xref" href="#spldoc_operator__parameter__baseLanguageModel">baseLanguageModel</a>, <a class="xref" href="#spldoc_operator__parameter__uri">uri</a>
 
 </p>
 
 <p class="p"> Optional: 
-<a class="xref" href="#spldoc_operator__parameter__acousticCustomizationId">acousticCustomizationId</a>, <a class="xref" href="#spldoc_operator__parameter__baseModelVersion">baseModelVersion</a>, <a class="xref" href="#spldoc_operator__parameter__contentType">contentType</a>, <a class="xref" href="#spldoc_operator__parameter__cpuYieldTimeInAudioSenderThread">cpuYieldTimeInAudioSenderThread</a>, <a class="xref" href="#spldoc_operator__parameter__customizationId">customizationId</a>, <a class="xref" href="#spldoc_operator__parameter__customizationWeight">customizationWeight</a>, <a class="xref" href="#spldoc_operator__parameter__filterProfanity">filterProfanity</a>, <a class="xref" href="#spldoc_operator__parameter__keywordsSpottingThreshold">keywordsSpottingThreshold</a>, <a class="xref" href="#spldoc_operator__parameter__keywordsToBeSpotted">keywordsToBeSpotted</a>, <a class="xref" href="#spldoc_operator__parameter__maxConnectionRetryDelay">maxConnectionRetryDelay</a>, <a class="xref" href="#spldoc_operator__parameter__maxUtteranceAlternatives">maxUtteranceAlternatives</a>, <a class="xref" href="#spldoc_operator__parameter__nonFinalUtterancesNeeded">nonFinalUtterancesNeeded</a>, <a class="xref" href="#spldoc_operator__parameter__smartFormattingNeeded">smartFormattingNeeded</a>, <a class="xref" href="#spldoc_operator__parameter__sttJsonResponseDebugging">sttJsonResponseDebugging</a>, <a class="xref" href="#spldoc_operator__parameter__sttLiveMetricsUpdateNeeded">sttLiveMetricsUpdateNeeded</a>, <a class="xref" href="#spldoc_operator__parameter__sttRequestLogging">sttRequestLogging</a>, <a class="xref" href="#spldoc_operator__parameter__sttResultMode">sttResultMode</a>, <a class="xref" href="#spldoc_operator__parameter__websocketLoggingNeeded">websocketLoggingNeeded</a>, <a class="xref" href="#spldoc_operator__parameter__wordAlternativesThreshold">wordAlternativesThreshold</a>
+<a class="xref" href="#spldoc_operator__parameter__acousticCustomizationId">acousticCustomizationId</a>, <a class="xref" href="#spldoc_operator__parameter__baseModelVersion">baseModelVersion</a>, <a class="xref" href="#spldoc_operator__parameter__contentType">contentType</a>, <a class="xref" href="#spldoc_operator__parameter__cpuYieldTimeInAudioSenderThread">cpuYieldTimeInAudioSenderThread</a>, <a class="xref" href="#spldoc_operator__parameter__customizationId">customizationId</a>, <a class="xref" href="#spldoc_operator__parameter__customizationWeight">customizationWeight</a>, <a class="xref" href="#spldoc_operator__parameter__filterProfanity">filterProfanity</a>, <a class="xref" href="#spldoc_operator__parameter__keywordsSpottingThreshold">keywordsSpottingThreshold</a>, <a class="xref" href="#spldoc_operator__parameter__keywordsToBeSpotted">keywordsToBeSpotted</a>, <a class="xref" href="#spldoc_operator__parameter__maxConnectionRetryDelay">maxConnectionRetryDelay</a>, <a class="xref" href="#spldoc_operator__parameter__maxUtteranceAlternatives">maxUtteranceAlternatives</a>, <a class="xref" href="#spldoc_operator__parameter__nonFinalUtterancesNeeded">nonFinalUtterancesNeeded</a>, <a class="xref" href="#spldoc_operator__parameter__smartFormattingNeeded">smartFormattingNeeded</a>, <a class="xref" href="#spldoc_operator__parameter__sttLiveMetricsUpdateNeeded">sttLiveMetricsUpdateNeeded</a>, <a class="xref" href="#spldoc_operator__parameter__sttRequestLogging">sttRequestLogging</a>, <a class="xref" href="#spldoc_operator__parameter__sttResultMode">sttResultMode</a>, <a class="xref" href="#spldoc_operator__parameter__websocketLoggingNeeded">websocketLoggingNeeded</a>, <a class="xref" href="#spldoc_operator__parameter__wordAlternativesThreshold">wordAlternativesThreshold</a>
 
 </p>
 <dl class="dl">
@@ -1143,41 +1128,6 @@ This operator supports 21 parameters.
 
   
   
-     <dt class="dt dlterm"><a name="spldoc_operator__parameter__sttJsonResponseDebugging"><!-- --></a><tt class="ph tt">sttJsonResponseDebugging</tt></dt>
-
-     <dd class="dd">
-<p class="p">This parameter is used for debugging the STT JSON response message. Mostly for IBM internal use. (Default is false)
-</p>
-
-  <dl class="dl">
-    
-     <dt class="dt dlterm">Properties</dt>
-
-     <dd class="dd">   <ul class="sl simple">
-     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__type">Type</a>: boolean
-     </li>
-
-     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__cardinality">Cardinality</a>: 1
-     </li>
-
-     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__optional">Optional</a>: true
-     </li>
-
-     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__expressionmode">ExpressionMode</a>: AttributeFree
-     </li>
-
-   </ul>
-
-     <p class="p"/>
-     </dd>
-
-    
-  </dl>
-
-     </dd>
-
-  
-  
      <dt class="dt dlterm"><a name="spldoc_operator__parameter__sttLiveMetricsUpdateNeeded"><!-- --></a><tt class="ph tt">sttLiveMetricsUpdateNeeded</tt></dt>
 
      <dd class="dd">
@@ -1254,10 +1204,10 @@ This operator supports 21 parameters.
 <p class="p">        This parameter specifies what type of STT result is needed: <tt class="ph tt">partial</tt>: to get partial utterances,          <tt class="ph tt">complete</tt>: (default) to get the full text after transcribing the entire audio. The setting of this If this parameter          influences the validity of output functions.
 </p>
 
-<p class="p">        In sttResultMode <tt class="ph tt">complete</tt> the following parameters are not allowed:         <tt class="ph tt">maxUtteranceAlternatives</tt>, <tt class="ph tt">wordAlternativesThreshold</tt>, <tt class="ph tt">keywordsSpottingThreshold</tt>, <tt class="ph tt">keywordsToBeSpotted</tt>, 
+<p class="p">        In sttResultMode <tt class="ph tt">complete</tt> parameter <tt class="ph tt">maxUtteranceAlternatives</tt> is not allowed.
 </p>
 
-<p class="p">        In sttResultMode <tt class="ph tt">complete</tt> the following output functions are not allowed:          <tt class="ph tt">getUtteranceNumber()</tt>, <tt class="ph tt">isFinalizedUtterance()</tt>, <tt class="ph tt">getConfidence()</tt>, <tt class="ph tt">isTranscriptionCompleted()</tt>, <tt class="ph tt">getUtteranceAlternatives()</tt>,          <tt class="ph tt">getWordAlternatives()</tt>, <tt class="ph tt">getWordAlternativesConfidences()</tt>, <tt class="ph tt">getWordAlternativesStartTimes()</tt>, <tt class="ph tt">getWordAlternativesEndTimes()</tt>,          <tt class="ph tt">getUtteranceWords()</tt>, <tt class="ph tt">getUtteranceWordsConfidences()</tt>, <tt class="ph tt">getUtteranceWordsStartTimes()</tt>, <tt class="ph tt">getUtteranceWordsEndTimes()</tt>,          <tt class="ph tt">getUtteranceStartTime()</tt>, <tt class="ph tt">getUtteranceEndTime()</tt>, <tt class="ph tt">getUtteranceWordsSpeakers()</tt>, <tt class="ph tt">getUtteranceWordsSpeakersConfidences()</tt>,          <tt class="ph tt">getKeywordsSpottingResults()</tt>
+<p class="p">        In sttResultMode <tt class="ph tt">complete</tt> the following output functions are not allowed:          <tt class="ph tt">getUtteranceNumber()</tt>, <tt class="ph tt">isFinalizedUtterance()</tt>, <tt class="ph tt">getConfidence()</tt>, <tt class="ph tt">getUtteranceAlternatives()</tt>, 
 </p>
 
   <dl class="dl">

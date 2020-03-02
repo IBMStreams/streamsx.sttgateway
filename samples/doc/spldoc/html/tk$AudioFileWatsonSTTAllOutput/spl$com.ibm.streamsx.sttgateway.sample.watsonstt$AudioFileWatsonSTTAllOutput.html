@@ -124,7 +124,7 @@ ffmpeg -i MyFile.wav -ac 1 -ar 8000 MyNewFile.wav
 <li class="sli"><strong class="ph b">baseModelVersion</strong>: base model version
 </li>
 
-<li class="sli"><strong class="ph b">customizationId</strong>: "customizationId"
+<li class="sli"><strong class="ph b">customizationId</strong>: customizationId
 </li>
 
 <li class="sli"><strong class="ph b">acousticCustomizationId</strong>: acousticCustomizationId
@@ -145,16 +145,13 @@ ffmpeg -i MyFile.wav -ac 1 -ar 8000 MyNewFile.wav
 <li class="sli"><strong class="ph b">filterProfanity</strong>: filterProfanity; Default false
 </li>
 
-<li class="sli"><strong class="ph b">sttJsonResponseDebugging</strong>: sttJsonResponseDebugging; Default false
-</li>
-
-<li class="sli"><strong class="ph b">wordAlternativesThreshold</strong>: "wordAlternativesThreshold; Default 0.0
+<li class="sli"><strong class="ph b">wordAlternativesThreshold</strong>: wordAlternativesThreshold; Default 0.0
 </li>
 
 <li class="sli"><strong class="ph b">smartFormattingNeeded</strong>: smartFormattingNeeded; Default false
 </li>
 
-<li class="sli"><strong class="ph b">keywordsSpottingThreshold</strong>: "keywordsSpottingThreshold; Default 0.0
+<li class="sli"><strong class="ph b">keywordsSpottingThreshold</strong>: keywordsSpottingThreshold; Default 0.0
 </li>
 
 <li class="sli"><strong class="ph b">keywordsToBeSpotted</strong>: keywordsToBeSpotted
@@ -218,8 +215,6 @@ ffmpeg -i MyFile.wav -ac 1 -ar 8000 MyNewFile.wav
  			(boolean)getSubmissionTimeValue("sttRequestLogging", "false");
  		expression&lt;boolean&gt; $filterProfanity : 
  			(boolean)getSubmissionTimeValue("filterProfanity", "false");
- 		expression&lt;boolean&gt; $sttJsonResponseDebugging : 
- 			(boolean)getSubmissionTimeValue("sttJsonResponseDebugging", "false");
  		expression&lt;float64&gt; $wordAlternativesThreshold : 
  			(float64)getSubmissionTimeValue("wordAlternativesThreshold", "0.0");
  		expression&lt;boolean&gt; $smartFormattingNeeded : 
@@ -252,6 +247,8 @@ ffmpeg -i MyFile.wav -ac 1 -ar 8000 MyNewFile.wav
  			boolean transcriptionCompleted,
  			rstring sttErrorMessage,
  			float64 confidence,
+ 			float64 utteranceStartTime,
+ 			float64 utteranceEndTime,
  			rstring utteranceText,
  			list&lt;rstring&gt; utteranceAlternatives, 
  			list&lt;list&lt;rstring&gt;&gt; wordAlternatives,
@@ -262,8 +259,6 @@ ffmpeg -i MyFile.wav -ac 1 -ar 8000 MyNewFile.wav
  			list&lt;float64&gt; utteranceWordsConfidences,
  			list&lt;float64&gt; utteranceWordsStartTimes,
  			list&lt;float64&gt; utteranceWordsEndTimes,
- 			float64 utteranceStartTime,
- 			float64 utteranceEndTime,
  			list&lt;int32&gt; utteranceWordsSpeakers,
  			list&lt;float64&gt; utteranceWordsSpeakersConfidences,
  			map&lt;rstring, list&lt;map&lt;rstring, float64&gt;&gt;&gt; keywordsSpottingResults,
@@ -363,7 +358,6 @@ ffmpeg -i MyFile.wav -ac 1 -ar 8000 MyNewFile.wav
  				contentType: $contentType;
  				sttRequestLogging: $sttRequestLogging;
  				filterProfanity: $filterProfanity;
- 				sttJsonResponseDebugging: $sttJsonResponseDebugging;
  				maxUtteranceAlternatives: $maxUtteranceAlternatives;
  				wordAlternativesThreshold: $wordAlternativesThreshold;
  				smartFormattingNeeded: $smartFormattingNeeded;

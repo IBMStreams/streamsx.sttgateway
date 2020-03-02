@@ -1,0 +1,785 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xml:lang="en-us" lang="en-us">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+<meta name="copyright" content="(C) Copyright 2005"/>
+<meta name="DC.rights.owner" content="(C) Copyright 2005"/>
+<meta name="DC.Type" content="reference"/>
+<meta name="DC.Title" content="Operator IBMVoiceGatewaySource"/>
+<meta name="DC.Format" content="XHTML"/>
+<meta name="DC.Identifier" content="spldoc_operator"/>
+<link rel="stylesheet" type="text/css" href="../../html/commonltr.css"/>
+<link rel="stylesheet" type="text/css" href="../../html/spldoc.css"/>
+<title>Operator IBMVoiceGatewaySource</title>
+</head>
+<body id="spldoc_operator">
+
+
+<h1 class="title topictitle1">Operator <tt class="ph tt">IBMVoiceGatewaySource</tt></h1>
+
+<div class="body refbody">
+<div class="section">
+<p class="p">
+<a class="xref" href="../toolkits/toolkits.html">Gateway to the IBM Speech To Text (STT) cloud service</a> &gt; <a class="xref" href="tk$com.ibm.streamsx.sttgateway.html">com.ibm.streamsx.sttgateway 2.0.0</a> &gt; <a class="xref" href="ns$com.ibm.streamsx.sttgateway.watson.html">com.ibm.streamsx.sttgateway.watson</a> &gt; IBMVoiceGatewaySource</p>
+
+</div>
+
+<div class="section splprimop">
+  <embed class="image" src="../../image/tk$com.ibm.streamsx.sttgateway/op$com.ibm.streamsx.sttgateway.watson$IBMVoiceGatewaySource.svg" width="872" height="112"/>
+</div>
+
+<div class="section">
+
+<p class="p">      The IBMVoiceGatewaySource operator is designed to ingest        speech data from the IBM Voice Gateway product version 1.0.3.0 or above.        This speech data is ingested in binary format from the        IBM Voice Gateway into this operator via the Websocket interface.        Such speech data arrives here in multiple fragments directly from        a live voice call. This operator is capable of receiving speech data        from multiple calls that can all happen at the very same time        between different pairs of speakers. For every voice call it handles        in real-time, the IBM Voice Gateway product will open two        Websocket connections into this operator and start sending the        live speech data on both of those connections. One of those connections        will carry the speech data of the agent and the other connection        will carry the speech data of the customer. This operator will        keep sending the audio chunks received on those two Websocket        connections via its output stream for consumption by the        downstream operators. At the end of the any given call,        IBM Voice Gateway will close the two WebSocket connections it        opened into this operator.
+</p>
+
+<p class="p">      This operator can be configured with a Websocket server port number which is optional. If the user of this       operator doesn't specify a Websocket server port number, then a default port number of 443 will be used.
+</p>
+
+<div class="p">      Requirements: 
+<ul class="ul">
+<li class="li"> Intel RHEL6 or RHEL7 hosts installed with IBM Streams. </li>
+
+</ul>
+
+</div>
+
+<p class="p">      See the samples folder inside this toolkit for a working example that show how to use this operator.
+</p>
+
+<p class="p">      For a detailed documentation about the operator design, usage patterns and in-depth technical       details, please refer to the official STT Gateway toolkit documentation available at this URL:
+</p>
+
+<p class="p">      <a class="xref" href="https://ibmstreams.github.io/streamsx.sttgateway">https://ibmstreams.github.io/streamsx.sttgateway</a>
+</p>
+
+</div>
+
+<div class="section"><h2 class="title sectiontitle splhead-1">Summary</h2>
+
+<dl class="dl" compact="compact">
+ 
+  <dt class="dt dlterm">Ports</dt>
+
+  <dd class="dd">This operator has 0 input ports and 2 output ports.</dd>
+
+ 
+ 
+  <dt class="dt dlterm">Windowing</dt>
+
+  <dd class="dd">This operator does not accept any windowing configurations.</dd>
+
+ 
+ 
+  <dt class="dt dlterm">Parameters</dt>
+
+  <dd class="dd">This operator supports 10 parameters.
+<p class="p"> Optional: 
+<a class="xref" href="#spldoc_operator__parameter__certificateFileName">certificateFileName</a>, <a class="xref" href="#spldoc_operator__parameter__initDelay">initDelay</a>, <a class="xref" href="#spldoc_operator__parameter__ipv6Available">ipv6Available</a>, <a class="xref" href="#spldoc_operator__parameter__nonTlsEndpointNeeded">nonTlsEndpointNeeded</a>, <a class="xref" href="#spldoc_operator__parameter__nonTlsPort">nonTlsPort</a>, <a class="xref" href="#spldoc_operator__parameter__tlsPort">tlsPort</a>, <a class="xref" href="#spldoc_operator__parameter__vgwLiveMetricsUpdateNeeded">vgwLiveMetricsUpdateNeeded</a>, <a class="xref" href="#spldoc_operator__parameter__vgwSessionLoggingNeeded">vgwSessionLoggingNeeded</a>, <a class="xref" href="#spldoc_operator__parameter__vgwStaleSessionPurgeInterval">vgwStaleSessionPurgeInterval</a>, <a class="xref" href="#spldoc_operator__parameter__websocketLoggingNeeded">websocketLoggingNeeded</a>
+
+</p>
+</dd>
+
+ 
+ 
+  <dt class="dt dlterm">Metrics</dt>
+
+  <dd class="dd">This operator reports 3 metrics.</dd>
+
+ 
+</dl>
+</div>
+
+<div class="section"><h2 class="title sectiontitle splhead-1">Properties</h2>
+
+<dl class="dl" compact="compact">
+ 
+  <dt class="dt dlterm">Implementation</dt>
+
+  <dd class="dd">C++</dd>
+
+ 
+ 
+  <dt class="dt dlterm"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__context__providessinglethreadedexecutioncontext">Threading</a></dt>
+
+  <dd class="dd"><tt class="ph tt">Never</tt> - Operator never provides a single threaded execution context.</dd>
+
+ 
+</dl>
+
+</div>
+
+<div class="section">
+<p class="p splhead-1"><strong class="ph b"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__output_port_set">Output Ports</a></strong></p>
+<dl class="dl">
+  
+     <dt class="dt dlterm">Assignments</dt>
+
+     <dd class="dd">This operator allows any SPL expression of the correct type to be assigned to output attributes.</dd>
+
+  
+</dl>
+
+<dl class="dl">
+      <dt class="dt dlterm"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__context__customoutputfunctions">Output Functions</a></dt>
+
+    <dd class="dd">
+      <dl class="dl">
+      
+        <dt class="dt dlterm">IBMVoiceGatewaySourceFunctions</dt>
+
+        <dd class="dd">
+          <dl class="dl">
+            <dt class="dt dlterm"/>
+<dd class="dd"/>
+
+            
+              <dt class="dt dlterm">
+                <tt class="ph tt">   &lt;any T&gt; T AsIs(T)</tt>              </dt>
+
+            <dd class="dd">
+
+<p class="p">The default function for output attributes. This function assigns the output attribute to the value of the input attribute with the same name.
+</p>
+              <p class="p"/>
+
+            </dd>
+
+                        
+              <dt class="dt dlterm">
+                <tt class="ph tt">   rstring getIBMVoiceGatewaySessionId()</tt>              </dt>
+
+            <dd class="dd">
+
+<p class="p">Returns an rstring value indicating the IBM Voice Gateway session id that corresponds to the current output tuple.
+</p>
+              <p class="p"/>
+
+            </dd>
+
+                        
+              <dt class="dt dlterm">
+                <tt class="ph tt">   boolean isCustomerSpeechData()</tt>              </dt>
+
+            <dd class="dd">
+
+<p class="p">Returns a boolean value to indicate if this is a customer's speech data or not.
+</p>
+              <p class="p"/>
+
+            </dd>
+
+                        
+              <dt class="dt dlterm">
+                <tt class="ph tt">   int32 getTupleCnt()</tt>              </dt>
+
+            <dd class="dd">
+
+<p class="p">Returns an int32 value indicating the total number of output tuples emitted so far for the given channel in a IBM Voice Gateway session id.
+</p>
+              <p class="p"/>
+
+            </dd>
+
+                        
+              <dt class="dt dlterm">
+                <tt class="ph tt">   int32 getTotalSpeechDataBytesReceived()</tt>              </dt>
+
+            <dd class="dd">
+
+<p class="p">Returns an int32 value indicating the total number of speech data bytes received so far for the given channel in a IBM Voice Gateway session id.
+</p>
+              <p class="p"/>
+
+            </dd>
+
+                        
+              <dt class="dt dlterm">
+                <tt class="ph tt">   int32 getVoiceChannelNumber()</tt>              </dt>
+
+            <dd class="dd">
+
+<p class="p">Returns an int32 value indicating the voice channel number in which the speech data bytes were received for a IBM Voice Gateway session id.
+</p>
+              <p class="p"/>
+
+            </dd>
+
+                        
+              <dt class="dt dlterm">
+                <tt class="ph tt">   rstring getAgentPhoneNumber()</tt>              </dt>
+
+            <dd class="dd">
+
+<p class="p">Returns an rstring value with details about the agent's phone number.
+</p>
+              <p class="p"/>
+
+            </dd>
+
+                        
+              <dt class="dt dlterm">
+                <tt class="ph tt">   rstring getCallerPhoneNumber()</tt>              </dt>
+
+            <dd class="dd">
+
+<p class="p">Returns an rstring value with details about the caller's phone number.
+</p>
+              <p class="p"/>
+
+            </dd>
+
+                      </dl>
+        </dd>
+
+      
+      </dl>
+
+    </dd>
+
+  </dl>
+
+ <dl class="dl">
+  
+   <dt class="dt dlterm">Ports (0)</dt>
+
+   <dd class="dd">
+
+<p class="p">        This port produces the output tuples that carry the binary speech data received from          the IBM Voice Gateway. The schema for this port must have its first attribute named          as speech with a blob data type to hold the speech data. Remaining attributes can be          of any type based on the needs of the application. Such speech data being sent in          these output tuples can represent multiple fragments of a full conversation          happening in a live voice call. This operator is capable of sending out speech data         from multiple calls that can all happen at the very same time between different          pairs of speakers. IBM Voice Gateway will always send the speech data in two voice         channels i.e. one channel will carry the speech data of a customer and the other         channel will carry the speech data of an agent. Please refer to the custom          output functions provided by this operator to query such voice call meta data         information and assign that meta data values to other optional attributes in this         output port. 
+</p>
+
+<p class="p">        <strong class="ph b">There are multiple available output functions</strong>, and output attributes can also be          assigned values with any SPL expression that evaluates to the proper type. 
+</p>
+
+    <p class="p"/>
+
+    <dl class="dl">
+     
+      <dt class="dt dlterm">Properties</dt>
+
+      <dd class="dd">   <ul class="sl simple">
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__output_port_set__optional">Optional</a>: false
+     </li>
+
+   </ul>
+
+   <ul class="sl simple">
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__output_port_set__tuplemutationallowed">TupleMutationAllowed</a>: false
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__output_port_set__windowpunctuationoutputmode">WindowPunctuationOutputMode</a>: Free
+     </li>
+
+   </ul>
+
+</dd>
+     
+    </dl>
+
+    <p class="p"/>
+
+   </dd>
+
+  
+  
+   <dt class="dt dlterm">Ports (1)</dt>
+
+   <dd class="dd">
+
+<p class="p">        This port produces periodic output tuples to give an indication about the end of a          specific speaker (i.e. channel) in a voice call that was in progress moments ago for          the given IBM Voice Gateway session id. The schema for this port must have these          three attributes with their correct data types as shown here.          rstring vgwSessionId, boolean isCustomerSpeechData, int32 vgwVoiceChannelNumber         This source operator will set the appropriate values for these attributes to          indicate which particular speaker (i.e. voice channel number) of a given voice call          (i.e. session id) just ended the conversation. This tuple also has an attribute          (i.e. isCustomerSpeechData) to tell whether that recently ended voice channel         carried the speech data of a customer or an agent. Downstream operators can make          use of this "End Of Voice Call" signal as they see fit.
+</p>
+
+    <p class="p"/>
+
+    <dl class="dl">
+     
+      <dt class="dt dlterm">Properties</dt>
+
+      <dd class="dd">   <ul class="sl simple">
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__output_port_set__optional">Optional</a>: false
+     </li>
+
+   </ul>
+
+   <ul class="sl simple">
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__output_port_set__tuplemutationallowed">TupleMutationAllowed</a>: false
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__output_port_set__windowpunctuationoutputmode">WindowPunctuationOutputMode</a>: Free
+     </li>
+
+   </ul>
+
+</dd>
+     
+    </dl>
+
+    <p class="p"/>
+
+   </dd>
+
+  
+</dl>
+
+</div>
+
+<div class="section">
+<p class="p splhead-1"><strong class="ph b"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters">Parameters</a></strong></p>
+This operator supports 10 parameters.
+<p class="p"> Optional: 
+<a class="xref" href="#spldoc_operator__parameter__certificateFileName">certificateFileName</a>, <a class="xref" href="#spldoc_operator__parameter__initDelay">initDelay</a>, <a class="xref" href="#spldoc_operator__parameter__ipv6Available">ipv6Available</a>, <a class="xref" href="#spldoc_operator__parameter__nonTlsEndpointNeeded">nonTlsEndpointNeeded</a>, <a class="xref" href="#spldoc_operator__parameter__nonTlsPort">nonTlsPort</a>, <a class="xref" href="#spldoc_operator__parameter__tlsPort">tlsPort</a>, <a class="xref" href="#spldoc_operator__parameter__vgwLiveMetricsUpdateNeeded">vgwLiveMetricsUpdateNeeded</a>, <a class="xref" href="#spldoc_operator__parameter__vgwSessionLoggingNeeded">vgwSessionLoggingNeeded</a>, <a class="xref" href="#spldoc_operator__parameter__vgwStaleSessionPurgeInterval">vgwStaleSessionPurgeInterval</a>, <a class="xref" href="#spldoc_operator__parameter__websocketLoggingNeeded">websocketLoggingNeeded</a>
+
+</p>
+<dl class="dl">
+  
+     <dt class="dt dlterm"><a name="spldoc_operator__parameter__certificateFileName"><!-- --></a><tt class="ph tt">certificateFileName</tt></dt>
+
+     <dd class="dd">
+<p class="p">This parameter specifies the full path of the WebSocket server PEM certificate file name. Default is to read ws-server.pem from the etc sub-directory of the application.
+</p>
+
+  <dl class="dl">
+    
+     <dt class="dt dlterm">Properties</dt>
+
+     <dd class="dd">   <ul class="sl simple">
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__type">Type</a>: rstring
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__cardinality">Cardinality</a>: 1
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__optional">Optional</a>: true
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__expressionmode">ExpressionMode</a>: AttributeFree
+     </li>
+
+   </ul>
+
+     <p class="p"/>
+     </dd>
+
+    
+  </dl>
+
+     </dd>
+
+  
+  
+     <dt class="dt dlterm"><a name="spldoc_operator__parameter__initDelay"><!-- --></a><tt class="ph tt">initDelay</tt></dt>
+
+     <dd class="dd">
+<p class="p">This parameter specifies a one time delay in seconds for which this source operator should wait before start generating its first tuple. Default delay is 0.0.
+</p>
+
+  <dl class="dl">
+    
+     <dt class="dt dlterm">Properties</dt>
+
+     <dd class="dd">   <ul class="sl simple">
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__type">Type</a>: float64
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__cardinality">Cardinality</a>: 1
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__optional">Optional</a>: true
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__expressionmode">ExpressionMode</a>: AttributeFree
+     </li>
+
+   </ul>
+
+     <p class="p"/>
+     </dd>
+
+    
+  </dl>
+
+     </dd>
+
+  
+  
+     <dt class="dt dlterm"><a name="spldoc_operator__parameter__ipv6Available"><!-- --></a><tt class="ph tt">ipv6Available</tt></dt>
+
+     <dd class="dd">
+<p class="p">This parameter indicates whether the ipv6 protocol stack is available in the Linux machine where the IBMVoiceGatewaySource operator is running. (Default is true)
+</p>
+
+  <dl class="dl">
+    
+     <dt class="dt dlterm">Properties</dt>
+
+     <dd class="dd">   <ul class="sl simple">
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__type">Type</a>: boolean
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__cardinality">Cardinality</a>: 1
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__optional">Optional</a>: true
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__expressionmode">ExpressionMode</a>: AttributeFree
+     </li>
+
+   </ul>
+
+     <p class="p"/>
+     </dd>
+
+    
+  </dl>
+
+     </dd>
+
+  
+  
+     <dt class="dt dlterm"><a name="spldoc_operator__parameter__nonTlsEndpointNeeded"><!-- --></a><tt class="ph tt">nonTlsEndpointNeeded</tt></dt>
+
+     <dd class="dd">
+<p class="p">This parameter specifies whether a WebSocket (plain) non-TLS endpoint is needed. (Default is false)
+</p>
+
+  <dl class="dl">
+    
+     <dt class="dt dlterm">Properties</dt>
+
+     <dd class="dd">   <ul class="sl simple">
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__type">Type</a>: boolean
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__cardinality">Cardinality</a>: 1
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__optional">Optional</a>: true
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__expressionmode">ExpressionMode</a>: AttributeFree
+     </li>
+
+   </ul>
+
+     <p class="p"/>
+     </dd>
+
+    
+  </dl>
+
+     </dd>
+
+  
+  
+     <dt class="dt dlterm"><a name="spldoc_operator__parameter__nonTlsPort"><!-- --></a><tt class="ph tt">nonTlsPort</tt></dt>
+
+     <dd class="dd">
+<p class="p">This parameter specifies the WebSocket (plain) non-TLS port number. Default port number is 80.
+</p>
+
+  <dl class="dl">
+    
+     <dt class="dt dlterm">Properties</dt>
+
+     <dd class="dd">   <ul class="sl simple">
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__type">Type</a>: uint32
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__cardinality">Cardinality</a>: 1
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__optional">Optional</a>: true
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__expressionmode">ExpressionMode</a>: AttributeFree
+     </li>
+
+   </ul>
+
+     <p class="p"/>
+     </dd>
+
+    
+  </dl>
+
+     </dd>
+
+  
+  
+     <dt class="dt dlterm"><a name="spldoc_operator__parameter__tlsPort"><!-- --></a><tt class="ph tt">tlsPort</tt></dt>
+
+     <dd class="dd">
+<p class="p">This parameter specifies the WebSocket TLS port number. Default port number is 443.
+</p>
+
+  <dl class="dl">
+    
+     <dt class="dt dlterm">Properties</dt>
+
+     <dd class="dd">   <ul class="sl simple">
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__type">Type</a>: uint32
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__cardinality">Cardinality</a>: 1
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__optional">Optional</a>: true
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__expressionmode">ExpressionMode</a>: AttributeFree
+     </li>
+
+   </ul>
+
+     <p class="p"/>
+     </dd>
+
+    
+  </dl>
+
+     </dd>
+
+  
+  
+     <dt class="dt dlterm"><a name="spldoc_operator__parameter__vgwLiveMetricsUpdateNeeded"><!-- --></a><tt class="ph tt">vgwLiveMetricsUpdateNeeded</tt></dt>
+
+     <dd class="dd">
+<p class="p">This parameter specifies whether live update for this operator's custom metrics is needed. (Default is true)
+</p>
+
+  <dl class="dl">
+    
+     <dt class="dt dlterm">Properties</dt>
+
+     <dd class="dd">   <ul class="sl simple">
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__type">Type</a>: boolean
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__cardinality">Cardinality</a>: 1
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__optional">Optional</a>: true
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__expressionmode">ExpressionMode</a>: AttributeFree
+     </li>
+
+   </ul>
+
+     <p class="p"/>
+     </dd>
+
+    
+  </dl>
+
+     </dd>
+
+  
+  
+     <dt class="dt dlterm"><a name="spldoc_operator__parameter__vgwSessionLoggingNeeded"><!-- --></a><tt class="ph tt">vgwSessionLoggingNeeded</tt></dt>
+
+     <dd class="dd">
+<p class="p">This parameter specifies whether logging is needed when the IBM Voice Gateway session is in progress with this operator. (Default is false)
+</p>
+
+  <dl class="dl">
+    
+     <dt class="dt dlterm">Properties</dt>
+
+     <dd class="dd">   <ul class="sl simple">
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__type">Type</a>: boolean
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__cardinality">Cardinality</a>: 1
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__optional">Optional</a>: true
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__expressionmode">ExpressionMode</a>: AttributeFree
+     </li>
+
+   </ul>
+
+     <p class="p"/>
+     </dd>
+
+    
+  </dl>
+
+     </dd>
+
+  
+  
+     <dt class="dt dlterm"><a name="spldoc_operator__parameter__vgwStaleSessionPurgeInterval"><!-- --></a><tt class="ph tt">vgwStaleSessionPurgeInterval</tt></dt>
+
+     <dd class="dd">
+<p class="p">This parameter specifies periodic time interval in seconds during which any stale Voice Gateway sessions should be purged to free up memory usage. (Default is 3<em class="ph i">60</em>60 seconds)
+</p>
+
+  <dl class="dl">
+    
+     <dt class="dt dlterm">Properties</dt>
+
+     <dd class="dd">   <ul class="sl simple">
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__type">Type</a>: uint32
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__cardinality">Cardinality</a>: 1
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__optional">Optional</a>: true
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__expressionmode">ExpressionMode</a>: AttributeFree
+     </li>
+
+   </ul>
+
+     <p class="p"/>
+     </dd>
+
+    
+  </dl>
+
+     </dd>
+
+  
+  
+     <dt class="dt dlterm"><a name="spldoc_operator__parameter__websocketLoggingNeeded"><!-- --></a><tt class="ph tt">websocketLoggingNeeded</tt></dt>
+
+     <dd class="dd">
+<p class="p">This parameter specifies whether logging is needed from the WebSocket library. (Default is false)
+</p>
+
+  <dl class="dl">
+    
+     <dt class="dt dlterm">Properties</dt>
+
+     <dd class="dd">   <ul class="sl simple">
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__type">Type</a>: boolean
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__cardinality">Cardinality</a>: 1
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__optional">Optional</a>: true
+     </li>
+
+     <li class="sli"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__parameters__parameter__expressionmode">ExpressionMode</a>: AttributeFree
+     </li>
+
+   </ul>
+
+     <p class="p"/>
+     </dd>
+
+    
+  </dl>
+
+     </dd>
+
+  
+</dl>
+
+</div>
+
+<div class="section">
+<p class="p splhead-1"><strong class="ph b"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__context__metrics">Metrics</a></strong></p>
+<dl class="dl">
+  
+    <dt class="dt dlterm"><tt class="ph tt">nOutputTuplesSent</tt> - <a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__context__metrics_kind_gauge">Gauge</a></dt>
+
+    <dd class="dd">
+
+<p class="p">          Number of output tuples sent by this operator instance.
+</p>
+
+<p class="p">          <em class="ph i">NOTE:</em> This metric is only updated if parameter <tt class="ph tt">vgwLiveMetricsUpdateNeeded</tt> is true.
+</p>
+
+     <p class="p"/>
+
+     </dd>
+
+  
+  
+    <dt class="dt dlterm"><tt class="ph tt">nSpeechDataBytesReceived</tt> - <a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__context__metrics_kind_counter">Counter</a></dt>
+
+    <dd class="dd">
+
+<p class="p">          Total number of speech data bytes received by this operator instance.
+</p>
+
+<p class="p">          <em class="ph i">NOTE:</em> This metric is only updated if parameter <tt class="ph tt">vgwLiveMetricsUpdateNeeded</tt> is true.
+</p>
+
+     <p class="p"/>
+
+     </dd>
+
+  
+  
+    <dt class="dt dlterm"><tt class="ph tt">nVoiceCallsProcessed</tt> - <a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__context__metrics_kind_counter">Counter</a></dt>
+
+    <dd class="dd">
+
+<p class="p">          Number of voice calls processed by this operator instance.
+</p>
+
+<p class="p">          <em class="ph i">NOTE:</em> This metric is only updated if parameter <tt class="ph tt">vgwLiveMetricsUpdateNeeded</tt> is true.
+</p>
+
+     <p class="p"/>
+
+     </dd>
+
+  
+</dl>
+
+</div>
+
+<div class="section">
+<p class="p splhead-1"><strong class="ph b"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__context__dependencies">Libraries</a></strong></p>
+<dl class="dl">
+ 
+  <dt class="dt dlterm"><tt class="ph tt">Boost Library common/Websocket include and Boost system</tt>  </dt>
+
+<dd class="dd"/>
+  <dd class="dd"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__context__dependencies__managedlibrary__lib">Library Name</a>: <tt class="ph tt">boost_system</tt></dd>
+
+  <dd class="dd"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__context__dependencies__managedlibrary__libpath">Library Path</a>: <tt class="ph tt">../../lib</tt></dd>
+
+  <dd class="dd"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__context__dependencies__managedlibrary__includepath">Include Path</a>: <tt class="ph tt">../../include</tt></dd>
+
+ 
+ 
+  <dt class="dt dlterm"><tt class="ph tt">Boost Library chrono</tt>  </dt>
+
+<dd class="dd"/>
+  <dd class="dd"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__context__dependencies__managedlibrary__lib">Library Name</a>: <tt class="ph tt">boost_chrono</tt></dd>
+
+  <dd class="dd"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__context__dependencies__managedlibrary__libpath">Library Path</a>: <tt class="ph tt">../../lib</tt></dd>
+
+ 
+ 
+  <dt class="dt dlterm"><tt class="ph tt">Boost Library random</tt>  </dt>
+
+<dd class="dd"/>
+  <dd class="dd"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__context__dependencies__managedlibrary__lib">Library Name</a>: <tt class="ph tt">boost_random</tt></dd>
+
+  <dd class="dd"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__context__dependencies__managedlibrary__libpath">Library Path</a>: <tt class="ph tt">../../lib</tt></dd>
+
+ 
+</dl>
+
+</div>
+
+</div>
+
+
+</body>
+</html>

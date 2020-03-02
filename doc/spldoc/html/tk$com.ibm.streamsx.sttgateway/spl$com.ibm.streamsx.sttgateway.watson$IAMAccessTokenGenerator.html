@@ -22,7 +22,7 @@
 <div class="body refbody">
 <div class="section">
 <p class="p">
-<a class="xref" href="../toolkits/toolkits.html">Gateway to the IBM Speech To Text (STT) cloud service</a> &gt; <a class="xref" href="tk$com.ibm.streamsx.sttgateway.html">com.ibm.streamsx.sttgateway 2.0.0</a> &gt; <a class="xref" href="ns$com.ibm.streamsx.sttgateway.watson.html">com.ibm.streamsx.sttgateway.watson</a> &gt; IAMAccessTokenGenerator.spl</p>
+<a class="xref" href="../toolkits/toolkits.html">Gateway to the IBM Speech To Text (STT) cloud service</a> &gt; <a class="xref" href="tk$com.ibm.streamsx.sttgateway.html">com.ibm.streamsx.sttgateway 2.1.1</a> &gt; <a class="xref" href="ns$com.ibm.streamsx.sttgateway.watson.html">com.ibm.streamsx.sttgateway.watson</a> &gt; IAMAccessTokenGenerator.spl</p>
 
 </div>
 
@@ -81,7 +81,7 @@
 
 <div class="p">This operator has 2 operation modes: 
 <ul class="ul">
-<li class="li"> If parameter <em class="ph i">accessToken</em> is non empty, the operator emits <strong class="ph b">one output tuple</strong> with the access token and the operator </li>
+<li class="li"> If parameter <em class="ph i">accessToken</em> is nonempty, the operator emits <strong class="ph b">one output tuple</strong> with the access token and the operator </li>
 
 </ul>
 thread ends.
@@ -118,10 +118,10 @@ thread ends.
 <div class="section"><h2 class="title sectiontitle">Parameters</h2>
 
 <ul class="sl simple">
-<li class="sli"><strong class="ph b">appConfigName</strong>: The name of the application configuration to look for connection parameters. If this parameter  is non empty, the properties from this application configuration overwrite the operator parameters. An empty string  disables the lookup in the Application Configuration. This may be used if all non default parameters are supplied in the operator  invocation.  Type: <em class="ph i">rstring</em>; Default: <em class="ph i">sttConnection</em> 
+<li class="sli"><strong class="ph b">appConfigName</strong>: The name of the application configuration to look for connection parameters. If this parameter  is nonempty, the properties from this application configuration overwrite the operator parameters. An empty string  disables the lookup in the Application Configuration. This may be used if all non default parameters are supplied in the operator  invocation.  Type: <em class="ph i">rstring</em>; Default: <em class="ph i">sttConnection</em> 
 </li>
 
-<li class="sli"><strong class="ph b">accessToken</strong>: If parameter <em class="ph i">accessToken</em> is non empty, the operator emits <strong class="ph b">one output tuple</strong> with the  access token and the operator thread ends. If parameter <em class="ph i">accessToken</em> is empty, the operator connects to the  IAM authorization service specified by parameter <tt class="ph tt">iamTokenURL</tt> and requests an access token by using the provided <tt class="ph tt">apiKey</tt>.  If the application configuration with name <em class="ph i">appConfigName</em> and property <em class="ph i">accessToken</em> exists, this parameter is overwritten.  Type: <em class="ph i">rstring</em>; Default: <em class="ph i">""</em> 
+<li class="sli"><strong class="ph b">accessToken</strong>: If parameter <em class="ph i">accessToken</em> is nonempty, the operator emits <strong class="ph b">one output tuple</strong> with the  access token and the operator thread ends. If parameter <em class="ph i">accessToken</em> is empty, the operator connects to the  IAM authorization service specified by parameter <tt class="ph tt">iamTokenURL</tt> and requests an access token by using the provided <tt class="ph tt">apiKey</tt>.  If the application configuration with name <em class="ph i">appConfigName</em> and property <em class="ph i">accessToken</em> exists, this parameter is overwritten.  Type: <em class="ph i">rstring</em>; Default: <em class="ph i">""</em> 
 </li>
 
 <li class="sli"><strong class="ph b">apiKey</strong>: The api key required for the generation of the access token. This parameter is evaluated  when the operator logic starts to generate a initial or a refresh access token. Thus the  parameter may be changed during operation of the streams application. If the value is the <em class="ph i">empty  string</em>, no access token is requested from IAM cloud service. When the value has changed,  the operator requests an initial access token when the current token becomes invalid.  If the application configuration with name <em class="ph i">appConfigName</em> and property <em class="ph i">apiKey</em> exists, this parameter is overwritten.  Type: <em class="ph i">rstring</em>; Default: <em class="ph i">""</em> 

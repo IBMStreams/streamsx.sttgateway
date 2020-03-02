@@ -16,6 +16,7 @@ sidebar:
 [SPLDoc for the streamsx.sttgateway toolkit](https://ibmstreams.github.io/streamsx.sttgateway/doc/spldoc/html/index.html)
 
 Reference of former releases:
+* [v2.0.0](https://ibmstreams.github.io/streamsx.sttgateway/doc/v2.0.0/spldoc/html/index.html)
 * [v1.0.6](https://ibmstreams.github.io/streamsx.sttgateway/doc/v1.0.6/spldoc/html/index.html)
 * [v1.0.5](https://ibmstreams.github.io/streamsx.sttgateway/doc/v1.0.5/spldoc/html/index.html)
 
