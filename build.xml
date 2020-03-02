@@ -17,6 +17,7 @@
 
 	<property name="websocket.version"  value="0.8.1"/>
 	<property name="boost.version"      value="1.69.0"/>
+	<property name="boost.achive"       value="boost_1_69_0.tar.gz"/>
 	<property name="rapidjson.version"  value="1.1.0"/>
 
 	<exec executable="bash" outputproperty="boost.version.name" failonerror="true">
@@ -25,9 +26,12 @@
 	</exec>
 
 	<property name="websocket.archive"  value="https://github.com/zaphoyd/websocketpp/archive"/>
-	<!-- donwnload not possible any more returns 403 forbidden -->
-	<!-- <property name="boost.archive"      value="https://dl.bintray.com/boostorg/release"/> -->
-	<property name="boost.archive"      value="https://downloads.sourceforge.net/project/boost/boost/1.69.0/boost_1_69_0.tar.gz"/>
+	<!-- since download is not possible from archive 1 : returns 403 forbidden 
+	try to download from second archive -->
+	<property name="boost.archive0" value="http://syss114.pok.stglabs.ibm.com:8081/nexus/content/repositories/Streams.external/external/noarch/noarch/boost-sources/1.69.0/boost-sources-1.69.0.tar.gz"/>
+	<property name="boost.archive.location1" value="https://dl.bintray.com/boostorg/release"/>
+	<property name="boost.archive.location2" value="https://downloads.sourceforge.net/project/boost/boost"/>
+	
 	<property name="boost.str"          value="boost"/>
 	<property name="websocket.str"      value="websocketpp"/>
 	<property name="rapidjson.str"      value="rapidjson"/>
@@ -60,6 +64,7 @@
 	
 	<available property="websocket.src.dir.exists" file="${ext.dir}/${websocket.str}-${websocket.version}/${websocket.str}" type="dir"/>
 	<available property="boost.exists" file="${ext.dir}/boost-install-files/${boost.str}_${boost.version.name}" type="dir"/>
+	<available property="boost.archive.exists" file="${ext.dir}/boost-install-files/${boost.achive}" type="file"/>
 
 	<!-- Create the time stamp -->
 	<tstamp/>
@@ -69,6 +74,7 @@
 	<target name="init">
 		<echo message="Toolkit Version: ${tkinfo.identity.version} boost.version: ${boost.version} websocket.version: ${websocket.version}"/>
 		<mkdir dir="${lib.dir}"/>
+		<mkdir dir="${ext.dir}/boost-install-files"/>
 	</target>
 
 	<target name="all" depends="toolkit,spldoc"
@@ -123,33 +129,36 @@
 	</target>
 
 	<!-- Download and build boost -->
-	<target name="download-boost" depends="download-boost-target"
-		description="Download, untar and bootstrap boost library if not existing. (all files into ext directory)">
-	</target>
-	
 	<!-- must examine boost.exists property, otherwise the tar command is always executed -->
-	<!-- download, untar and bootstrap boost lib -->
-	<target name="download-boost-target" depends="init" unless="${boost.exists}">
-		<!-- donwnload not possible any more returns 403 forbidden -->
-		<echo>Download and bootstrap boost ${boost.version}</echo>
-		<mkdir dir="${ext.dir}/boost-install-files"/>
-		<!--<get src="${boost.archive}/${boost.version}/source/boost_${boost.version.name}.tar.gz" dest="${ext.dir}/boost-install-files/boost-${boost.version}.tar.gz" verbose="true" usetimestamp="true"/> -->
-		<get src="${boost.archive}" dest="${ext.dir}/boost-install-files/boost-${boost.version}.tar.gz" verbose="true" usetimestamp="true"/>
+	<target name="download-boost" depends="download-boost-target" unless="${boost.exists}"
+		description="Download, untar and bootstrap boost library if not existing. (all files into ext directory)">
 		<!-- use tar command because ant untar target does not set execute permission -->
+		<echo>Untar and bootstrap boost ${boost.version}</echo>
 		<exec dir="${ext.dir}/boost-install-files" executable="tar">
 			<arg value="xzf"/>
-			<arg value="boost-${boost.version}.tar.gz"/>
+			<arg value="${boost.achive}"/>
 		</exec>
 		<exec executable="./bootstrap.sh" dir="${ext.dir}/boost-install-files/boost_${boost.version.name}" failonerror="true">
 			<arg value="--prefix=${prefix.dir}"/>
 		</exec>
 	</target>
+	
+	<!-- download from archive1 2 or 3-->
+	<target name="download-boost-target" depends="init" unless="${boost.archive.exists}">
+		<echo>Download from ${boost.archive0}</echo>
+		<get src="${boost.archive0}" dest="${ext.dir}/boost-install-files/${boost.achive}"
+			verbose="true" ignoreerrors="true" skipexisting="true"/>
+		<echo>Download from ${boost.archive.location1}</echo>
+		<get src="${boost.archive.location1}/${boost.version}/source/${boost.achive}" dest="${ext.dir}/boost-install-files"
+			verbose="true" ignoreerrors="true" skipexisting="true"/>
+		<echo>Download from ${boost.archive.location2}</echo>
+		<get src="${boost.archive.location2}/${boost.version}/${boost.achive}" dest="${ext.dir}/boost-install-files"
+			verbose="true" skipexisting="true"/>
+	</target>
 
 	<target name="download-clean"
 		description="Clean up downloaded library sources and the libraries build artifacts from ext directory">
 		<delete includeemptydirs="true">
-			<!-- do not delete the boost archive -->
-			<!-- <fileset dir="${ext.dir}" excludes="${rapidjson.str}/*,boost-install-files/${boost.str}*.tar.gz"/> -->
 			<fileset dir="${ext.dir}" excludes="${rapidjson.str}/*"/>
 		</delete>
 	</target>
