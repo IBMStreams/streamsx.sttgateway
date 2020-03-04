@@ -179,21 +179,6 @@ ffmpeg -i MyFile.wav -ac 1 -ar 8000 MyNewFile.wav
  			float64 utteranceEndTime,
  			rstring utteranceText,
  			rstring sttErrorMessage,
- 			
- 			/*list&lt;rstring&gt; utteranceWords,
- 			list&lt;float64&gt; utteranceWordsConfidences,
- 			list&lt;float64&gt; utteranceWordsStartTimes,
- 			
- 			list&lt;rstring&gt; utteranceAlternatives, 
- 			list&lt;list&lt;rstring&gt;&gt; wordAlternatives,
- 			list&lt;list&lt;float64&gt;&gt; wordAlternativesConfidences,
- 			list&lt;float64&gt; wordAlternativesStartTimes,
- 			list&lt;float64&gt; wordAlternativesEndTimes,
- 	
- 			list&lt;float64&gt; utteranceWordsEndTimes,
- 			list&lt;int32&gt; utteranceWordsSpeakers,
- 			map&lt;rstring, list&lt;map&lt;rstring, float64&gt;&gt;&gt; keywordsSpottingResults,*/
- 			
  			rstring conversationId;
  
  	graph
@@ -256,10 +241,6 @@ ffmpeg -i MyFile.wav -ac 1 -ar 8000 MyNewFile.wav
  				contentType: $contentType;
  				sttResultMode: partial;
  				nonFinalUtterancesNeeded: $nonFinalUtterancesNeeded;
- 				/*maxUtteranceAlternatives: 4;
- 				wordAlternativesThreshold: 0.7;
- 				keywordsSpottingThreshold: 0.2;
- 				keywordsToBeSpotted: ["Abraham", "Lincoln", "November", "nation", "freedom", "bill", "pay"];*/
  			output O:
  				conversationId = speech,
  				utteranceNumber = getUtteranceNumber(),
@@ -269,18 +250,6 @@ ffmpeg -i MyFile.wav -ac 1 -ar 8000 MyNewFile.wav
  				transcriptionCompleted = isTranscriptionCompleted(),
  				utteranceStartTime = getUtteranceStartTime(),
  				utteranceEndTime = getUtteranceEndTime(),
- 				/*utteranceWords = getUtteranceWords(),
- 				utteranceWordsConfidences = getUtteranceWordsConfidences(),
- 				utteranceWordsStartTimes = getUtteranceWordsStartTimes(),
- 				
- 				utteranceAlternatives = getUtteranceAlternatives(),
- 				wordAlternatives = getWordAlternatives(),
- 				wordAlternativesConfidences = getWordAlternativesConfidences(),
- 				wordAlternativesStartTimes = getWordAlternativesStartTimes(),
- 				wordAlternativesEndTimes = getWordAlternativesEndTimes(),
- 				
- 				utteranceWordsSpeakers = getUtteranceWordsSpeakers(),
- 				keywordsSpottingResults = getKeywordsSpottingResults(),*/
  				sttErrorMessage = getSTTErrorMessage();
  			config
  				placement : partitionColocation("somePartitionColocationId");
@@ -292,12 +261,16 @@ ffmpeg -i MyFile.wav -ac 1 -ar 8000 MyNewFile.wav
  				onTuple I: {
  					mutable O otuple = {};
  					if (sttErrorMessage == "") {
+ 						if (transcriptionCompleted) {
  						otuple.line = "conversationId=" + conversationId + " myseq=" + (rstring)myseq + "\n" +
- 							"transcriptionCompleted=" + (rstring)transcriptionCompleted +
- 							" finalizedUtterance=" + (rstring)finalizedUtterance + " utteranceNumber=" + (rstring)utteranceNumber +
- 							" confidence=" + (rstring)confidence + " utteranceStartTime=" + (rstring)utteranceStartTime +
- 							" utteranceEndTime=" + (rstring)utteranceEndTime + "\n" +
- 							utteranceText + "\n";
+ 							"*** Conversation complete ***\n";
+ 						} else {
+ 							otuple.line = "conversationId=" + conversationId + " myseq=" + (rstring)myseq + "\n" +
+ 								"finalizedUtterance=" + (rstring)finalizedUtterance + " utteranceNumber=" + (rstring)utteranceNumber +
+ 								" confidence=" + (rstring)confidence + " utteranceStartTime=" + (rstring)utteranceStartTime +
+ 								" utteranceEndTime=" + (rstring)utteranceEndTime + "\n" +
+ 								utteranceText + "\n";
+ 							}
  					} else {
  						otuple.line = "conversationId=" + conversationId + " myseq=" + (rstring)myseq + "\n" +
  							"transcriptionCompleted=" + (rstring)transcriptionCompleted +
