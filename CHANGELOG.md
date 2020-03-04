@@ -1,5 +1,8 @@
 # Changes
 
+## v2.1.2
+* WatsonSTT: Correction issue #39: There should be no output tuples if non final utterances are received and parameter nonFinalUtterancesNeeded is false.
+
 ## v2.1.1
 * Download boost from other repo
 * Correction: Operator WatsonSTT remove previous speaker label attributes from output tuple before utterance attributes
