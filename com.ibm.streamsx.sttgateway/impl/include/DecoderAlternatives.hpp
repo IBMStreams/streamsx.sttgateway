@@ -85,7 +85,7 @@ void DecoderAlternatives::doWork(const rapidjson::Value& result, const std::stri
 		}
 
 		// Decode confidence: Confidence is evaluated only if partial utterances are requested
-		if (configuration.sttResultMode != WatsonSTTConfig::complete) {
+		if (configuration.sttOutputResultMode != WatsonSTTConfig::complete) {
 			if (resultIndex == 0) {
 				if (i == 0) {
 					const rapidjson::Value * confidenceVal = getOptionalMember<NumberLabel>(alternative, "confidence", ppname.str().c_str());
@@ -107,7 +107,7 @@ void DecoderAlternatives::doWork(const rapidjson::Value& result, const std::stri
 		} else {
 			// alternatives are collected only if not completeResults
 			// if we are requesting not completeResults it should not happen that there are more than one result
-			if ((configuration.sttResultMode != WatsonSTTConfig::complete) && (resultIndex == 0)) {
+			if ((configuration.sttOutputResultMode != WatsonSTTConfig::complete) && (resultIndex == 0)) {
 				utteranceAlternatives.pushBack(SPL::rstring(transcriptVal.GetString()));
 			}
 		}

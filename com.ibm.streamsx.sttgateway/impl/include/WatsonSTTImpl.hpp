@@ -134,7 +134,7 @@ private:
 	SPL::int64 nAudioBytesSend;
 
 	// Custom metrics for this operator.
-	SPL::Metric * const sttResultModeMetric;
+	SPL::Metric * const sttOutputResultModeMetric;
 	SPL::Metric * const nFullAudioConversationsReceivedMetric;
 	SPL::Metric * const nWebsocketConnectionAttemptsMetric;
 	SPL::Metric * const nWebsocketConnectionAttemptsFailedMetric;
@@ -182,15 +182,15 @@ WatsonSTTImpl<OP, OT>::WatsonSTTImpl(OP & splOperator_,Conf config_)
 		// Hence, there is no need to explicitly create them here.
 		// Simply get the custom metrics already defined for this operator.
 		// The update of metrics nFullAudioConversationsReceived and nAudioBytesSendMetric depends on parameter sttLiveMetricsUpdateNeeded
-		sttResultModeMetric{ & Rec::splOperator.getContext().getMetrics().getCustomMetricByName("sttResultMode")},
+		sttOutputResultModeMetric{ & Rec::splOperator.getContext().getMetrics().getCustomMetricByName("sttOutputResultMode")},
 		nFullAudioConversationsReceivedMetric{ & Rec::splOperator.getContext().getMetrics().getCustomMetricByName("nFullAudioConversationsReceived")},
 		nWebsocketConnectionAttemptsMetric{ & Rec::splOperator.getContext().getMetrics().getCustomMetricByName("nWebsocketConnectionAttempts")},
 		nWebsocketConnectionAttemptsFailedMetric{& Rec::splOperator.getContext().getMetrics().getCustomMetricByName("nWebsocketConnectionAttemptsFailed")},
 		nAudioBytesSendMetric{ & Rec::splOperator.getContext().getMetrics().getCustomMetricByName("nAudioBytesSend")}
 {
-	if (Conf::sttResultMode == Conf::partial)
+	if (Conf::sttOutputResultMode == Conf::partial)
 		if (not Conf::nonFinalUtterancesNeeded)
-			Conf::sttResultMode = Conf::final;
+			Conf::sttOutputResultMode = Conf::final;
 
 	if (Conf::customizationId == "") {
 		// No customization id configured. Hence, set the customization weight to
@@ -198,8 +198,8 @@ WatsonSTTImpl<OP, OT>::WatsonSTTImpl(OP & splOperator_,Conf config_)
 		Conf::customizationWeight = 9.9;
 	}
 
-	if (Conf::sttResultMode < 1 || Conf::sttResultMode > 3) {
-		throw std::runtime_error(STTGW_INVALID_PARAM_VALUE_1("WatsonSTT", Conf::sttResultMode));
+	if (Conf::sttOutputResultMode < 1 || Conf::sttOutputResultMode > 3) {
+		throw std::runtime_error(STTGW_INVALID_PARAM_VALUE_1("WatsonSTT", Conf::sttOutputResultMode));
 	}
 
 	if (Conf::maxUtteranceAlternatives <= 0) {
@@ -238,7 +238,7 @@ WatsonSTTImpl<OP, OT>::WatsonSTTImpl(OP & splOperator_,Conf config_)
 	// in sttResultMose complete
 
 	// Update the operator metric.
-	sttResultModeMetric->setValueNoLock(Conf::sttResultMode);
+	sttOutputResultModeMetric->setValueNoLock(Conf::sttOutputResultMode);
 
 	//print the configuration
 	std::cout << "WatsonSTT configuration:"
@@ -252,7 +252,7 @@ WatsonSTTImpl<OP, OT>::WatsonSTTImpl(OP & splOperator_,Conf config_)
 	<< "\nuri                                     = " << Conf::uri
 	<< "\nbaseLanguageModel                       = " << Conf::baseLanguageModel
 	<< "\ncontentType                             = " << Conf::contentType
-	<< "\nsttResultMode                           = " << Conf::sttResultMode
+	<< "\nsttOutputResultMode                     = " << Conf::sttOutputResultMode
 	<< "\nnonFinalUtterancesNeeded                = " << Conf::nonFinalUtterancesNeeded
 	<< "\nsttRequestLogging                       = " << Conf::sttRequestLogging
 	<< "\nbaseModelVersion                        = " << Conf::baseModelVersion

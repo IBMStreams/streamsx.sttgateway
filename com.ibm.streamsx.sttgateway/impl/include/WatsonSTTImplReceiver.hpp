@@ -401,7 +401,7 @@ void WatsonSTTImplReceiver<OP, OT>::on_open(client* c, websocketpp::connection_h
 
 	std::string interimResultsNeeded = "false";
 
-	if (sttResultMode == 1 || sttResultMode == 2) {
+	if (sttOutputResultMode == 1 || sttOutputResultMode == 2) {
 		// User configured it for either partial utterance or completed utterance.
 		interimResultsNeeded = "true";
 	}
@@ -528,7 +528,7 @@ void WatsonSTTImplReceiver<OP, OT>::on_message(client* c, websocketpp::connectio
 
 	// Do json decoding work
 	const std::string & payload_ = msg->get_payload();
-	bool completeResults = Config::sttResultMode == Config::complete;
+	bool completeResults = Config::sttOutputResultMode == Config::complete;
 	SPLAPPTRC(L_TRACE, traceIntro << "-->RE7 on_message payload_: " << payload_, "ws_receiver");
 	dec.doWork(payload_);
 
@@ -690,9 +690,10 @@ void WatsonSTTImplReceiver<OP, OT>::on_message(client* c, websocketpp::connectio
 
 		OT * myRecentOTuple = recentOTuple.load(); // load atomic
 		if (myRecentOTuple) {
-			bool myfinal = false;
-			if (Config::sttResultMode == WatsonSTTConfig::complete) {
-				myfinal = true;
+			bool finalUtteranceOrModeComplete = false;
+			// if sttResultgMode is complete use a fixed value of true for value final
+			if (Config::sttOutputResultMode == WatsonSTTConfig::complete) {
+				finalUtteranceOrModeComplete = true;
 			} else {
 				if (dec.DecoderResults::getSize() > 1) {
 					SPLAPPTRC(L_ERROR, traceIntro << "-->RE33 more than one result received in partial mode", "ws_receiver");
@@ -700,12 +701,11 @@ void WatsonSTTImplReceiver<OP, OT>::on_message(client* c, websocketpp::connectio
 				if (dec.DecoderResults::getSize() == 0) {
 					SPLAPPTRC(L_ERROR, traceIntro << "-->RE34 zero results received in partial mode", "ws_receiver");
 				} else {
-					myfinal = dec.DecoderFinal::getResult(0);
+					finalUtteranceOrModeComplete = dec.DecoderFinal::getResult(0);
 				}
 			}
 			// prepare speaker label consistency check
 			if (Config::identifySpeakers) {
-				//myUtteranceWordsStartTimes.clear();
 				myUtteranceWordsStartTimes = dec.DecoderAlternatives::getUtteranceWordsStartTimes();
 			}
 			// clean speaker values which are probably set
@@ -715,7 +715,7 @@ void WatsonSTTImplReceiver<OP, OT>::on_message(client* c, websocketpp::connectio
 			splOperator.setResultAttributes(
 					myRecentOTuple,
 					dec.DecoderResultIndex::getResult(),
-					myfinal,
+					finalUtteranceOrModeComplete,
 					// utterances
 					dec.DecoderAlternatives::getConfidence(),
 					dec.DecoderAlternatives::getUtteranceStartTime(),
@@ -735,12 +735,23 @@ void WatsonSTTImplReceiver<OP, OT>::on_message(client* c, websocketpp::connectio
 					dec.DecoderWordAlternatives::getWordAlternativesEndTimes(),
 					dec.DecoderKeywordsResult::getKeywordsSpottingResults()
 			);
-			if (Config::identifySpeakers && myfinal) {
-				SPLAPPTRC(L_DEBUG, traceIntro << "-->RE35 queue utterance results until speaker labels are available", "ws_receiver");
-				oTupleUsedForSubmission = myRecentOTuple;
+
+			// output logic of the tuple
+			if (finalUtteranceOrModeComplete) {
+				// send or queue final utterances
+				if (Config::identifySpeakers) {
+					SPLAPPTRC(L_DEBUG, traceIntro << "-->RE35 queue utterance results until speaker labels are available", "ws_receiver");
+					oTupleUsedForSubmission = myRecentOTuple;
+				} else {
+					SPLAPPTRC(L_DEBUG, traceIntro << "-->RE36a send utterance results tuple", "ws_receiver");
+					splOperator.submit(*myRecentOTuple, 0);
+				}
 			} else {
-				SPLAPPTRC(L_DEBUG, traceIntro << "-->RE36 send utterance results tuple", "ws_receiver");
-				splOperator.submit(*myRecentOTuple, 0);
+				// send non final utterances only if they are requested
+				if (Config::nonFinalUtterancesNeeded) {
+					SPLAPPTRC(L_DEBUG, traceIntro << "-->RE36 send utterance results tuple", "ws_receiver");
+					splOperator.submit(*myRecentOTuple, 0);
+				}
 			}
 
 		} else {
