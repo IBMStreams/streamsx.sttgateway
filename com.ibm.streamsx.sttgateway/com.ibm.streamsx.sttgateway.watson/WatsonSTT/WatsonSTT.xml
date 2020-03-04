@@ -52,7 +52,7 @@
 
       <metrics>
         <metric>
-          <name>sttResultMode</name>
+          <name>sttOutputResultMode</name>
           <description>
           STT result mode currently in effect for a given operator instance.
           

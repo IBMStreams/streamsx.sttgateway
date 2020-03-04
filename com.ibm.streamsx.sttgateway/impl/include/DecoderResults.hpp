@@ -50,7 +50,7 @@ protected:
 		const rapidjson::Value * results = getOptionalMember<ArrayLabel>(jsonDoc, "results", "universe");
 		if (results) {
 			resultsSize = results->Size();
-			if (configuration.sttResultMode != WatsonSTTConfig::complete) {
+			if (configuration.sttOutputResultMode != WatsonSTTConfig::complete) {
 				if (resultsSize > 1) {
 					SPLAPPTRC(L_ERROR, "We expect partial results but dimension of results is " << resultsSize, WATSON_DECODER);
 				}
@@ -65,7 +65,7 @@ protected:
 				}
 				DecoderFinal::doWork(result, ppname.str().c_str());
 				bool final = DecoderFinal::getResult(i);
-				if (final || (configuration.sttResultMode == WatsonSTTConfig::partial)) {
+				if (final || (configuration.sttOutputResultMode == WatsonSTTConfig::partial)) {
 					DecoderAlternatives::doWork(result, ppname.str().c_str(), i, final);
 				}
 				if (final) {

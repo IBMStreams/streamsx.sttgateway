@@ -135,7 +135,7 @@ type IAMAccessToken = rstring access_token, rstring refresh_token,
  * overwrites the received expires_in value. Type *float64*; Default *0.0*
  * 
  */
-public composite IAMAccessTokenGenerator(output IamAccessTokenStream) {
+public composite IAMAccessTokenGenerator(output stream<IAMAccessToken> IamAccessTokenStream) {
 	param
 		// IMPORTANT: The WatsonSTT operator uses Websocket to communicate with the 
 		// Watson STT service. For the STT service on public cloud, one must use 
