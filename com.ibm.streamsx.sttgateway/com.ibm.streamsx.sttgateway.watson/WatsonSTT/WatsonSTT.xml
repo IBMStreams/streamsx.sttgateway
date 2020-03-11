@@ -33,9 +33,6 @@
       The setting of this this parameter influences the validity of output functions and parameters. In `sttResultMode` 
       `partial` the parameter `nonFinalUtterancesNeeded` controls the output of non final utterances.
       
-      Requirements: 
-      * Intel RHEL6 or RHEL7 hosts installed with IBM Streams. 
-      
       **Note:** Multiple invocations of this operator can be fused to make 
       an efficient use of the available pool of CPU cores.
       
