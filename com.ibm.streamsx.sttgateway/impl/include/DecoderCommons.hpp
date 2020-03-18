@@ -16,6 +16,7 @@
 #include <stdexcept>
 #include <sstream>
 
+#include "WatsonSTTConfig.hpp"
 
 namespace com { namespace ibm { namespace streams { namespace sttgateway {
 

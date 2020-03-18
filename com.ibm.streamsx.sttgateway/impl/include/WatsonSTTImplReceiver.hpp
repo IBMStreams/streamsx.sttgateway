@@ -15,6 +15,7 @@
 #include <atomic>
 #include <typeinfo>
 #include <unordered_map>
+#include <functional>
 
 // This operator heavily relies on the Websocket++ header only library.
 // https://docs.websocketpp.org/index.html
@@ -561,7 +562,7 @@ void WatsonSTTImplReceiver<OP, OT>::on_message(client* c, websocketpp::connectio
 	// in sttResultMode 3 (complete result) utterance and speaker may be in one responmse message
 	if ((numFound > 2) || ((numFound == 2) && (not utteranceResultFound_ || not speakerResultFound_))) {
 		std::stringstream message;
-		message << traceIntro << "-->RE82 Unexpected decoding results - stateFound_ : " << stateFound_ << " sttErrorFound_: "
+		message << traceIntro << "-->RE88 Unexpected decoding results - stateFound_ : " << stateFound_ << " sttErrorFound_: "
 				<< sttErrorFound_ << " utteranceResultFound_: " << utteranceResultFound_ << " speakerResultFound_: "
 				<< speakerResultFound_ << " payload:" << payload_;
 		throw std::runtime_error(message.str());
@@ -878,7 +879,7 @@ void WatsonSTTImplReceiver<OP, OT>::on_fail(client* c, websocketpp::connection_h
 	recentOTuple.store(nullptr);
 	setWsState(WsState::failed);
 	// c->get_alog().write(websocketpp::log::alevel::app, "Websocket connection to the Watson STT service failed.");
-	SPLAPPTRC(L_ERROR, traceIntro << "-->RE83 Websocket connection to the Watson STT service failed.", "ws_receiver");
+	SPLAPPTRC(L_ERROR, traceIntro << "-->RE89 Websocket connection to the Watson STT service failed.", "ws_receiver");
 }
 
 template<typename OP, typename OT>

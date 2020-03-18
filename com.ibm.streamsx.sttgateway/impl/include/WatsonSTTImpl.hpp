@@ -38,8 +38,9 @@
 #include <SPL/Runtime/Utility/Mutex.h>
 #include <SPL/Runtime/Operator/Port/Punctuation.h>
 
-#include <WatsonSTTImplReceiver.hpp>
 #include <SttGatewayResource.h>
+
+#include "WatsonSTTImplReceiver.hpp"
 
 namespace com { namespace ibm { namespace streams { namespace sttgateway {
 
