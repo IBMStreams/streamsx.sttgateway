@@ -32,7 +32,7 @@ Now you must provide all dependencies for the toolkit code. Execute
 
 	ant requirements
 
-Check whether all required library heder files exist in directory `com.ibm.streamsx.sttgatewayit/include`
+Check whether all required library header files exist in directory `com.ibm.streamsx.sttgatewayit/include`
 
 Refresh the project view (press F5).
 

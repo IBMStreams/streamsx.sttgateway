@@ -72,6 +72,12 @@ public:
 	~WatsonSTTImpl();
 
 protected:
+	// Notify port readiness
+	//void allPortsReady();
+
+	// Processing for websocket receiver and ping threads
+	//void process(uint32_t idx);
+
 	// Tuple processing for mutating data port 0
 	template<typename IT0, typename DATA_TYPE, DATA_TYPE const & (IT0::*GETTER)() const>
 	void process_0(IT0 const & inputTuple);
@@ -98,6 +104,10 @@ private:
 	// send the action stop if connection is in listening state
 	void sendActionStop();
 
+	// The ping thread send a ping periodically with period
+	// senderPingPeriod if the wsState is listening
+	void ping_init();
+
 private:
 	// Access Token mutex this should be a different to portMutex
 	// Concurrent access to the access token from port 0 and port 1 is managed by the accessTokenMutex
@@ -115,10 +125,10 @@ private:
 	//In - out related variables set from sender thread only controlled by portMutex
 	int numberOfAudioBlobFragmentsReceivedInCurrentConversation;
 	SPL::int64 numberOfAudioSendInCurrentConversation;
-	bool mediaEndReached;
+	// is set when a media end is detected
 	// In parallel regions window marker are broadcasted to all chains
 	// so if an window marker is directly followed by a window marker, it will be ignored
-	bool ignoreNextWindowMarker;
+	bool mediaEndReached;
 
 	// The list of all o tuples of an conversation
 	// The wastebasked is emptied after transcription was finalized and before a new conversation starts
@@ -140,6 +150,7 @@ private:
 	SPL::Metric * const nWebsocketConnectionAttemptsMetric;
 	SPL::Metric * const nWebsocketConnectionAttemptsFailedMetric;
 	SPL::Metric * const nAudioBytesSendMetric;
+	//int pingSequenceNumber;
 };
 
 // The extraction function to extract the blob or reads the blob from file
@@ -171,7 +182,6 @@ WatsonSTTImpl<OP, OT>::WatsonSTTImpl(OP & splOperator_,Conf config_)
 		numberOfAudioBlobFragmentsReceivedInCurrentConversation(0),
 		numberOfAudioSendInCurrentConversation(0),
 		mediaEndReached(true),
-		ignoreNextWindowMarker(true),
 		oTupleWastebasket(),
 
 		nFullAudioConversationsReceived(0),
@@ -188,6 +198,7 @@ WatsonSTTImpl<OP, OT>::WatsonSTTImpl(OP & splOperator_,Conf config_)
 		nWebsocketConnectionAttemptsMetric{ & Rec::splOperator.getContext().getMetrics().getCustomMetricByName("nWebsocketConnectionAttempts")},
 		nWebsocketConnectionAttemptsFailedMetric{& Rec::splOperator.getContext().getMetrics().getCustomMetricByName("nWebsocketConnectionAttemptsFailed")},
 		nAudioBytesSendMetric{ & Rec::splOperator.getContext().getMetrics().getCustomMetricByName("nAudioBytesSend")}
+		//pingSequenceNumber(0)
 {
 	if (Conf::sttOutputResultMode == Conf::partial)
 		if (not Conf::nonFinalUtterancesNeeded)
@@ -280,6 +291,27 @@ WatsonSTTImpl<OP, OT>::~WatsonSTTImpl() {
 	for (auto x : oTupleWastebasket)
 		delete x;
 }
+
+/* ping is not able to keep the connection
+template<typename OP, typename OT>
+void WatsonSTTImpl<OP, OT>::allPortsReady() {
+	// create the operator receiver thread and the ping thread
+	uint32_t userThreadIndex = Rec::splOperator.createThreads(2);
+	if (userThreadIndex != 0) {
+		throw std::invalid_argument(Conf::traceIntro +" WatsonSTTImpl invalid userThreadIndex");
+	}
+}
+
+template<typename OP, typename OT>
+void WatsonSTTImpl<OP, OT>::process(uint32_t idx) {
+	SPLAPPTRC(L_INFO, Conf::traceIntro << "-->Run thread idx=" << idx, "ws_receiver");
+	if (idx == 0)
+		// run the ping trhead
+		ping_init();
+	else
+		// run the operator receiver thread
+		Rec::ws_init();
+} */
 
 template<typename OP, typename OT>
 template<typename IT1, const SPL::rstring& (IT1::*GETTER)()const>
@@ -390,11 +422,9 @@ template<typename OP, typename OT>
 template<typename IT0, typename DATA_TYPE, DATA_TYPE const & (IT0::*GETTER)() const>
 void WatsonSTTImpl<OP, OT>::process_0(IT0 const & inputTuple) {
 
-	// serialize this method and protect from issues when multiple threads send
-	// to this port
+	// serialize this method and processPunct and protect from issues when multiple threads send to this port
 	SPL::AutoMutex autoMutex(portMutex);
 
-	ignoreNextWindowMarker = false;
 	bool myMediaEndReached = mediaEndReached;
 	if (mediaEndReached) {
 		// this tuple starts a new conversation
@@ -487,6 +517,8 @@ void WatsonSTTImpl<OP, OT>::process_0(IT0 const & inputTuple) {
 			SPLAPPTRC(L_ERROR, errorMsg, "ws_sender");
 		}
 		connect();
+		if (Rec::splOperator.getPE().getShutdownRequested())
+			return;
 		// Do not send a tuple here because of probably multi threading issues
 		// Create an output tuple with the error text and auto assign from current input tuple
 		OT * myOTuple = Rec::splOperator.createOutTupleAndAutoAssign(inputTuple);
@@ -501,6 +533,8 @@ void WatsonSTTImpl<OP, OT>::process_0(IT0 const & inputTuple) {
 
 	} else { // Result success
 		connect();
+		if (Rec::splOperator.getPE().getShutdownRequested())
+			return;
 		// here we must be in listening state
 		// ignore race condition if state enters a different state
 		OT * nextOTuple = Rec::splOperator.createOutTupleAndAutoAssign(inputTuple);
@@ -518,7 +552,6 @@ void WatsonSTTImpl<OP, OT>::process_0(IT0 const & inputTuple) {
 		if (myAudioBytes == 0) {
 			sendActionStop();
 			mediaEndReached = true;
-			ignoreNextWindowMarker = true;
 		}
 	}
 } // End: WatsonSTTImpl<OP, OT>::process_0
@@ -526,16 +559,14 @@ void WatsonSTTImpl<OP, OT>::process_0(IT0 const & inputTuple) {
 // Punctuation processing for data port 0 Window Markers
 template<typename OP, typename OT>
 void WatsonSTTImpl<OP, OT>::processPunct_0(SPL::Punctuation const & punct) {
-	// serialize this method and protect from issues when multiple threads send
-	// to this port
+	// serialize this method and process and protect from issues when multiple threads send to this port
 	SPL::AutoMutex autoMutex(portMutex);
 
 	if (punct == SPL::Punctuation::WindowMarker) {
-		if (not ignoreNextWindowMarker) {
+		if (not mediaEndReached) {
 			// Ignore message if not in listening state
 			sendActionStop();
 			mediaEndReached = true;
-			ignoreNextWindowMarker = true;
 		} else {
 			SPLAPPTRC(L_TRACE, Conf::traceIntro << "PP1 Ignore window marker without data", "ws_sender");
 		}
@@ -571,7 +602,7 @@ void WatsonSTTImpl<OP, OT>::connect() {
 			SPL::Functions::Utility::block(Conf::senderWaitTimeForFinalReceiverState);
 		} else if (myWsState == WsState::error){
 			SPLAPPTRC(L_ERROR, Conf::traceIntro <<
-					"-->>CS4 Something to sent but receiver is in transient state error "
+					"-->CS4 Something to sent but receiver is in transient state error "
 					" wait " << Conf::senderWaitTimeForFinalReceiverState, "ws_sender");
 			SPL::Functions::Utility::block(Conf::senderWaitTimeForFinalReceiverState);
 		} else {
@@ -645,12 +676,13 @@ void WatsonSTTImpl<OP, OT>::sendDataToSTT(unsigned char const * audioBytes, uint
 		Rec::wsClient->send(Rec::wsHandle, audioBytes, audioSize, websocketpp::frame::opcode::binary, ec);
 		//Rec::statusOfAudioDataTransmissionToSTT = AUDIO_BLOB_FRAGMENTS_BEING_SENT_TO_STT;
 		if (ec) {
-			SPLAPPTRC(L_ERROR, Conf::traceIntro << "CS9 -->Error when send connectAndSendDataToSTT ec=" << ec, "ws_sender");
+			SPLAPPTRC(L_ERROR, Conf::traceIntro << "-->CS9 Error when send connectAndSendDataToSTT ec=" << ec <<
+					" message=" << ec.message(), "ws_sender");
 		}
 	} // END: if (audioSize > 0)
 
 	return;
-} // End: WatsonSTTImpl<OP, OT>::connectAndSendDataToSTT
+} // End: WatsonSTTImpl<OP, OT>::sendDataToSTT
 
 template<typename OP, typename OT>
 void WatsonSTTImpl<OP, OT>::sendActionStop() {
@@ -658,7 +690,7 @@ void WatsonSTTImpl<OP, OT>::sendActionStop() {
 	WsState myWsState = Rec::wsState.load();
 	if (myWsState == WsState::listening) {
 
-		SPLAPPTRC(L_DEBUG, Conf::traceIntro << "-->CS6 Send \"action\" : \"stop\"", "ws_sender");
+		SPLAPPTRC(L_INFO, Conf::traceIntro << "-->CS6 Send \"action\" : \"stop\"", "ws_sender");
 		// We reached the end of the blob data as sent/streamed from the SPL application.
 		// Signal end of the audio data.
 		// https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-websockets#WSstop
@@ -668,7 +700,8 @@ void WatsonSTTImpl<OP, OT>::sendActionStop() {
 		// So set this flag to indicate that.
 		//Rec::statusOfAudioDataTransmissionToSTT = FULL_AUDIO_DATA_SENT_TO_STT;
 		if (ec) {
-			SPLAPPTRC(L_ERROR, Conf::traceIntro << "-->CS10 Error in sendActionStop ec=" << ec, "ws_sender");
+			SPLAPPTRC(L_ERROR, Conf::traceIntro << "-->CS10 Error in sendActionStop ec=" << ec <<
+					" message=" << ec.message(), "ws_sender");
 		}
 	} else {
 		SPLAPPTRC(L_ERROR, Conf::traceIntro <<
@@ -679,6 +712,23 @@ void WatsonSTTImpl<OP, OT>::sendActionStop() {
 	return;
 }
 
+/* ping is not able to keep the connection
+template<typename OP, typename OT>
+void WatsonSTTImpl<OP, OT>::ping_init() {
+	while (not Rec::splOperator.getPE().getShutdownRequested()) {
+		SPL::Functions::Utility::block(Conf::senderPingPeriod);
+		if (not Rec::splOperator.getPE().getShutdownRequested()) {
+
+			if (Rec::wsState.load() == WsState::listening) {
+				std::string pingmessage{"pong_" + std::to_string(pingSequenceNumber++)};
+				websocketpp::lib::error_code ec{};
+				Rec::wsClient->ping(Rec::wsHandle, pingmessage, ec);
+				if (ec)
+					SPLAPPTRC(L_ERROR, Conf::traceIntro << "-->CS99 Error when send ping ec=" << ec << " message=" << ec.message(), "ws_sender");
+			}
+		}
+	}
+} */
 }}}}
 
 #endif /* COM_IBM_STREAMS_STTGATEWAY_WATSONSTTIMPL_HPP_ */

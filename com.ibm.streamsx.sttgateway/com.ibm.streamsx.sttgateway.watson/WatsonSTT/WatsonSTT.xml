@@ -118,10 +118,11 @@
           * 2=connecting: trying to connect to stt
           * 3=open: connection is opened
           * 4=listening: listening received
-          * 5=error: error received during transcription
-          * 6=closed: connection has closed
-          * 7=failed: connection has failed
-          * 8=crashed: Error was caught in ws_init tread
+          * 5=closing: transcription is finalized - close the connection
+          * 6=error: error received during transcription
+          * 7=closed: connection has closed
+          * 8=failed: connection has failed
+          * 9=crashed: Error was caught in ws_init tread
           </description>
           <kind>Gauge</kind>
         </metric>

@@ -394,7 +394,7 @@
 		<delete file="${release.info.file}"/>
 	</target>
 	
-	<!--- Targets to purge the workspace before a release archive is ptroduced -->
+	<!--- Targets to purge the workspace before a release archive is produced -->
 	<target name="clean-ignored" depends="warn-unclean">
 	</target>
 	

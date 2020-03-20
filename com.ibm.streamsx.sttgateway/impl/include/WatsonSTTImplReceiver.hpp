@@ -57,6 +57,7 @@ enum class WsState : char {
 	connecting, // trying to connect to stt
 	open,       // connection is opened
 	listening,  // listening received
+	closing,    // connection is closing
 	error,      // error received during transcription
 	closed,     // connection has closed
 	failed,     // connection has failed
@@ -111,6 +112,10 @@ private:
 	// Webscoket connection failure event handler
 	void on_fail(client* c, websocketpp::connection_hdl hdl);
 
+	//bool on_ping(client* c, websocketpp::connection_hdl hdl, std::string mess);
+
+	//void on_pong(client* c, websocketpp::connection_hdl hdl, std::string mess);
+
 	// Websocket initialization thread method
 	void ws_init();
 
@@ -132,22 +137,23 @@ protected:
 	client *wsClient;
 	websocketpp::connection_hdl wsHandle;
 
+	// the access token used in receiver-thread during ws_init after wsState changes to 'start'
+	// the value is copied from the sender- to receiver-thread before a 'makeNewWebsocketConnection' has been flagged
+	// this is a change of wsStae from any state to 'start'
+	std::string accessToken;
+
 	// The tuple with assignments from the input port
 	// to be used if transcription results or error indications have to be sent
 	// the sender thread guarantees that here is an valid value until transcriptionFinalized is flagged
 	// this otuple may change during a transcription when the input receives new input tuples for the
 	// current transcription. The previous value remains valid until transcriptionFinalized is flagged.
 	std::atomic<OT *> recentOTuple;
+private:
 	// when the on_message method is about to send something, this member is used to store the
 	// output tuple pointer. The output tuple contains the utterances and related attributes.
 	// The member is reset, after the tuple was submitted
 	OT * oTupleUsedForSubmission;
 
-	// the access token for the sender thread
-	// the value is copied from the sender thread before makeNewWebsocketConnection has been flagged
-	std::string accessToken;
-
-private:
 	std::atomic<SPL::int64> nWebsocketConnectionAttemptsCurrent;
 	std::atomic<SPL::int64> nFullAudioConversationsTranscribed;
 	std::atomic<SPL::int64> nFullAudioConversationsFailed;
@@ -181,10 +187,11 @@ WatsonSTTImplReceiver<OP, OT>::WatsonSTTImplReceiver(OP & splOperator_,Config co
 		transcriptionFinalized(true),
 		wsClient(nullptr),
 		wsHandle{},
-		recentOTuple{},
-		oTupleUsedForSubmission{},
 
 		accessToken{},
+
+		recentOTuple{},
+		oTupleUsedForSubmission{},
 
 		nWebsocketConnectionAttemptsCurrent{0},
 		nFullAudioConversationsTranscribed{0},
@@ -233,7 +240,7 @@ void WatsonSTTImplReceiver<OP, OT>::prepareToShutdown() {
 				SPLAPPTRC(L_INFO, traceIntro <<
 					"-->Client is closing the Websocket connection to the Watson STT service.",
 					"prepareToShutdown");
-				wsClient->close(wsHandle,websocketpp::close::status::normal,"");
+				wsClient->close(wsHandle, websocketpp::close::status::internal_endpoint_error, "Shutdown");
 			}
 		} else {
 			SPLAPPTRC(L_INFO, traceIntro <<
@@ -343,6 +350,8 @@ void WatsonSTTImplReceiver<OP, OT>::ws_init() {
 			wsClient->set_fail_handler(bind(&WatsonSTTImplReceiver<OP, OT>::on_fail,this,wsClient,::_1));
 			wsClient->set_message_handler(bind(&WatsonSTTImplReceiver<OP, OT>::on_message,this,wsClient,::_1,::_2));
 			wsClient->set_close_handler(bind(&WatsonSTTImplReceiver<OP, OT>::on_close,this,wsClient,::_1));
+			//wsClient->set_ping_handler(bind(&WatsonSTTImplReceiver<OP, OT>::on_ping,this,wsClient,::_1,::_2));
+			//wsClient->set_pong_handler(bind(&WatsonSTTImplReceiver<OP, OT>::on_pong,this,wsClient,::_1,::_2));
 
 			// Create a connection to the given URI and queue it for connection once
 			// the event loop starts
@@ -350,7 +359,7 @@ void WatsonSTTImplReceiver<OP, OT>::ws_init() {
 			websocketpp::lib::error_code ec;
 			// https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-basic-request#using-the-websocket-interface
 			client::connection_ptr con = wsClient->get_connection(uri, ec);
-			SPLAPPTRC(L_DEBUG, traceIntro << "-->RE4 (after get_connection) ec.value=" << ec.value(), "ws_receiver");
+			SPLAPPTRC(L_DEBUG, traceIntro << "-->RE4 (after get_connection) ec=" << ec, "ws_receiver");
 			if (ec)
 				throw ec;
 
@@ -367,7 +376,8 @@ void WatsonSTTImplReceiver<OP, OT>::ws_init() {
 			//SPL::Functions::Utility::abort(__FILE__, __LINE__);
 		} catch (const websocketpp::lib::error_code & e) {
 			//websocketpp::lib::error_code is a class -> catching by reference makes sense
-			SPLAPPTRC(L_ERROR, traceIntro << "-->RE92 websocketpp::lib::error_code: " << e.message(), "ws_receiver");
+			SPLAPPTRC(L_ERROR, traceIntro << "-->RE92 websocketpp::lib::error_code: e=" << e <<
+					" message=" << e.message(), "ws_receiver");
 			setWsState(WsState::crashed);
 			//SPL::Functions::Utility::abort(__FILE__, __LINE__);
 		} catch (...) {
@@ -491,8 +501,8 @@ void WatsonSTTImplReceiver<OP, OT>::on_open(client* c, websocketpp::connection_h
 	wsHandle = hdl;
 	// c->get_alog().write(websocketpp::log::alevel::app, "Sent Message: "+msg);
 	SPLAPPTRC(L_INFO, traceIntro <<
-			"-->RE7 A recognition request start message was sent to the Watson STT service:" <<
-			msg, "ws_receiver");
+			"-->RE7 A recognition request start message was sent to the Watson STT service at host:" <<
+			c->get_con_from_hdl(hdl)->get_host() << " message=" << msg, "ws_receiver");
 } //End: WatsonSTTImpl<OP, OT>::on_open
 
 // Whenever a message (transcription result, STT service message or an STT error message) is
@@ -593,10 +603,21 @@ void WatsonSTTImplReceiver<OP, OT>::on_message(client* c, websocketpp::connectio
 			// This is the "listening" response from the STT service for the
 			// transcription completion for the audio data that was sent earlier.
 			// This response also indicates that the STT service is ready to do a new transcription.
+			// But we close the connection now:
+			// see issue #44
+			// There is no reliable way to keep the connection forever open (except to send idle payload?)
+			// Ping messages do not keep the connection open
+			// The session timeout can not be switched off https://cloud.ibm.com/docs/speech-to-text?topic=speech-to-text-websockets#WSkeep
+			// Thus the stt service closes the connection after approx. 30 sec.
+			// This may produce is rare cases a race condition of the connection close from stt and the transmission of
+			// new speech samples. In this case a whole file may get lost.
+			// So we close the connection here
+			setWsState(WsState::closing);
 			fullTranscriptionCompleted_ = true;
+			wsClient->close(hdl, websocketpp::close::status::going_away, "");
 
 			SPLAPPTRC(L_DEBUG, traceIntro <<
-				"-->RE21 Websocket connection established - transcription completion.", "ws_receiver");
+				"-->RE85 Websocket connection established - transcription completion. Going to close", "ws_receiver");
 		}
 	}
 
@@ -833,19 +854,34 @@ void WatsonSTTImplReceiver<OP, OT>::on_close(client* c, websocketpp::connection_
 	// We must flag this as a connection error so that a connection retry attempt
 	// can be triggered inside the ws_audio_blob_sender method.
 	recentOTuple.store(nullptr);
+
+	// get information from ws lib
+	client::connection_ptr con = c->get_con_from_hdl(hdl);
+	int val = con->get_ec().value();
+	std::string mess = con->get_ec().message();
+	int closecode = con->get_remote_close_code();
+	const std::string & closemess = con->get_remote_close_reason();
+
 	WsState st = wsState.load();
-	if ((st != WsState::listening) && (st != WsState::error)) {
+	if (st == WsState::closing) {
+		// a connection close was requested
+		SPLAPPTRC(L_INFO, traceIntro <<
+				"RE87 -->Connection closed. wsState=" << wsStateToString(st) << " value=" << val << " message=" << mess <<
+				" remote_close_code=" << closecode << " remote_close_mesage=" << closemess, "ws_receiver");
+	} else if ((st != WsState::listening) && (st != WsState::error)) {
 		// This connection was not fully established before.
 		// This closure happened during an ongoing connection attempt.
 		// Let us flag this as a connection error.
 		SPLAPPTRC(L_ERROR, traceIntro <<
 				"RE81 -->Partially established Websocket connection closed with the Watson STT service during an ongoing "
-				"connection attempt. wsState=" << wsStateToString(st), "ws_receiver");
+				"connection attempt. wsState=" << wsStateToString(st) << " value=" << val << " message=" << mess <<
+				" remote_close_code=" << closecode << " remote_close_mesage=" << closemess, "ws_receiver");
 	} else {
 		// c->get_alog().write(websocketpp::log::alevel::app, "Websocket connection closed with the Watson STT service.");
 		SPLAPPTRC(L_ERROR, traceIntro <<
 				"-->RE82 Fully established Websocket connection closed with the Watson STT service."
-				" wsState=" << wsStateToString(st), "ws_receiver");
+				" wsState=" << wsStateToString(st) << " value=" << val << " message=" << mess <<
+				" remote_close_code=" << closecode << " remote_close_mesage=" << closemess, "ws_receiver");
 	}
 	setWsState(WsState::closed);
 }
@@ -879,8 +915,23 @@ void WatsonSTTImplReceiver<OP, OT>::on_fail(client* c, websocketpp::connection_h
 	recentOTuple.store(nullptr);
 	setWsState(WsState::failed);
 	// c->get_alog().write(websocketpp::log::alevel::app, "Websocket connection to the Watson STT service failed.");
-	SPLAPPTRC(L_ERROR, traceIntro << "-->RE89 Websocket connection to the Watson STT service failed.", "ws_receiver");
+	client::connection_ptr con = c->get_con_from_hdl(hdl);
+	int val = con->get_ec().value();
+	std::string mess = con->get_ec().message();
+	SPLAPPTRC(L_ERROR, traceIntro << "-->RE89 Websocket connection to the Watson STT service failed. value=" << val <<
+			" message=" << mess, "ws_receiver");
 }
+
+/*template<typename OP, typename OT>
+bool WatsonSTTImplReceiver<OP, OT>::on_ping(client* c, websocketpp::connection_hdl hdl, std::string mess) {
+	SPLAPPTRC(L_DEBUG, traceIntro << "-->RE99 Websocket ping message=" << mess, "ws_receiver");
+	return true;
+}
+
+template<typename OP, typename OT>
+void WatsonSTTImplReceiver<OP, OT>::on_pong(client* c, websocketpp::connection_hdl hdl, std::string mess) {
+	SPLAPPTRC(L_DEBUG, traceIntro << "-->RE99 Websocket pong message=" << mess, "ws_receiver");
+}*/
 
 template<typename OP, typename OT>
 void WatsonSTTImplReceiver<OP, OT>::setWsState(WsState ws) {
@@ -919,6 +970,7 @@ const char * wsStateToString(WsState ws) {
 	case WsState::connecting: return "connecting";
 	case WsState::open:       return "open";
 	case WsState::listening:  return "listening";
+	case WsState::closing:    return "closing";
 	case WsState::error:      return "error";
 	case WsState::closed:     return "closed";
 	case WsState::failed:     return "failed";
