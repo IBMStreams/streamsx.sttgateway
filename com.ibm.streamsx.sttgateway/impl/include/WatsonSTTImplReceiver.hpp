@@ -15,12 +15,15 @@
 #include <atomic>
 #include <typeinfo>
 #include <unordered_map>
-#include <functional>
 
 // This operator heavily relies on the Websocket++ header only library.
 // https://docs.websocketpp.org/index.html
 // This C++11 library code does the asynchronous full duplex Websocket communication with
 // the Watson STT service via a series of event handlers (a.k.a callback methods).
+// The websocketpp gives c++11 support also for older compilers
+// With c++11 capable compiler the stdlib is used
+#include <websocketpp/common/functional.hpp>
+
 // Bulk of the logic in this operator class appears in those event handler methods below.
 #include <websocketpp/config/asio_client.hpp>
 #include <websocketpp/client.hpp>
@@ -53,20 +56,22 @@ typedef websocketpp::lib::shared_ptr<boost::asio::ssl::context> context_ptr;
 
 enum class WsState : char {
 	idle,       // initial idle state
-	start,      // start a new connection
-	connecting, // trying to connect to stt
-	open,       // connection is opened
-	listening,  // listening received
-	closing,    // connection is closing
-	error,      // error received during transcription
-	closed,     // connection has closed
-	failed,     // connection has failed
-	crashed     // Error was caught in ws_init tread
+	start,      // start a new connection request (set from sender thread) - transient
+	connecting, // connection attempt started (from receiver tread) - transient
+	open,       // connection is opened (on open event) - transient
+	listening,  // listening received (on message event) - stable state
+	closing,    // connection is closing (set from receiver thread thread) - transient
+	error,      // error received during transcription (error message received on message) - transient
+	closed,     // connection has closed (on close event) - stable state
+	failed,     // connection has failed (on fail event) - stable state
+	crashed     // Error was caught in ws_init (receiver thread)- stable state
 };
 // helper function to make a pretty print
 const char * wsStateToString(WsState ws);
 // helper function to determine whether the receiver has reached an inactive state
 bool receiverHasStopped(WsState ws);
+// helper function to determine whether the receiver is in a transient state
+bool receiverHasTransientState(WsState ws);
 
 /*
  * Implementation class for operator Watson STT
@@ -130,7 +135,12 @@ protected:
 	// this flag us set from receiver thread and reset from sender thread
 	// it is set at the end of the on_message method, when the stt service sends a 'listening' event
 	// after transcription
-	bool transcriptionFinalized;
+	std::atomic<bool> transcriptionFinalized;
+
+	// This is set from the sender thread when the the next conversation is queued
+	// If this flag is set when a transcription completes, the connection is kept
+	// Otherwise the connection is closed to avoid the race condition when the next conversation arrives
+	std::atomic<bool> nextConversationQueued;
 
 	// This values are set from receiver thread when state is connecting
 	// the sender thread requires the values but should not use them during connecting state
@@ -185,6 +195,7 @@ WatsonSTTImplReceiver<OP, OT>::WatsonSTTImplReceiver(OP & splOperator_,Config co
 
 		wsState{WsState::idle},
 		transcriptionFinalized(true),
+		nextConversationQueued(false),
 		wsClient(nullptr),
 		wsHandle{},
 
@@ -532,7 +543,7 @@ void WatsonSTTImplReceiver<OP, OT>::on_message(client* c, websocketpp::connectio
 	WsState entryState = wsState.load();
 	SPLAPPTRC(L_DEBUG, traceIntro << "-->on_message entyState: " << wsStateToString(entryState), "ws_receiver");
 	if ((entryState != WsState::open) && (entryState != WsState::listening))
-		throw std::runtime_error(traceIntro + "RE80-->Unexpected entryState in ws on_message; state: " + std::string(wsStateToString(entryState)));
+		throw std::runtime_error(traceIntro + "-->RE80 Unexpected entryState in ws on_message; state: " + std::string(wsStateToString(entryState)));
 
 	// Local state variables
 	bool fullTranscriptionCompleted_ = false;	// Is set when a second listening event is received
@@ -603,7 +614,8 @@ void WatsonSTTImplReceiver<OP, OT>::on_message(client* c, websocketpp::connectio
 			// This is the "listening" response from the STT service for the
 			// transcription completion for the audio data that was sent earlier.
 			// This response also indicates that the STT service is ready to do a new transcription.
-			// But we close the connection now:
+			fullTranscriptionCompleted_ = true;
+			// But we close the connection now if further conversation is queued:
 			// see issue #44
 			// There is no reliable way to keep the connection forever open (except to send idle payload?)
 			// Ping messages do not keep the connection open
@@ -611,13 +623,15 @@ void WatsonSTTImplReceiver<OP, OT>::on_message(client* c, websocketpp::connectio
 			// Thus the stt service closes the connection after approx. 30 sec.
 			// This may produce is rare cases a race condition of the connection close from stt and the transmission of
 			// new speech samples. In this case a whole file may get lost.
-			// So we close the connection here
-			setWsState(WsState::closing);
-			fullTranscriptionCompleted_ = true;
-			wsClient->close(hdl, websocketpp::close::status::going_away, "");
-
-			SPLAPPTRC(L_DEBUG, traceIntro <<
-				"-->RE85 Websocket connection established - transcription completion. Going to close", "ws_receiver");
+			if (nextConversationQueued.load()) {
+				SPLAPPTRC(L_DEBUG, traceIntro <<
+					"-->RE85 Transcription completion and nextConversationQueued - Keep connection", "ws_receiver");
+			} else {
+				setWsState(WsState::closing);
+				wsClient->close(hdl, websocketpp::close::status::going_away, "");
+				SPLAPPTRC(L_DEBUG, traceIntro <<
+					"-->RE86 Transcription completion and no nextConversationQueued. Going to close", "ws_receiver");
+			}
 		}
 	}
 
@@ -696,7 +710,7 @@ void WatsonSTTImplReceiver<OP, OT>::on_message(client* c, websocketpp::connectio
 		// flag transcriptionFinalized
 		recentOTuple.store(nullptr);
 		splOperator.submit(SPL::Punctuation::WindowMarker, 0);
-		transcriptionFinalized = true;
+		transcriptionFinalized.store(true);
 
 		return;
 	}
@@ -851,8 +865,8 @@ void WatsonSTTImplReceiver<OP, OT>::on_close(client* c, websocketpp::connection_
 	// closed right after an on_open event without actually receiving the "listening" response
 	// in the on_message event from the Watson STT service. This condition clearly means
 	// that this is not a normal connection closure. Instead, the connection attempt has failed.
-	// We must flag this as a connection error so that a connection retry attempt
-	// can be triggered inside the ws_audio_blob_sender method.
+	// In this case the connection does not reach the state listening and the connection attempt will be repeated in
+	// the connect function of the sender thread
 	recentOTuple.store(nullptr);
 
 	// get information from ws lib
@@ -866,14 +880,14 @@ void WatsonSTTImplReceiver<OP, OT>::on_close(client* c, websocketpp::connection_
 	if (st == WsState::closing) {
 		// a connection close was requested
 		SPLAPPTRC(L_INFO, traceIntro <<
-				"RE87 -->Connection closed. wsState=" << wsStateToString(st) << " value=" << val << " message=" << mess <<
+				"-->RE87 Connection closed. wsState=" << wsStateToString(st) << " value=" << val << " message=" << mess <<
 				" remote_close_code=" << closecode << " remote_close_mesage=" << closemess, "ws_receiver");
 	} else if ((st != WsState::listening) && (st != WsState::error)) {
 		// This connection was not fully established before.
 		// This closure happened during an ongoing connection attempt.
 		// Let us flag this as a connection error.
 		SPLAPPTRC(L_ERROR, traceIntro <<
-				"RE81 -->Partially established Websocket connection closed with the Watson STT service during an ongoing "
+				"-->RE81 Partially established Websocket connection closed with the Watson STT service during an ongoing "
 				"connection attempt. wsState=" << wsStateToString(st) << " value=" << val << " message=" << mess <<
 				" remote_close_code=" << closecode << " remote_close_mesage=" << closemess, "ws_receiver");
 	} else {
@@ -981,6 +995,9 @@ const char * wsStateToString(WsState ws) {
 
 bool receiverHasStopped(WsState ws) {
 	return (ws == WsState::closed) || (ws == WsState::failed) || (ws == WsState::crashed);
+}
+bool receiverHasTransientState(WsState ws) {
+	return ws == WsState::start || ws == WsState::connecting || ws == WsState::open || ws == WsState::closing;
 }
 }}}}
 
