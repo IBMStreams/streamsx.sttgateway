@@ -194,7 +194,7 @@
             
             **Note:** If this function is requested, the operator emits at conversation end a tuple with this flag equal 
             true. All other output functions deliver the default value for the final tuple of an conversation. If this 
-            function is not requested, the operator does not send a final tuple for the conversation. The operator sends in any 
+            function is not requested, the operator does not send this final tuple for the conversation. The operator sends in any 
             case a window punctuation marker at the end of an conversation.
             </description>
             <prototype><![CDATA[boolean isTranscriptionCompleted()]]></prototype>

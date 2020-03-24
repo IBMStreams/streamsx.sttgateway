@@ -160,7 +160,11 @@ protected:
 	std::atomic<OT *> recentOTuple;
 private:
 	// when the on_message method is about to send something, this member is used to store the
-	// output tuple pointer. The output tuple contains the utterances and related attributes.
+	// output tuple pointer.
+	// First we expect the results for utterance, alternatives, and word alternatives
+	// Then we expect the speaker results.
+	// This value is used to store the non output tuple contains with the utterances and related attributes
+	// until the appropriate speaker result is received.
 	// The member is reset, after the tuple was submitted
 	OT * oTupleUsedForSubmission;
 
@@ -185,6 +189,17 @@ protected:
 	inline void incrementNFullAudioConversationsTranscribed();
 	inline void incrementNFullAudioConversationsFailed();
 	inline SPL::float64 getNWebsocketConnectionAttemptsCurrent() { return nWebsocketConnectionAttemptsCurrent.load(); };
+
+private:
+	// send out the error with the wit the specified reason
+	// This function consumes a non finalized output tuple (oTupleUsedForSubmission) if any
+	// Or uses a the recent output tuple (recentOTuple).
+	// If no recent output tuple is available, no tuple is sent and an error log is emitted
+	// increment the FullAudioConversationsFailed
+	void sendErrorTuple(const std::string & reason);
+
+	// send the finalization tuple of an conversation
+	void sendTranscriptionCompletedTuple(OT * otuple);
 };
 
 template<typename OP, typename OT>
@@ -641,36 +656,7 @@ void WatsonSTTImplReceiver<OP, OT>::on_message(client* c, websocketpp::connectio
 
 		std::string sttErrorString_ = dec.DecoderError::getResult();
 		SPLAPPTRC(L_ERROR, traceIntro << "-->RE25 STT error message=" << sttErrorString_, "ws_receiver");
-
-		// send out the error with the non finalized output if any
-		if (oTupleUsedForSubmission) {
-			SPLAPPTRC(L_DEBUG, traceIntro << "-->RE26 send a non finalized oTupleUsedForSubmission", "ws_receiver");
-			splOperator.appendErrorAttribute(oTupleUsedForSubmission, sttErrorString_);
-			splOperator.submit(*oTupleUsedForSubmission, 0);
-			oTupleUsedForSubmission = nullptr;
-		} else {
-
-			// send stand alone error tuple if there is a recent otuple
-			OT * myRecentOTuple = recentOTuple.load(); // load atomic
-			if (myRecentOTuple) {
-				SPLAPPTRC(L_WARN, traceIntro << "-->RE27 append error attribute and send error tuple", "ws_receiver");
-				incrementNFullAudioConversationsFailed();
-				// clean the previous set values in the output tuple
-				splOperator.setResultAttributes(myRecentOTuple, -1, false, -1.0, 0.0, 0.0, "", SPL::list<SPL::rstring>(),
-				SPL::list<SPL::rstring>(), SPL::list<SPL::float64>(), SPL::list<SPL::float64>(), SPL::list<SPL::float64>(),
-				SPL::list<SPL::list<SPL::rstring> >(), SPL::list<SPL::list<SPL::float64> >(),
-				SPL::list<SPL::float64>(), SPL::list<SPL::float64>(),
-				SPL::map<SPL::rstring, SPL::list<SPL::map<SPL::rstring, SPL::float64> > >());
-				if (Config::identifySpeakers)
-					splOperator.setSpeakerResultAttributes(myRecentOTuple, SPL::list<SPL::int32>(), SPL::list<SPL::float64>(), SPL::list<SPL::float64>());
-				// set required output values
-				splOperator.appendErrorAttribute(myRecentOTuple, sttErrorString_);
-				splOperator.submit(*myRecentOTuple, 0);
-			} else {
-				SPLAPPTRC(L_WARN, traceIntro << "-->RE28 no recent output tuple: send no error tuple", "ws_receiver");
-			}
-		}
-
+		sendErrorTuple(sttErrorString_);
 		setWsState(WsState::error);
 		return;
 
@@ -681,6 +667,7 @@ void WatsonSTTImplReceiver<OP, OT>::on_message(client* c, websocketpp::connectio
 		// metric
 		incrementNFullAudioConversationsTranscribed();
 
+		// The conversation should end with a completed submission cycle (speaker labels and utterances are sent)
 		if (oTupleUsedForSubmission) {
 			SPLAPPTRC(L_ERROR, traceIntro << "-->RE29 fullTranscriptionCompleted_ but non finalized oTupleUsedForSubmission available", "ws_receiver");
 			splOperator.submit(*oTupleUsedForSubmission, 0);
@@ -688,19 +675,10 @@ void WatsonSTTImplReceiver<OP, OT>::on_message(client* c, websocketpp::connectio
 		}
 		if (Config::isTranscriptionCompletedRequested) {
 			OT * myRecentOTuple = recentOTuple.load(); // load atomic
+			// there should be a conversation which means recentOTuple must not be null
+			// log an error if not
 			if (myRecentOTuple) {
-				SPLAPPTRC(L_DEBUG, traceIntro << "-->RE 30 send transcription completed tuple.", "ws_receiver");
-				// clean the previous set values in the output tuple
-				splOperator.setResultAttributes(myRecentOTuple, -1, false, -1.0, 0.0, 0.0, "", SPL::list<SPL::rstring>(),
-				SPL::list<SPL::rstring>(), SPL::list<SPL::float64>(), SPL::list<SPL::float64>(), SPL::list<SPL::float64>(),
-				SPL::list<SPL::list<SPL::rstring> >(), SPL::list<SPL::list<SPL::float64> >(),
-				SPL::list<SPL::float64>(), SPL::list<SPL::float64>(),
-				SPL::map<SPL::rstring, SPL::list<SPL::map<SPL::rstring, SPL::float64> > >());
-				if (Config::identifySpeakers)
-					splOperator.setSpeakerResultAttributes(myRecentOTuple, SPL::list<SPL::int32>(), SPL::list<SPL::float64>(), SPL::list<SPL::float64>());
-				// set required output values
-				splOperator.setTranscriptionCompleteAttribute(myRecentOTuple);
-				splOperator.submit(*myRecentOTuple, 0);
+				sendTranscriptionCompletedTuple(myRecentOTuple);
 			} else {
 				SPLAPPTRC(L_ERROR, traceIntro << "-->RE 31 no recent output tuple available but non finalized fullTranscriptionCompleted_. payload_: " << payload_, "ws_receiver");
 			}
@@ -709,6 +687,7 @@ void WatsonSTTImplReceiver<OP, OT>::on_message(client* c, websocketpp::connectio
 		// delete the recentOTuple if end of conversation was reached
 		// flag transcriptionFinalized
 		recentOTuple.store(nullptr);
+		// flag the conversation end in any case
 		splOperator.submit(SPL::Punctuation::WindowMarker, 0);
 		transcriptionFinalized.store(true);
 
@@ -746,7 +725,8 @@ void WatsonSTTImplReceiver<OP, OT>::on_message(client* c, websocketpp::connectio
 			}
 			// clean speaker values which are probably set
 			if (Config::identifySpeakers)
-				splOperator.setSpeakerResultAttributes(myRecentOTuple, SPL::list<SPL::int32>(), SPL::list<SPL::float64>(), SPL::list<SPL::float64>());
+				splOperator.setSpeakerResultAttributes(myRecentOTuple, SPL::list<SPL::int32>(), SPL::list<SPL::float64>(),
+						SPL::list<SPL::float64>());
 			// set utterance result attributes
 			splOperator.setResultAttributes(
 					myRecentOTuple,
@@ -867,7 +847,6 @@ void WatsonSTTImplReceiver<OP, OT>::on_close(client* c, websocketpp::connection_
 	// that this is not a normal connection closure. Instead, the connection attempt has failed.
 	// In this case the connection does not reach the state listening and the connection attempt will be repeated in
 	// the connect function of the sender thread
-	recentOTuple.store(nullptr);
 
 	// get information from ws lib
 	client::connection_ptr con = c->get_con_from_hdl(hdl);
@@ -880,23 +859,52 @@ void WatsonSTTImplReceiver<OP, OT>::on_close(client* c, websocketpp::connection_
 	if (st == WsState::closing) {
 		// a connection close was requested
 		SPLAPPTRC(L_INFO, traceIntro <<
-				"-->RE87 Connection closed. wsState=" << wsStateToString(st) << " value=" << val << " message=" << mess <<
+				"-->RE87 Connection closed. wsState=" << wsStateToString(st) << " ec.value=" << val << " ec.message=" << mess <<
 				" remote_close_code=" << closecode << " remote_close_mesage=" << closemess, "ws_receiver");
-	} else if ((st != WsState::listening) && (st != WsState::error)) {
+
+	} else if (st == WsState::listening) {
+		// This connection was fully established before but a error was not received in on_message
+		// Sent the error tuple now
+		std::stringstream errmess;
+		errmess << traceIntro << "-->RE81 Websocket connection closed from listening state ec.value=" << val <<
+				" ec.message=" << mess << " remote_close_code=" << closecode << " remote_close_mesage=" << closemess;
+		sendErrorTuple(errmess.str());
+		SPLAPPTRC(L_ERROR, errmess.str(), "ws_receiver");
+
+		// send a end tuple and window punctuation if a conversation was ongoing
+		OT * myRecentOTuple = recentOTuple.load(); // load atomic
+		if (myRecentOTuple) {
+			if (Config::isTranscriptionCompletedRequested)
+				sendTranscriptionCompletedTuple(myRecentOTuple);
+			splOperator.submit(SPL::Punctuation::WindowMarker, 0);
+		}
+
+	} else if (st == WsState::error) {
 		// This connection was not fully established before.
-		// This closure happened during an ongoing connection attempt.
-		// Let us flag this as a connection error.
+		// This closure happened during an ongoing connection.
+		// The error tuple was sent in on_message
 		SPLAPPTRC(L_ERROR, traceIntro <<
-				"-->RE81 Partially established Websocket connection closed with the Watson STT service during an ongoing "
-				"connection attempt. wsState=" << wsStateToString(st) << " value=" << val << " message=" << mess <<
+				"-->RE81a Fully established Websocket connection closed with the Watson STT service."
+				" wsState=" << wsStateToString(st) << " ec.value=" << val << " ec.message=" << mess <<
 				" remote_close_code=" << closecode << " remote_close_mesage=" << closemess, "ws_receiver");
+
+		// send a end tuple and window punctuation if a conversation was ongoing
+		OT * myRecentOTuple = recentOTuple.load(); // load atomic
+		if (myRecentOTuple) {
+			if (Config::isTranscriptionCompletedRequested)
+				sendTranscriptionCompletedTuple(myRecentOTuple);
+			splOperator.submit(SPL::Punctuation::WindowMarker, 0);
+		}
+
 	} else {
 		// c->get_alog().write(websocketpp::log::alevel::app, "Websocket connection closed with the Watson STT service.");
 		SPLAPPTRC(L_ERROR, traceIntro <<
-				"-->RE82 Fully established Websocket connection closed with the Watson STT service."
-				" wsState=" << wsStateToString(st) << " value=" << val << " message=" << mess <<
+				"-->RE82 Partially established Websocket connection closed with the Watson STT service during an ongoing "
+				"connection attempt. wsState=" << wsStateToString(st) << " ec.value=" << val << " ec.message=" << mess <<
 				" remote_close_code=" << closecode << " remote_close_mesage=" << closemess, "ws_receiver");
 	}
+
+	recentOTuple.store(nullptr);
 	setWsState(WsState::closed);
 }
 
@@ -932,8 +940,58 @@ void WatsonSTTImplReceiver<OP, OT>::on_fail(client* c, websocketpp::connection_h
 	client::connection_ptr con = c->get_con_from_hdl(hdl);
 	int val = con->get_ec().value();
 	std::string mess = con->get_ec().message();
-	SPLAPPTRC(L_ERROR, traceIntro << "-->RE89 Websocket connection to the Watson STT service failed. value=" << val <<
-			" message=" << mess, "ws_receiver");
+	SPLAPPTRC(L_ERROR, traceIntro << "-->RE89 Websocket connection to the Watson STT service failed. ec.value=" << val <<
+			" ec.message=" << mess, "ws_receiver");
+}
+
+template<typename OP, typename OT>
+void WatsonSTTImplReceiver<OP, OT>::sendErrorTuple(const std::string & reason) {
+	// send out the error with the non finalized output if any
+	if (oTupleUsedForSubmission) {
+		SPLAPPTRC(L_ERROR, traceIntro << "-->RE26 send a non finalized oTupleUsedForSubmission", "ws_receiver");
+		splOperator.appendErrorAttribute(oTupleUsedForSubmission, reason);
+		splOperator.submit(*oTupleUsedForSubmission, 0);
+		oTupleUsedForSubmission = nullptr;
+	} else {
+
+		// send stand alone error tuple if there is a recent otuple
+		OT * myRecentOTuple = recentOTuple.load(); // load atomic
+		if (myRecentOTuple) {
+			SPLAPPTRC(L_DEBUG, traceIntro << "-->RE27 append error attribute and send error tuple", "ws_receiver");
+			incrementNFullAudioConversationsFailed();
+			// clean the previous set values in the output tuple
+			splOperator.setResultAttributes(myRecentOTuple, -1, false, -1.0, 0.0, 0.0, "", SPL::list<SPL::rstring>(),
+				SPL::list<SPL::rstring>(), SPL::list<SPL::float64>(), SPL::list<SPL::float64>(), SPL::list<SPL::float64>(),
+				SPL::list<SPL::list<SPL::rstring> >(), SPL::list<SPL::list<SPL::float64> >(),
+				SPL::list<SPL::float64>(), SPL::list<SPL::float64>(),
+				SPL::map<SPL::rstring, SPL::list<SPL::map<SPL::rstring, SPL::float64> > >());
+			if (Config::identifySpeakers)
+				splOperator.setSpeakerResultAttributes(myRecentOTuple, SPL::list<SPL::int32>(), SPL::list<SPL::float64>(),
+						SPL::list<SPL::float64>());
+			// set required output values
+			splOperator.appendErrorAttribute(myRecentOTuple, reason);
+			splOperator.submit(*myRecentOTuple, 0);
+		} else {
+			SPLAPPTRC(L_ERROR, traceIntro << "-->RE28 no recent output tuple: send no error tuple", "ws_receiver");
+		}
+	}
+}
+
+template<typename OP, typename OT>
+void WatsonSTTImplReceiver<OP, OT>::sendTranscriptionCompletedTuple(OT * otuple) {
+	SPLAPPTRC(L_DEBUG, traceIntro << "-->RE 30 send transcription completed tuple.", "ws_receiver");
+	// clean the previous set values in the output tuple
+	splOperator.setResultAttributes(otuple, -1, false, -1.0, 0.0, 0.0, "", SPL::list<SPL::rstring>(),
+		SPL::list<SPL::rstring>(), SPL::list<SPL::float64>(), SPL::list<SPL::float64>(), SPL::list<SPL::float64>(),
+		SPL::list<SPL::list<SPL::rstring> >(), SPL::list<SPL::list<SPL::float64> >(),
+		SPL::list<SPL::float64>(), SPL::list<SPL::float64>(),
+		SPL::map<SPL::rstring, SPL::list<SPL::map<SPL::rstring, SPL::float64> > >());
+	if (Config::identifySpeakers)
+		splOperator.setSpeakerResultAttributes(otuple, SPL::list<SPL::int32>(), SPL::list<SPL::float64>(),
+				SPL::list<SPL::float64>());
+	// set required output values
+	splOperator.setTranscriptionCompleteAttribute(otuple);
+	splOperator.submit(*otuple, 0);
 }
 
 /*template<typename OP, typename OT>
@@ -979,16 +1037,16 @@ void WatsonSTTImplReceiver<OP, OT>::incrementNFullAudioConversationsFailed() {
 
 const char * wsStateToString(WsState ws) {
 	switch (ws) {
-	case WsState::idle:       return "idle";
-	case WsState::start:      return "start";
-	case WsState::connecting: return "connecting";
-	case WsState::open:       return "open";
-	case WsState::listening:  return "listening";
-	case WsState::closing:    return "closing";
-	case WsState::error:      return "error";
-	case WsState::closed:     return "closed";
-	case WsState::failed:     return "failed";
-	case WsState::crashed:    return "crashed";
+		case WsState::idle:       return "idle";
+		case WsState::start:      return "start";
+		case WsState::connecting: return "connecting";
+		case WsState::open:       return "open";
+		case WsState::listening:  return "listening";
+		case WsState::closing:    return "closing";
+		case WsState::error:      return "error";
+		case WsState::closed:     return "closed";
+		case WsState::failed:     return "failed";
+		case WsState::crashed:    return "crashed";
 	}
 	return "*****";
 }
