@@ -497,7 +497,7 @@
       <parameter>
         <name>maxUtteranceAlternatives</name>
         <description>
-        This parameter indicates the required number of n-best alternative hypotheses for the transcription results. (Default is 1)
+        This parameter indicates the required number of n-best alternative hypotheses for the transcription results. (Default is 3)
         see: [https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-output#max_alternatives] 
         
         **Note:** This parameter is not valid if `sttResultMode` equals `complete`.
@@ -512,7 +512,7 @@
       <parameter>
         <name>wordAlternativesThreshold</name>
         <description>
-        This parameter controls the density of the word alternatives results (a.k.a. Confusion Networks). A value of 0.0 
+        This parameter controls the density of the word alternatives results (a.k.a. Confusion Networks). A value of 0.6 
         disables this feature. Valid value must be less than 1.0 (Default is 0.0)
         see: [https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-output#word_alternatives] 
         
@@ -542,7 +542,7 @@
         <name>keywordsSpottingThreshold</name>
         <description>
         This parameter specifies the minimum confidence level that the STT service must have for an utterance word to 
-        match a given keyword. A value of 0.0 disables this feature. Valid value must be less than 1.0. (Default is 0.0)
+        match a given keyword. A value of 0.0 disables this feature. Valid value must be less than 1.0. (Default is 0.3)
         see: [https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-output#keyword_spotting] 
         
         **Note:** This parameter is not valid if `sttResultMode` equals `complete`.

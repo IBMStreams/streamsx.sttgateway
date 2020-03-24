@@ -108,6 +108,8 @@ https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-websocke
 	my $wordTimestampNeeded = 0;
 	my $wordConfidenceNeeded = 0;
 	my $identifySpeakers = 0;
+	my $utteranceAlternativesNeeded = 0;
+	my $wordAlternativesNeeded = 0;
 	my $isTranscriptionCompletedRequested = 0;
 	my $oport = $model->getOutputPortAt(0); 
 	foreach my $attribute (@{$oport->getAttributes()}) {
@@ -127,6 +129,11 @@ https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-websocke
 		} elsif ($op eq "getUtteranceWordsSpeakersConfidences") {
 			$identifySpeakers = 1;
 			$wordTimestampNeeded = 1;
+		} elsif ($op eq "getUtteranceAlternatives") {
+			$utteranceAlternativesNeeded = 1;
+		} elsif (($op eq "getWordAlternatives") || ($op eq "getWordAlternativesConfidences")
+				|| ($op eq "getWordAlternativesStartTimes") || ($op eq "getWordAlternativesEndTimes")) {
+			$wordAlternativesNeeded = 1;
 		} elsif ($op eq "isTranscriptionCompleted") {
 			$isTranscriptionCompletedRequested = 1;
 		} elsif (($op eq "getUtteranceNumber") || ($op eq "isFinalizedUtterance") ||
@@ -137,6 +144,7 @@ https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-websocke
 		}
 	}
 	print "// wordConfidenceNeeded=$wordConfidenceNeeded wordTimestampNeeded=$wordTimestampNeeded identifySpeakers=$identifySpeakers isTranscriptionCompletedRequested=$isTranscriptionCompletedRequested\n";
+	print "// utteranceAlternativesNeeded=$utteranceAlternativesNeeded wordAlternativesNeeded=$wordAlternativesNeeded\n";
 
 	# Following are the operator parameters.
 	
@@ -180,19 +188,27 @@ https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-websocke
 	if (($sttResultMode eq "complete") && $maxUtteranceAlternatives) {
 		SPL::CodeGen::exitln("In sttResultMode complete, parameter maxUtteranceAlternatives is not allowed", $model->getContext()->getSourceLocation());
 	}
-	# Default: 1 for a single result in the JSON alternatives array.
-	$maxUtteranceAlternatives = $maxUtteranceAlternatives ? $maxUtteranceAlternatives->getValueAt(0)->getCppExpression() : 1;
+	# Default: 3
+	$maxUtteranceAlternatives = $maxUtteranceAlternatives ? $maxUtteranceAlternatives->getValueAt(0)->getCppExpression() : 3;
+	# to disable the feature set to 0
+	if ($utteranceAlternativesNeeded == 0) {
+		$maxUtteranceAlternatives = 1;
+	}
 
 	my $wordAlternativesThreshold = $model->getParameterByName("wordAlternativesThreshold");
-	# Default: 0.0 to distable the wordAlternatives feature (a.k.a Confusion Networks).
-	$wordAlternativesThreshold = $wordAlternativesThreshold ? $wordAlternativesThreshold->getValueAt(0)->getCppExpression() : 0.0;
+	# Default: 0.6
+	$wordAlternativesThreshold = $wordAlternativesThreshold ? $wordAlternativesThreshold->getValueAt(0)->getCppExpression() : 0.6;
+	# to distable the wordAlternatives feature (a.k.a Confusion Networks) set to 0.0.
+	if ($wordAlternativesNeeded == 0) {
+		$wordAlternativesThreshold = 0.0;
+	}
 
 	my $smartFormattingNeeded = $model->getParameterByName("smartFormattingNeeded");
 	$smartFormattingNeeded = $smartFormattingNeeded ? $smartFormattingNeeded->getValueAt(0)->getCppExpression() : 0;
 
 	my $keywordsSpottingThreshold = $model->getParameterByName("keywordsSpottingThreshold");
 	# Default: 0.0 to distable the keywords spotting feature.
-	$keywordsSpottingThreshold = $keywordsSpottingThreshold ? $keywordsSpottingThreshold->getValueAt(0)->getCppExpression() : 0.0;
+	$keywordsSpottingThreshold = $keywordsSpottingThreshold ? $keywordsSpottingThreshold->getValueAt(0)->getCppExpression() : 0.3;
 	
 	my $keywordsToBeSpotted = $model->getParameterByName("keywordsToBeSpotted");
 	$keywordsToBeSpotted = $keywordsToBeSpotted ? $keywordsToBeSpotted->getValueAt(0)->getCppExpression() : "SPL::list<SPL::rstring>{}";
