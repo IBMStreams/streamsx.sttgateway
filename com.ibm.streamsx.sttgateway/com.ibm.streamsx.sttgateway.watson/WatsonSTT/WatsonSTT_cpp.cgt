@@ -108,6 +108,7 @@ https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-websocke
 	my $wordTimestampNeeded = 0;
 	my $wordConfidenceNeeded = 0;
 	my $identifySpeakers = 0;
+	my $speakerUpdatesNeeded = 0;
 	my $utteranceAlternativesNeeded = 0;
 	my $wordAlternativesNeeded = 0;
 	my $isTranscriptionCompletedRequested = 0;
@@ -116,7 +117,7 @@ https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-websocke
 		my $name = $attribute->getName(); 
 		my $paramValues = $attribute->getAssignmentOutputFunctionParameterValues();
 		my $op = $attribute->getAssignmentOutputFunctionName(); 
-
+		my $attributeType = $attribute->getSPLType();
 		if ($op eq "getUtteranceWordsConfidences") {
 			$wordConfidenceNeeded = 1;
 		} elsif (($op eq "getUtteranceWordsStartTimes") || ($op eq "getUtteranceWordsEndTimes")) {
@@ -129,6 +130,19 @@ https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-websocke
 		} elsif ($op eq "getUtteranceWordsSpeakersConfidences") {
 			$identifySpeakers = 1;
 			$wordTimestampNeeded = 1;
+		} elsif ($op eq "getUtteranceWordsSpeakerUpdates") {
+			if (SPL::CodeGen::Type::isList($attributeType)) {
+				my $elementType = SPL::CodeGen::Type::getElementType($attributeType);
+				if ($elementType eq "tuple<float64 startTime,int32 speaker,float64 confidence>") {
+					$identifySpeakers = 1;
+					$wordTimestampNeeded = 1;
+					$speakerUpdatesNeeded = 1;
+				} else {
+					SPL::CodeGen::exitln("Attribute %s has wrong type! It must be of type list<tuple<float64 startTime,int32 speaker,float64 confidence>>", "$name", $oport->getSourceLocation());
+				}
+			} else {
+				SPL::CodeGen::exitln("Attribute %s must be a list type! It must be of type list<float64 startTime,int32 speaker,float64 confidence>>", "$name", $oport->getSourceLocation());
+			}
 		} elsif ($op eq "getUtteranceAlternatives") {
 			$utteranceAlternativesNeeded = 1;
 		} elsif (($op eq "getWordAlternatives") || ($op eq "getWordAlternativesConfidences")
@@ -143,7 +157,9 @@ https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-websocke
 			}
 		}
 	}
-	print "// wordConfidenceNeeded=$wordConfidenceNeeded wordTimestampNeeded=$wordTimestampNeeded identifySpeakers=$identifySpeakers isTranscriptionCompletedRequested=$isTranscriptionCompletedRequested\n";
+	print "// wordConfidenceNeeded=$wordConfidenceNeeded wordTimestampNeeded=$wordTimestampNeeded\n";
+	print "// identifySpeakers=$identifySpeakers speakerUpdatesNeeded=$speakerUpdatesNeeded\n";
+	print "// isTranscriptionCompletedRequested=$isTranscriptionCompletedRequested\n";
 	print "// utteranceAlternativesNeeded=$utteranceAlternativesNeeded wordAlternativesNeeded=$wordAlternativesNeeded\n";
 
 	# Following are the operator parameters.
@@ -228,6 +244,8 @@ https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-websocke
 	$sttLiveMetricsUpdateNeeded = $sttLiveMetricsUpdateNeeded ? $sttLiveMetricsUpdateNeeded->getValueAt(0)->getCppExpression() : 1;
 %>
 
+#include <type_traits>
+
 <%SPL::CodeGen::implementationPrologue($model);%>
 
 // Constructor
@@ -261,6 +279,7 @@ MY_OPERATOR::MY_OPERATOR()
 						<%=$wordConfidenceNeeded%>,
 						<%=$wordTimestampNeeded%>,
 						<%=$identifySpeakers%>,
+						<%=$speakerUpdatesNeeded%>,
 						<%=$smartFormattingNeeded%>,
 						<%=$keywordsSpottingThreshold%>,
 						<%=$keywordsToBeSpotted%>,
@@ -463,12 +482,7 @@ void MY_OPERATOR::setResultAttributes(
 }
 
 // Assign speaker result to output tuple
-void MY_OPERATOR::setSpeakerResultAttributes(
-		OPort0Type * tuple,
-		const SPL::list<SPL::int32> & getUtteranceWordsSpeakers_,
-		const SPL::list<SPL::float64> & getUtteranceWordsSpeakersConfidences_,
-		const SPL::list<SPL::float64> & getUtteranceWordsSpeakersStartTime_
-) {
+void MY_OPERATOR::setSpeakerResultAttributes(OPort0Type * tuple, const com::ibm::streams::sttgateway::SpeakerProcessor & spkproc) {
 <% 
 	my $oport = $model->getOutputPortAt(0);
 	foreach my $attribute (@{$oport->getAttributes()}) {
@@ -478,11 +492,14 @@ void MY_OPERATOR::setSpeakerResultAttributes(
 
 		if ($operation eq "getUtteranceWordsSpeakers") {
 %>
-			tuple->set_<%=$name%>(getUtteranceWordsSpeakers_);
+			tuple->set_<%=$name%>(spkproc.getUtteranceWordsSpeakers());
 <%		} elsif ($operation eq "getUtteranceWordsSpeakersConfidences") { %>
-			tuple->set_<%=$name%>(getUtteranceWordsSpeakersConfidences_);
-<%		} elsif ($operation eq "getUtteranceWordsSpeakers") { %>
-			tuple->set_<%=$name%>(getUtteranceWordsSpeakers_);
+			tuple->set_<%=$name%>(spkproc.getUtteranceWordsSpeakersConfidences());
+<%		} elsif ($operation eq "getUtteranceWordsSpeakerUpdates") { %>
+			//auto & theTupleList = tuple->get_<%=$name%>();
+			//theTupleList.clear();
+			//spkproc.getUtteranceWordsSpeakerUpdates(theTupleList);
+			tuple->set_<%=$name%>(spkproc.getUtteranceWordsSpeakerUpdates<std::remove_reference<decltype(tuple->get_<%=$name%>())>::type::value_type>());
 <%
 		}
 	}

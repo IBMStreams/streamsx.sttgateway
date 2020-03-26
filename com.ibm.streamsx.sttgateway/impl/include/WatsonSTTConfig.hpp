@@ -40,6 +40,7 @@ struct WatsonSTTConfig {
 	const bool wordConfidenceNeeded;
 	const bool wordTimestampNeeded;
 	const bool identifySpeakers;
+	const bool speakerUpdatesNeeded;
 	const bool smartFormattingNeeded;
 	SPL::float64 keywordsSpottingThreshold;
 	const SPL::list<SPL::rstring> keywordsToBeSpotted;

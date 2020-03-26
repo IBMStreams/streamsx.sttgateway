@@ -300,6 +300,21 @@
           </function>
           <function>
             <description>
+            Return the speaker identifier updates for all emitted utterance words in the currect conversation. 
+            This function returns an update to previously sent word speaker identifiers without adding any new results.
+            
+            Speaker numbering starts at 0. The invalid index -1 identifies a non identified speaker. 
+            It will typically take 5-10 seconds of speakers for diarization results to become reliable, and will continually 
+            improve over the course of an audio conversation.
+            
+            If return type of this function is **list\&#60;tuple\&#60;float64 startTime, int32 speaker, float64 confidence\&#62;\&#62;** 
+            The speaker label is given with respect to the start time of the utterance word.
+            No other tuple types are accepted as result type.
+            </description>
+            <prototype><![CDATA[<tuple T> list<T> getUtteranceWordsSpeakerUpdates()]]></prototype>
+          </function>
+          <function>
+            <description>
             Returns the STT keywords spotting results as a map of key/value pairs. Read this toolkit's documentation to learn about the map contents. 
             
             **Note:** keyword spotting results are available only for final `utterances`.

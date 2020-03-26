@@ -7,7 +7,6 @@
 #define COM_IBM_STREAMS_STTGATEWAY_DECODER_SPEAKER_LABELS_H_
 
 #include "DecoderCommons.hpp"
-#include <vector>
 
 namespace com { namespace ibm { namespace streams { namespace sttgateway {
 

@@ -280,6 +280,7 @@ WatsonSTTImpl<OP, OT>::WatsonSTTImpl(OP & splOperator_,Conf config_)
 	<< "\nwordConfidenceNeeded                    = " << Conf::wordConfidenceNeeded
 	<< "\nwordTimestampNeeded                     = " << Conf::wordTimestampNeeded
 	<< "\nidentifySpeakers                        = " << Conf::identifySpeakers
+	<< "\nspeakerUpdatesNeeded                    = " << Conf::speakerUpdatesNeeded
 	<< "\nsmartFormattingNeeded                   = " << Conf::smartFormattingNeeded
 	<< "\nkeywordsSpottingThreshold               = " << Conf::keywordsSpottingThreshold
 	<< "\nkeywordsToBeSpotted                     = " << Conf::keywordsToBeSpotted

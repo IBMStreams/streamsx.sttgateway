@@ -12,10 +12,14 @@ Last modified on: Jun/11/2019
 ============================================================
 */
 
-/* Additional includes go here */
-#include <WatsonSTTImpl.hpp>
+/* Additional includes go here 
+ * Use headerPrologue function to make sure that include is generated after header guard
+ */
+<%
+my @includes = "#include <WatsonSTTImpl.hpp>";
 
-<%SPL::CodeGen::headerPrologue($model);%>
+SPL::CodeGen::headerPrologue($model, \@includes);
+%>
 
 /*
  * Make this operator a composition of the MY_BASE_OPERATOR and the implementation class: WatsonSTTImpl
@@ -83,12 +87,7 @@ public:
 	);
 	
 	// Assign speaker result to output tuple
-	void setSpeakerResultAttributes(
-			OPort0Type * tuple,
-			const SPL::list<SPL::int32> & getUtteranceWordsSpeakers_,
-			const SPL::list<SPL::float64> & getUtteranceWordsSpeakersConfidences_,
-			const SPL::list<SPL::float64> & getUtteranceWordsSpeakersStartTime_
-	);
+	void setSpeakerResultAttributes(OPort0Type * tuple, const com::ibm::streams::sttgateway::SpeakerProcessor & spkproc);
 	
 	// Assign transcription complete attribute to output tuple
 	void setTranscriptionCompleteAttribute(OPort0Type * tuple);
