@@ -46,6 +46,7 @@ composite WatsonSTT0OutputFunctions {
 			//<*_cfn*>,list<float64> wordAlternativesEndTimes
 			//<*_spk*>,list<int32> utteranceWordsSpeakers
 			//<*_spk*>,list<float64> utteranceWordsSpeakersConfidences
+			//<*_spk*>,list<tuple<float64 startTime, int32 speaker, float64 confidence>> utteranceWordsSpeakerUpdates
 			//<*Mode1 *Mode2>,map<rstring, list<map<rstring, float64>>> keywordsSpottingResults
 			;
 		
@@ -119,6 +120,7 @@ composite WatsonSTT0OutputFunctions {
 				//<*_cfn*>,wordAlternativesEndTimes = getWordAlternativesEndTimes()
 				//<*_spk*>,utteranceWordsSpeakers = getUtteranceWordsSpeakers()
 				//<*_spk*>,utteranceWordsSpeakersConfidences = getUtteranceWordsSpeakersConfidences()
+				//<*_spk*>,utteranceWordsSpeakerUpdates = getUtteranceWordsSpeakerUpdates()
 				// Results from keywords spotting (matching) in an utterance.
 				//<*Mode1 *Mode2>keywordsSpottingResults = getKeywordsSpottingResults(),
 				;
