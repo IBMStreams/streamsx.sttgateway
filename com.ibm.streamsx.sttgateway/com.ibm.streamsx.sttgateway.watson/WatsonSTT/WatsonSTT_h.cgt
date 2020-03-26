@@ -59,7 +59,10 @@ public:
 	
 	// append the error message to the error attribute of the output tuple
 	void appendErrorAttribute(OPort0Type * tuple, std::string const & errorMessage);
-	
+
+	// clear the error message
+	void clearErrorAttribute(OPort0Type * tuple);
+
 	// Assign result attributes except speaker results and transcription complete to output tuple
 	void setResultAttributes(
 			OPort0Type * tuple,

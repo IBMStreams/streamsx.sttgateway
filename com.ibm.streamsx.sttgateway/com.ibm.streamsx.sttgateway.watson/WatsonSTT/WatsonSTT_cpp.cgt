@@ -407,6 +407,23 @@ void MY_OPERATOR::appendErrorAttribute(OPort0Type * tuple, std::string const & e
 %>
 }
 
+// clear to the error message attribute of the output tuple
+void MY_OPERATOR::clearErrorAttribute(OPort0Type * tuple) {
+<% 
+	my $oport = $model->getOutputPortAt(0); 
+	foreach my $attribute (@{$oport->getAttributes()}) { 
+		my $name = $attribute->getName(); 
+		my $paramValues = $attribute->getAssignmentOutputFunctionParameterValues();
+		my $operation = $attribute->getAssignmentOutputFunctionName();
+
+		if ($operation eq "getSTTErrorMessage") {
+%>
+			tuple->get_<%=$name%>().clear();
+<%		}
+	}
+%>
+}
+
 // Assign result attributes except speaker results and transcription complete to output tuple
 void MY_OPERATOR::setResultAttributes(
 		OPort0Type * tuple,

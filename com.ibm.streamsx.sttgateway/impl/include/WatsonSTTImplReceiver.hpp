@@ -187,7 +187,7 @@ private:
 	SPL::Metric * const nFullAudioConversationsFailedMetric;
 	SPL::Metric * const wsConnectionStateMetric;
 
-	static SpeakerProcessor emptySpeakerResults;
+	static const SpeakerProcessor emptySpeakerResults;
 
 protected:
 	// Helper functions
@@ -895,16 +895,12 @@ void SpeakerProcessor::run() {
 		spkIndexMap.insert(std::pair<const SPL::float64, rapidjson::SizeType>(spkFrom[i], i));
 	}
 	// size check
-
 	auto wordListSize = myUtteranceWordsStartTimes.size();
 	if (spkSize != wordListSize) {
 		SPLAPPTRC(L_DEBUG, traceIntro << "-->RE41 Word list size " << wordListSize <<
 				" and speaker list size " << spkSize << " are not equal.", "ws_receiver");
 	}
 	// the result lists - each entry corresponds to the entry in the word list
-	SPL::list<SPL::float64> spkFromNew; spkFromNew.reserve(wordListSize);
-	SPL::list<SPL::int32>   spkSpkNew;  spkSpkNew.reserve(wordListSize);
-	SPL::list<SPL::float64> spkCfdNew;  spkCfdNew.reserve(wordListSize);
 	// a set with all indexes used from the word list
 	std::unordered_set<rapidjson::SizeType> usedSpkIndexes;
 	for (rapidjson::SizeType i = 0; i < wordListSize; i++) {
@@ -1018,7 +1014,7 @@ void WatsonSTTImplReceiver<OP, OT>::on_close(client* c, websocketpp::connection_
 	setWsState(WsState::closed);
 }
 
-// When a Websocket connection handshake happens with the Watson STT serice for enabling
+// When a Websocket connection handshake happens with the Watson STT service for enabling
 // TLS security, this callback method will be called from the websocketpp layer.
 template<typename OP, typename OT>
 context_ptr WatsonSTTImplReceiver<OP, OT>::on_tls_init(client* c, websocketpp::connection_hdl) {
@@ -1061,6 +1057,7 @@ void WatsonSTTImplReceiver<OP, OT>::sendErrorTuple(const std::string & reason) {
 		SPLAPPTRC(L_ERROR, traceIntro << "-->RE26 send a non finalized oTupleUsedForSubmission", "ws_receiver");
 		splOperator.appendErrorAttribute(oTupleUsedForSubmission, reason);
 		splOperator.submit(*oTupleUsedForSubmission, 0);
+		splOperator.clearErrorAttribute(oTupleUsedForSubmission);
 		oTupleUsedForSubmission = nullptr;
 	} else {
 
@@ -1080,6 +1077,7 @@ void WatsonSTTImplReceiver<OP, OT>::sendErrorTuple(const std::string & reason) {
 			// set required output values
 			splOperator.appendErrorAttribute(myRecentOTuple, reason);
 			splOperator.submit(*myRecentOTuple, 0);
+			splOperator.clearErrorAttribute(myRecentOTuple);
 		} else {
 			SPLAPPTRC(L_ERROR, traceIntro << "-->RE28 no recent output tuple: send no error tuple", "ws_receiver");
 		}
@@ -1167,7 +1165,7 @@ bool receiverHasTransientState(WsState ws) {
 }
 
 template<typename OP, typename OT>
-SpeakerProcessor WatsonSTTImplReceiver<OP, OT>::emptySpeakerResults;
+const SpeakerProcessor WatsonSTTImplReceiver<OP, OT>::emptySpeakerResults;
 
 }}}}
 
