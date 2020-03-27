@@ -86,7 +86,7 @@ public:
 			const SPL::list<SPL::float64> & wordAlternativesStartTimes_,
 			const SPL::list<SPL::float64> & wordAlternativesEndTimes_,
 			// keyword spotting
-			const SPL::map<SPL::rstring, SPL::list<SPL::map<SPL::rstring, SPL::float64>>> & keywordsSpottingResults_
+			const com::ibm::streams::sttgateway::KeywordProcessor & keywordproc_
 	);
 	
 	// Assign speaker result to output tuple

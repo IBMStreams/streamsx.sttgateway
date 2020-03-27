@@ -112,6 +112,7 @@ https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-websocke
 	my $utteranceAlternativesNeeded = 0;
 	my $wordAlternativesNeeded = 0;
 	my $isTranscriptionCompletedRequested = 0;
+	my $keywordsSpottingResultType = "";
 	my $oport = $model->getOutputPortAt(0); 
 	foreach my $attribute (@{$oport->getAttributes()}) {
 		my $name = $attribute->getName(); 
@@ -155,12 +156,21 @@ https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-websocke
 			if ($sttResultMode eq "complete") {
 				SPL::CodeGen::exitln("In sttResultMode complete, Output Function $op is not allowed", $model->getContext()->getSourceLocation());
 			}
+		# Type check for keyword result
+		} elsif ($op eq "getKeywordsSpottingResults") {
+			if (($attributeType eq "map<rstring,list<map<rstring,float64>>>")
+					|| ($attributeType eq "map<rstring,list<tuple<float64 start_time,float64 end_time,float64 confidence>>>")) {
+				$keywordsSpottingResultType = "$attributeType";
+			} else {
+				SPL::CodeGen::exitln("Attribute %s has wrong type! It must be of type map<rstring,list<tuple<float64 start_time,float64 end_time,float64 confidence>>> or map<rstring,list<map<rstring,float64>>>", "$name", $oport->getSourceLocation());
+			}
 		}
 	}
 	print "// wordConfidenceNeeded=$wordConfidenceNeeded wordTimestampNeeded=$wordTimestampNeeded\n";
 	print "// identifySpeakers=$identifySpeakers speakerUpdatesNeeded=$speakerUpdatesNeeded\n";
 	print "// isTranscriptionCompletedRequested=$isTranscriptionCompletedRequested\n";
 	print "// utteranceAlternativesNeeded=$utteranceAlternativesNeeded wordAlternativesNeeded=$wordAlternativesNeeded\n";
+	print "// keywordsSpottingResultType=$keywordsSpottingResultType\n";
 
 	# Following are the operator parameters.
 	
@@ -447,7 +457,7 @@ void MY_OPERATOR::setResultAttributes(
 		const SPL::list<SPL::float64> & wordAlternativesStartTimes_,
 		const SPL::list<SPL::float64> & wordAlternativesEndTimes_,
 		// keyword spotting
-		const SPL::map<SPL::rstring, SPL::list<SPL::map<SPL::rstring, SPL::float64>>> & keywordsSpottingResults_
+		const com::ibm::streams::sttgateway::KeywordProcessor & keywordproc_
 ) {
 <% 
 	my $oport = $model->getOutputPortAt(0); 
@@ -491,7 +501,9 @@ void MY_OPERATOR::setResultAttributes(
 <%		} elsif ($operation eq "getUtteranceEndTime") { %>
 			tuple->set_<%=$name%>(utteranceEndTime_);
 <%		} elsif ($operation eq "getKeywordsSpottingResults") { %>
-			tuple->set_<%=$name%>(keywordsSpottingResults_);
+			//tuple->set_<%=$name%>(keywordsSpottingResults_);
+			auto & theKeywMap = tuple->get_<%=$name%>();
+			keywordproc_.getKeywordsSpottingResults(theKeywMap);
 <%
 		}
 	}
@@ -516,7 +528,13 @@ void MY_OPERATOR::setSpeakerResultAttributes(OPort0Type * tuple, const com::ibm:
 			//auto & theTupleList = tuple->get_<%=$name%>();
 			//theTupleList.clear();
 			//spkproc.getUtteranceWordsSpeakerUpdates(theTupleList);
-			tuple->set_<%=$name%>(spkproc.getUtteranceWordsSpeakerUpdates<std::remove_reference<decltype(tuple->get_<%=$name%>())>::type::value_type>());
+			tuple->set_<%=$name%>(
+					spkproc.getUtteranceWordsSpeakerUpdates
+						<std::remove_reference<
+							decltype(tuple->get_<%=$name%>())
+						>::type::value_type
+					>()
+			);
 <%
 		}
 	}

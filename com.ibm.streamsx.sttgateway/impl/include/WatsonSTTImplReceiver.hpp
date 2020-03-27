@@ -76,6 +76,7 @@ bool receiverHasStopped(WsState ws);
 bool receiverHasTransientState(WsState ws);
 
 class SpeakerProcessor;
+class KeywordProcessor;
 
 /*
  * Implementation class for operator Watson STT
@@ -188,6 +189,7 @@ private:
 	SPL::Metric * const wsConnectionStateMetric;
 
 	static const SpeakerProcessor emptySpeakerResults;
+	static const KeywordProcessor emptyKeywordProcessor;
 
 protected:
 	// Helper functions
@@ -242,6 +244,11 @@ public:
 
 	SpeakerProcessor();
 
+	SpeakerProcessor(const SpeakerProcessor&) = delete;
+	SpeakerProcessor(SpeakerProcessor&&) = delete;
+	SpeakerProcessor& operator=(const SpeakerProcessor&) = delete;
+	SpeakerProcessor& operator=(const SpeakerProcessor&&) = delete;
+
 	void run();
 
 	SPL::list<SPL::int32> getUtteranceWordsSpeakers() const { return spkSpkNew; }
@@ -251,6 +258,24 @@ public:
 	template<typename TUPLE>
 	SPL::list<TUPLE> getUtteranceWordsSpeakerUpdates() const;
 };
+
+/* data struct and function to get the keyword result */
+class KeywordProcessor {
+	const bool isEmpty;
+	const DecoderKeywordsResult::ResultMapType & keywordResults;
+
+public:
+	KeywordProcessor(const DecoderKeywordsResult::ResultMapType & keywordResults_);
+	KeywordProcessor();
+	KeywordProcessor(const KeywordProcessor&) = delete;
+	KeywordProcessor(KeywordProcessor&&) = delete;
+	KeywordProcessor& operator=(const KeywordProcessor&) = delete;
+	KeywordProcessor& operator=(const KeywordProcessor&&) = delete;
+	template<typename T>
+	void getKeywordsSpottingResults(SPL::map<SPL::rstring, SPL::list<T> > & destination) const;
+};
+
+typename SPL::map<SPL::rstring, SPL::float64> KeyWordEmergenceMap;
 
 template<typename OP, typename OT>
 WatsonSTTImplReceiver<OP, OT>::WatsonSTTImplReceiver(OP & splOperator_,Config config_)
@@ -776,6 +801,8 @@ void WatsonSTTImplReceiver<OP, OT>::on_message(client* c, websocketpp::connectio
 			// clean speaker values which are probably set
 			if (Config::identifySpeakers)
 				splOperator.setSpeakerResultAttributes(myRecentOTuple, emptySpeakerResults);
+			// prepare keywords
+			const KeywordProcessor keywordProc(dec.DecoderKeywordsResult::getKeywordsSpottingResults());
 			// set utterance result attributes
 			splOperator.setResultAttributes(
 					myRecentOTuple,
@@ -798,7 +825,7 @@ void WatsonSTTImplReceiver<OP, OT>::on_message(client* c, websocketpp::connectio
 					dec.DecoderWordAlternatives::getWordAlternativesConfidences(),
 					dec.DecoderWordAlternatives::getWordAlternativesStartTimes(),
 					dec.DecoderWordAlternatives::getWordAlternativesEndTimes(),
-					dec.DecoderKeywordsResult::getKeywordsSpottingResults()
+					keywordProc
 			);
 
 			// output logic of the tuple
@@ -872,6 +899,8 @@ SpeakerProcessor::SpeakerProcessor(
 
 SpeakerProcessor::SpeakerProcessor() :
 	spkSize(0),
+	// the references to the temporary lists are invalid but are never used in this instance in get...
+	// spkUpdateIndexes.size() is zero in this instance
 	spkFrom(SPL::list<SPL::float64>()),
 	spkSpk(SPL::list<SPL::int32>()),
 	spkCfd(SPL::list<SPL::float64>()),
@@ -931,6 +960,7 @@ void SpeakerProcessor::run() {
 template<typename TUPLE>
 SPL::list<TUPLE> SpeakerProcessor::getUtteranceWordsSpeakerUpdates() const {
 	SPL::list<TUPLE> destination;
+	// spkUpdateIndexes.size() is zero in empty instance, so no invalid references are used
 	for (size_t i = 0; i < spkUpdateIndexes.size(); ++i) {
 		TUPLE theTuple;
 		auto indx = spkUpdateIndexes[i];
@@ -940,6 +970,56 @@ SPL::list<TUPLE> SpeakerProcessor::getUtteranceWordsSpeakerUpdates() const {
 		destination.push_back(theTuple);
 	}
 	return destination;
+}
+
+KeywordProcessor::KeywordProcessor(const DecoderKeywordsResult::ResultMapType & keywordResults_) :
+	isEmpty(false),
+	keywordResults(keywordResults_) {
+}
+
+KeywordProcessor::KeywordProcessor() :
+	// the references to the keywordResults is invalid in this instance
+	// the reference is never used due to isEmpty == true
+	isEmpty(true),
+	keywordResults(DecoderKeywordsResult::ResultMapType()) {
+}
+
+template<typename T>
+void KeywordProcessor::getKeywordsSpottingResults(SPL::map<SPL::rstring, SPL::list<T> > & destination) const {
+	destination.clear();
+	if (not isEmpty) {
+		for (const auto & keyw : keywordResults) {
+			const auto & keyword = keyw.first;
+			SPL::list<T> i;
+			for (const auto & emergence : keyw.second) {
+				T t;
+				t.set_start_time(emergence.start_time);
+				t.set_end_time(emergence.end_time);
+				t.set_confidence(emergence.confidence);
+				i.push_back(t);
+			}
+			destination.insert(typename SPL::map<SPL::rstring, SPL::list<T> >::value_type(keyword, i));
+		}
+	}
+}
+
+template<>
+void KeywordProcessor::getKeywordsSpottingResults<SPL::map<SPL::rstring, SPL::float64> >(SPL::map<SPL::rstring, SPL::list<SPL::map<SPL::rstring, SPL::float64> > > & destination) const {
+	destination.clear();
+	if (not isEmpty) {
+		for (const auto & keyw : keywordResults) {
+			const auto & keyword = keyw.first;
+			SPL::list<SPL::map<SPL::rstring, SPL::float64> > i;
+			for (const auto & emergence : keyw.second) {
+				SPL::map<SPL::rstring, SPL::float64> t;
+				t.insert(SPL::map<SPL::rstring, SPL::float64>::value_type("start_time", emergence.start_time));
+				t.insert(SPL::map<SPL::rstring, SPL::float64>::value_type("set_end_time", emergence.end_time));
+				t.insert(SPL::map<SPL::rstring, SPL::float64>::value_type("confidence", emergence.confidence));
+				i.push_back(t);
+			}
+			destination.insert(SPL::map<SPL::rstring, SPL::list<SPL::map<SPL::rstring, SPL::float64>> >::value_type(keyword, i));
+		}
+	}
 }
 
 // Whenever our existing Websocket connection to the Watson STT service is closed,
@@ -1071,7 +1151,7 @@ void WatsonSTTImplReceiver<OP, OT>::sendErrorTuple(const std::string & reason) {
 				SPL::list<SPL::rstring>(), SPL::list<SPL::float64>(), SPL::list<SPL::float64>(), SPL::list<SPL::float64>(),
 				SPL::list<SPL::list<SPL::rstring> >(), SPL::list<SPL::list<SPL::float64> >(),
 				SPL::list<SPL::float64>(), SPL::list<SPL::float64>(),
-				SPL::map<SPL::rstring, SPL::list<SPL::map<SPL::rstring, SPL::float64> > >());
+				emptyKeywordProcessor);
 			if (Config::identifySpeakers)
 				splOperator.setSpeakerResultAttributes(myRecentOTuple, emptySpeakerResults);
 			// set required output values
@@ -1092,7 +1172,7 @@ void WatsonSTTImplReceiver<OP, OT>::sendTranscriptionCompletedTuple(OT * otuple)
 		SPL::list<SPL::rstring>(), SPL::list<SPL::float64>(), SPL::list<SPL::float64>(), SPL::list<SPL::float64>(),
 		SPL::list<SPL::list<SPL::rstring> >(), SPL::list<SPL::list<SPL::float64> >(),
 		SPL::list<SPL::float64>(), SPL::list<SPL::float64>(),
-		SPL::map<SPL::rstring, SPL::list<SPL::map<SPL::rstring, SPL::float64> > >());
+		emptyKeywordProcessor);
 	if (Config::identifySpeakers)
 		splOperator.setSpeakerResultAttributes(otuple, emptySpeakerResults);
 	// set required output values
@@ -1166,6 +1246,9 @@ bool receiverHasTransientState(WsState ws) {
 
 template<typename OP, typename OT>
 const SpeakerProcessor WatsonSTTImplReceiver<OP, OT>::emptySpeakerResults;
+
+template<typename OP, typename OT>
+const KeywordProcessor WatsonSTTImplReceiver<OP, OT>::emptyKeywordProcessor;
 
 }}}}
 

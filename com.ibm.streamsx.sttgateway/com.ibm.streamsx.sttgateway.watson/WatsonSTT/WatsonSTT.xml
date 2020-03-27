@@ -307,7 +307,8 @@
             It will typically take 5-10 seconds of speakers for diarization results to become reliable, and will continually 
             improve over the course of an audio conversation.
             
-            If return type of this function is **list\&#60;tuple\&#60;float64 startTime, int32 speaker, float64 confidence\&#62;\&#62;** 
+            If return type of this function is
+            	list&#60;tuple&#60;float64 startTime, int32 speaker, float64 confidence&#62;&#62;
             The speaker label is given with respect to the start time of the utterance word.
             No other tuple types are accepted as result type.
             </description>
@@ -315,11 +316,23 @@
           </function>
           <function>
             <description>
-            Returns the STT keywords spotting results as a map of key/value pairs. Read this toolkit's documentation to learn about the map contents. 
+            Returns the STT keywords spotting results as a map. The keys of the map are the spotted keywords. The values 
+            of the map are lists with the keyword emergence. The the keyword emergence may be either 
+            
+            	tuple&#60;float64 start_time, float64 end_time, float64 confidence&#62;
+            or
+            	map&#60;rstring, float64&#62;
+            
+            In the latter case the inner map has the entries: `start_time`, `end_time`, `confidence`. Thus the complete 
+            attribute type may be either:
+            
+            	map&#60;rstring, list&#60;tuple&#60;float64 start_time, float64 end_time, float64 confidence&#62;&#62;&#62;
+            or 
+            	map&#60;rstring, list&#60;map&#60;rstring, float64&#62;&#62;&#62;
             
             **Note:** keyword spotting results are available only for final `utterances`.
             </description>
-            <prototype><![CDATA[map<rstring, list<map<rstring, float64>>> getKeywordsSpottingResults()]]></prototype>
+            <prototype><![CDATA[<any T> T getKeywordsSpottingResults()]]></prototype>
           </function>
         </customOutputFunction>
       </customOutputFunctions>
