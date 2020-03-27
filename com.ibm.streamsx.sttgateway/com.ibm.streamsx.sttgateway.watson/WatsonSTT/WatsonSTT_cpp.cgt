@@ -104,6 +104,29 @@ https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-websocke
 	$sttResultMode = $sttResultMode ? $sttResultMode->getValueAt(0)->getSPLExpression() : "complete";
 	print "// sttResultMode = $sttResultMode\n";
 
+	# all attribute name variables for output functions
+	my $getUtteranceNumberName = "";
+	my $getUtteranceTextName = "";
+	my $isFinalizedUtteranceName = "";
+	my $getConfidenceName = "";
+	my $getSTTErrorMessageName = "";
+	my $isTranscriptionCompletedName = "";
+	my $getUtteranceAlternativesName = "";
+	my $getWordAlternativesName = "";
+	my $getWordAlternativesConfidencesName = "";
+	my $getWordAlternativesStartTimesName = "";
+	my $getWordAlternativesEndTimesName = "";
+	my $getUtteranceWordsName = "";
+	my $getUtteranceWordsConfidencesName = "";
+	my $getUtteranceWordsStartTimesName = "";
+	my $getUtteranceWordsEndTimesName = "";
+	my $getUtteranceStartTimeName = "";
+	my $getUtteranceEndTimeName = "";
+	my $getUtteranceWordsSpeakersName = "";
+	my $getUtteranceWordsSpeakersConfidencesName = "";
+	my $getUtteranceWordsSpeakerUpdatesName = "";
+	my $getKeywordsSpottingResultsName = "";
+
 	# determine the requirements from output functions
 	my $wordTimestampNeeded = 0;
 	my $wordConfidenceNeeded = 0;
@@ -119,6 +142,52 @@ https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-websocke
 		my $paramValues = $attribute->getAssignmentOutputFunctionParameterValues();
 		my $op = $attribute->getAssignmentOutputFunctionName(); 
 		my $attributeType = $attribute->getSPLType();
+
+		# set the name variables
+		if ($op eq "getUtteranceNumber") {
+			$getUtteranceNumberName = "$name";
+		} elsif ($op eq "getUtteranceText") {
+			$getUtteranceTextName = "$name";
+		} elsif ($op eq "isFinalizedUtterance") {
+			$isFinalizedUtteranceName = "$name";
+		} elsif ($op eq "getConfidence") {
+			$getConfidenceName = "$name";
+		} elsif ($op eq "getSTTErrorMessage") {
+			$getSTTErrorMessageName = "$name";
+		} elsif ($op eq "isTranscriptionCompleted") {
+			$isTranscriptionCompletedName = "$name";
+		} elsif ($op eq "getUtteranceAlternatives") {
+			$getUtteranceAlternativesName = "$name";
+		} elsif ($op eq "getWordAlternatives") {
+			$getWordAlternativesName = "$name";
+		} elsif ($op eq "getWordAlternativesConfidences") {
+			$getWordAlternativesConfidencesName = "$name";
+		} elsif ($op eq "getWordAlternativesStartTimes") {
+			$getWordAlternativesStartTimesName = "$name";
+		} elsif ($op eq "getWordAlternativesEndTimes") {
+			$getWordAlternativesEndTimesName = "$name";
+		} elsif ($op eq "getUtteranceWords") {
+			$getUtteranceWordsName = "$name";
+		} elsif ($op eq "getUtteranceWordsConfidences") {
+			$getUtteranceWordsConfidencesName = "$name";
+		} elsif ($op eq "getUtteranceWordsStartTimes") {
+			$getUtteranceWordsStartTimesName = "$name";
+		} elsif ($op eq "getUtteranceWordsEndTimes") {
+			$getUtteranceWordsEndTimesName = "$name";
+		} elsif ($op eq "getUtteranceStartTime") {
+			$getUtteranceStartTimeName = "$name";
+		} elsif ($op eq "getUtteranceEndTime") {
+			$getUtteranceEndTimeName = "$name";
+		} elsif ($op eq "getUtteranceWordsSpeakers") {
+			$getUtteranceWordsSpeakersName = "$name";
+		} elsif ($op eq "getUtteranceWordsSpeakersConfidences") {
+			$getUtteranceWordsSpeakersConfidencesName = "$name";
+		} elsif ($op eq "getUtteranceWordsSpeakerUpdates") {
+			$getUtteranceWordsSpeakerUpdatesName = "$name";
+		} elsif ($op eq "getKeywordsSpottingResults") {
+			$getKeywordsSpottingResultsName = "$name";
+		}
+		# check requirements
 		if ($op eq "getUtteranceWordsConfidences") {
 			$wordConfidenceNeeded = 1;
 		} elsif (($op eq "getUtteranceWordsStartTimes") || ($op eq "getUtteranceWordsEndTimes")) {
@@ -164,6 +233,131 @@ https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-websocke
 			} else {
 				SPL::CodeGen::exitln("Attribute %s has wrong type! It must be of type map<rstring,list<tuple<float64 start_time,float64 end_time,float64 confidence>>> or map<rstring,list<map<rstring,float64>>>", "$name", $oport->getSourceLocation());
 			}
+		}
+	}
+	
+	# second loop to determine the default assignemnts
+	foreach my $attribute (@{$oport->getAttributes()}) {
+		my $name = $attribute->getName(); 
+		my $paramValues = $attribute->getAssignmentOutputFunctionParameterValues();
+		my $attributeType = $attribute->getSPLType();
+		if ($attribute->hasAssignment() || $attribute->hasAssignmentWithOutputFunction()) {
+			print "// $name has assignemnt\n";
+		} else {
+			if (($name eq "utteranceNumber") && ($getUtteranceNumberName eq "")) {
+				if ($attributeType eq "int32") {
+					if ($sttResultMode ne "complete") {
+						$getUtteranceNumberName = "$name";
+					}
+				}
+			} elsif (($name eq "utteranceText") && ($getUtteranceTextName eq "")) {
+				if ($attributeType eq "rstring") {
+					$getUtteranceTextName = "$name";
+				}
+			} elsif (($name eq "isFinalizedUtterance") && ($isFinalizedUtteranceName eq "")) {
+				if ($attributeType eq "boolean") {
+					if ($sttResultMode ne "complete") {
+						$isFinalizedUtteranceName = "$name";
+					}
+				}
+			} elsif (($name eq "confidence") && ($getConfidenceName eq "")) {
+				if ($attributeType eq "float64") {
+					if ($sttResultMode ne "complete") {
+						$getConfidenceName = "$name";
+					}
+				}
+			} elsif (($name eq "sttErrorMessage") && ($getSTTErrorMessageName eq "")) {
+				if ($attributeType eq "rstring") {
+					$getSTTErrorMessageName = "$name";
+				}
+			} elsif (($name eq "transcriptionCompleted") && ($isTranscriptionCompletedName eq "")) {
+				if ($attributeType eq "boolean") {
+					$isTranscriptionCompletedName = "$name";
+					$isTranscriptionCompletedRequested = 1;
+				}
+			} elsif (($name eq "utteranceAlternatives") && ($getUtteranceAlternativesName eq "")) {
+				if ($attributeType eq "list<rstring>") {
+					if ($sttResultMode ne "complete") {
+						$getUtteranceAlternativesName = "$name";
+						$utteranceAlternativesNeeded = 1;
+					}
+				}
+			} elsif (($name eq "wordAlternatives") && ($getWordAlternativesName eq "")) {
+				if ($attributeType eq "list<list<rstring>>") {
+					$getWordAlternativesName = "$name";
+					$wordAlternativesNeeded = 1;
+				}
+			} elsif (($name eq "wordAlternativesConfidences") && ($getWordAlternativesConfidencesName eq "")) {
+				if ($attributeType eq "list<list<float64>>") {
+					$getWordAlternativesConfidencesName = "$name";
+					$wordAlternativesNeeded = 1;
+				}
+			} elsif (($name eq "wordAlternativesStartTimes") && ($getWordAlternativesStartTimesName eq "")) {
+				if ($attributeType eq "list<list<float64>>") {
+					$getWordAlternativesStartTimesName = "$name";
+					$wordAlternativesNeeded = 1;
+				}
+			} elsif (($name eq "wordAlternativesEndTimes") && ($getWordAlternativesEndTimesName eq "")) {
+				if ($attributeType eq "list<list<float64>>") {
+					$getWordAlternativesEndTimesName = "$name";
+					$wordAlternativesNeeded = 1;
+				}
+			} elsif (($name eq "utteranceWords") && ($getUtteranceWordsName eq "")) {
+				if ($attributeType eq "list<rstring>") {
+					$getUtteranceWordsName = "$name";
+				}
+			} elsif (($name eq "utteranceWordsConfidences") && ($getUtteranceWordsConfidencesName eq "")) {
+				if ($attributeType eq "list<float64>") {
+					$getUtteranceWordsConfidencesName = "$name";
+					$wordConfidenceNeeded = 1;
+				}
+			} elsif (($name eq "utteranceWordsStartTimes") && ($getUtteranceWordsStartTimesName eq "")) {
+				if ($attributeType eq "list<float64>") {
+					$getUtteranceWordsStartTimesName = "$name";
+					$wordTimestampNeeded = 1;
+				}
+			} elsif (($name eq "utteranceWordsEndTimes") && ($getUtteranceWordsEndTimesName eq "")) {
+				if ($attributeType eq "list<float64>") {
+					$getUtteranceWordsEndTimesName = "$name";
+					$wordTimestampNeeded = 1;
+				}
+			} elsif (($name eq "utteranceStartTime") && ($getUtteranceStartTimeName eq "")) {
+				if ($attributeType eq "float64") {
+					$getUtteranceStartTimeName = "$name";
+					$wordTimestampNeeded = 1;
+				}
+			} elsif (($name eq "utteranceEndTime") && ($getUtteranceEndTimeName eq "")) {
+				if ($attributeType eq "float64") {
+					$getUtteranceEndTimeName = "$name";
+					$wordTimestampNeeded = 1;
+				}
+			} elsif (($name eq "utteranceWordsSpeakers") && ($getUtteranceWordsSpeakersName eq "")) {
+				if ($attributeType eq "list<int32>") {
+					$getUtteranceWordsSpeakersName = "$name";
+					$wordTimestampNeeded = 1;
+					$identifySpeakers = 1;
+				}
+			} elsif (($name eq "utteranceWordsSpeakersConfidences") && ($getUtteranceWordsSpeakersConfidencesName eq "")) {
+				if ($attributeType eq "list<float64>") {
+					$getUtteranceWordsSpeakersConfidencesName = "$name";
+					$wordTimestampNeeded = 1;
+					$identifySpeakers = 1;
+				}
+			} elsif (($name eq "utteranceWordsSpeakerUpdates") && ($getUtteranceWordsSpeakerUpdatesName eq "")) {
+				if ($attributeType eq "tuple<float64 startTime,int32 speaker,float64 confidence>") {
+					$getUtteranceWordsSpeakerUpdatesName = "$name";
+					$wordTimestampNeeded = 1;
+					$identifySpeakers = 1;
+					my $speakerUpdatesNeeded = 1;
+				}
+			} elsif (($name eq "keywordsSpottingResults") && ($getKeywordsSpottingResultsName eq "")) {
+				if (($attributeType eq "map<rstring,list<map<rstring,float64>>>")
+						|| $attributeType eq "map<rstring,list<tuple<float64 start_time,float64 end_time,float64 confidence>>>") {
+					$getKeywordsSpottingResultsName = "$name";
+					$keywordsSpottingResultType = "$attributeType";
+				}
+			}
+			
 		}
 	}
 	print "// wordConfidenceNeeded=$wordConfidenceNeeded wordTimestampNeeded=$wordTimestampNeeded\n";
@@ -408,7 +602,7 @@ void MY_OPERATOR::appendErrorAttribute(OPort0Type * tuple, std::string const & e
 		my $paramValues = $attribute->getAssignmentOutputFunctionParameterValues();
 		my $operation = $attribute->getAssignmentOutputFunctionName();
 
-		if ($operation eq "getSTTErrorMessage") {
+		if (($operation eq "getSTTErrorMessage") || ($name eq $getSTTErrorMessageName)) {
 %>
 			SPL::rstring & ea = tuple->get_<%=$name%>();
 			ea.append(SPL::rstring(errorMessage));
@@ -426,7 +620,7 @@ void MY_OPERATOR::clearErrorAttribute(OPort0Type * tuple) {
 		my $paramValues = $attribute->getAssignmentOutputFunctionParameterValues();
 		my $operation = $attribute->getAssignmentOutputFunctionName();
 
-		if ($operation eq "getSTTErrorMessage") {
+		if (($operation eq "getSTTErrorMessage") || ($name eq $getSTTErrorMessageName)) {
 %>
 			tuple->get_<%=$name%>().clear();
 <%		}
@@ -466,41 +660,41 @@ void MY_OPERATOR::setResultAttributes(
 		my $paramValues = $attribute->getAssignmentOutputFunctionParameterValues();
 		my $operation = $attribute->getAssignmentOutputFunctionName(); 
 
-		if ($operation eq "getUtteranceNumber") {
+		if (($operation eq "getUtteranceNumber") || ($name eq $getUtteranceNumberName)) {
 %>
 			// Utterance number starts from 0. Hence, add 1 to it.
 			tuple->set_<%=$name%>(utteranceNumber_ + 1);
-<%		} elsif ($operation eq "getUtteranceText") { %>
+<%		} elsif (($operation eq "getUtteranceText") || ($name eq $getUtteranceTextName)) { %>
 			tuple->set_<%=$name%>(utteranceText_);
-<%		} elsif ($operation eq "isFinalizedUtterance") { %>
+<%		} elsif (($operation eq "isFinalizedUtterance") || ($name eq $isFinalizedUtteranceName)) { %>
 			tuple->set_<%=$name%>(final_);
-<%		} elsif ($operation eq "getConfidence") { %>
+<%		} elsif (($operation eq "getConfidence") || ($name eq $getConfidenceName)) { %>
 			tuple->set_<%=$name%>(confidence_);
-<%		} elsif ($operation eq "isTranscriptionCompleted") { %>
+<%		} elsif (($operation eq "isTranscriptionCompleted") || ($name eq $isTranscriptionCompletedName)) { %>
 			tuple->set_<%=$name%>(false);
-<%		} elsif ($operation eq "getUtteranceAlternatives") { %>
+<%		} elsif (($operation eq "getUtteranceAlternatives") || ($name eq $getUtteranceAlternativesName)) { %>
 			tuple->set_<%=$name%>(utteranceAlternatives_);
-<%		} elsif ($operation eq "getWordAlternatives") { %>
+<%		} elsif (($operation eq "getWordAlternatives") || ($name eq $getWordAlternativesName)) { %>
 			tuple->set_<%=$name%>(wordAlternatives_);
-<%		} elsif ($operation eq "getWordAlternativesConfidences") { %>
+<%		} elsif (($operation eq "getWordAlternativesConfidences") || ($name eq $getWordAlternativesConfidencesName)) { %>
 			tuple->set_<%=$name%>(wordAlternativesConfidences_);
-<%		} elsif ($operation eq "getWordAlternativesStartTimes") { %>
+<%		} elsif (($operation eq "getWordAlternativesStartTimes") || ($name eq $getWordAlternativesStartTimesName)) { %>
 			tuple->set_<%=$name%>(wordAlternativesStartTimes_);
-<%		} elsif ($operation eq "getWordAlternativesEndTimes") { %>
+<%		} elsif (($operation eq "getWordAlternativesEndTimes") || ($name eq $getWordAlternativesEndTimesName)) { %>
 			tuple->set_<%=$name%>(wordAlternativesEndTimes_);
-<%		} elsif ($operation eq "getUtteranceWords") { %>
+<%		} elsif (($operation eq "getUtteranceWords") || ($name eq $getUtteranceWordsName)) { %>
 			tuple->set_<%=$name%>(utteranceWords_);
-<%		} elsif ($operation eq "getUtteranceWordsConfidences") { %>
+<%		} elsif (($operation eq "getUtteranceWordsConfidences") || ($name eq $getUtteranceWordsConfidencesName)) { %>
 			tuple->set_<%=$name%>(utteranceWordsConfidences_);
-<%		} elsif ($operation eq "getUtteranceWordsStartTimes") { %>
+<%		} elsif (($operation eq "getUtteranceWordsStartTimes") || ($name eq $getUtteranceWordsStartTimesName)) { %>
 			tuple->set_<%=$name%>(utteranceWordsStartTimes_);
-<%		} elsif ($operation eq "getUtteranceWordsEndTimes") { %>
+<%		} elsif (($operation eq "getUtteranceWordsEndTimes") || ($name eq $getUtteranceWordsEndTimesName)) { %>
 			tuple->set_<%=$name%>(utteranceWordsEndTimes_);
-<%		} elsif ($operation eq "getUtteranceStartTime") { %>
+<%		} elsif (($operation eq "getUtteranceStartTime") || ($name eq $getUtteranceStartTimeName)) { %>
 			tuple->set_<%=$name%>(utteranceStartTime_);
-<%		} elsif ($operation eq "getUtteranceEndTime") { %>
+<%		} elsif (($operation eq "getUtteranceEndTime") || ($name eq $getUtteranceEndTimeName)) { %>
 			tuple->set_<%=$name%>(utteranceEndTime_);
-<%		} elsif ($operation eq "getKeywordsSpottingResults") { %>
+<%		} elsif (($operation eq "getKeywordsSpottingResults") || ($name eq $getKeywordsSpottingResultsName)) { %>
 			//tuple->set_<%=$name%>(keywordsSpottingResults_);
 			auto & theKeywMap = tuple->get_<%=$name%>();
 			keywordproc_.getKeywordsSpottingResults(theKeywMap);
@@ -519,12 +713,12 @@ void MY_OPERATOR::setSpeakerResultAttributes(OPort0Type * tuple, const com::ibm:
 		my $paramValues = $attribute->getAssignmentOutputFunctionParameterValues();
 		my $operation = $attribute->getAssignmentOutputFunctionName();
 
-		if ($operation eq "getUtteranceWordsSpeakers") {
+		if (($operation eq "getUtteranceWordsSpeakers") || ($name eq $getUtteranceWordsSpeakersName)) {
 %>
 			tuple->set_<%=$name%>(spkproc.getUtteranceWordsSpeakers());
-<%		} elsif ($operation eq "getUtteranceWordsSpeakersConfidences") { %>
+<%		} elsif (($operation eq "getUtteranceWordsSpeakersConfidences") || ($name eq $getUtteranceWordsSpeakersConfidencesName)) { %>
 			tuple->set_<%=$name%>(spkproc.getUtteranceWordsSpeakersConfidences());
-<%		} elsif ($operation eq "getUtteranceWordsSpeakerUpdates") { %>
+<%		} elsif (($operation eq "getUtteranceWordsSpeakerUpdates") || ($name eq $getUtteranceWordsSpeakerUpdatesName)) { %>
 			//auto & theTupleList = tuple->get_<%=$name%>();
 			//theTupleList.clear();
 			//spkproc.getUtteranceWordsSpeakerUpdates(theTupleList);
@@ -550,7 +744,7 @@ void MY_OPERATOR::setTranscriptionCompleteAttribute(OPort0Type * tuple) {
 		my $paramValues = $attribute->getAssignmentOutputFunctionParameterValues();
 		my $operation = $attribute->getAssignmentOutputFunctionName();
 
-		if ($operation eq "isTranscriptionCompleted") {
+		if (($operation eq "isTranscriptionCompleted") || ($name eq $isTranscriptionCompletedName)) {
 %>
 			tuple->set_<%=$name%>(true);
 <%		}
