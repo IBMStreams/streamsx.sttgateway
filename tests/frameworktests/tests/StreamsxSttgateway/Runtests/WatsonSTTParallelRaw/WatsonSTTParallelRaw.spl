@@ -41,7 +41,8 @@ composite WatsonSTTParallelRaw {
 			list<float64> wordAlternativesStartTimes,
 			list<float64> wordAlternativesEndTimes,
 			list<int32> utteranceWordsSpeakers,
-			list<float64> utteranceWordsSpeakersConfidences;
+			list<float64> utteranceWordsSpeakersConfidences,
+			map<rstring,list<tuple<float64 start_time,float64 end_time,float64 confidence>>> keywordsSpottingResults;
 		
 	graph
 		
@@ -212,6 +213,7 @@ composite WatsonSTTParallelRaw {
 				contentType: $contentType;
 				sttResultMode: partial;
 				nonFinalUtterancesNeeded: true;
+				keywordsToBeSpotted: ["IBM", "IBMs", "pay", "bill", "Thomas", "Watson", "Watsons", "Abraham", "Lincoln", "Ginni", "Rometty", "business", "technology", "cloud", "platform", "innovation", "computer", "underpayment","payment", "freedom", "government", "performance", "service", " internet", "risk", "skill", "skills"];
 			output O:
 				utteranceNumber = getUtteranceNumber(),
 				finalizedUtterance = isFinalizedUtterance(),
@@ -233,7 +235,8 @@ composite WatsonSTTParallelRaw {
 				wordAlternativesEndTimes = getWordAlternativesEndTimes(),
 				// Speaker label a.k.a. Speaker id
 				utteranceWordsSpeakers = getUtteranceWordsSpeakers(),
-				utteranceWordsSpeakersConfidences = getUtteranceWordsSpeakersConfidences();
+				utteranceWordsSpeakersConfidences = getUtteranceWordsSpeakersConfidences(),
+				keywordsSpottingResults = getKeywordsSpottingResults();
 			config
 				//<fused*>placement : partitionColocation("somePartitionColocationId");
 				//<unFused*>placement : partitionIsolation;

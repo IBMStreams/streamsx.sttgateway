@@ -43,7 +43,7 @@ composite WatsonSTT0RawModes {
 			//<*Mode1 *Mode2>float64 utteranceEndTime,
 			//<*Mode1 *Mode2>list<int32> utteranceWordsSpeakers,
 			//<*Mode1 *Mode2>list<float64> utteranceWordsSpeakersConfidences,
-			//<*Mode1 *Mode2>map<rstring, list<map<rstring, float64>>> keywordsSpottingResults,
+			//<*Mode1 *Mode2>map<rstring,list<tuple<float64 start_time,float64 end_time,float64 confidence>>> keywordsSpottingResults,
 			boolean transcriptionCompleted,
 			uint64 myseq;
 		
@@ -219,6 +219,7 @@ composite WatsonSTT0RawModes {
 				//<*Mode3>sttResultMode: complete;
 				//<*Mode1>nonFinalUtterancesNeeded: true;
 				//<*Mode2>nonFinalUtterancesNeeded: false;
+				//<*Mode1 *Mode2>keywordsToBeSpotted: ["IBM", "IBMs", "pay", "bill", "Thomas", "Watson", "Watsons", "Abraham", "Lincoln", "Ginni", "Rometty", "business", "technology", "cloud", "platform", "innovation", "computer", "underpayment","payment", "freedom", "government", "performance", "service", " internet", "risk", "skill", "skills"];
 			output O:
 				//<*Mode1 *Mode2>utteranceNumber = getUtteranceNumber(),
 				utteranceText = getUtteranceText(),
