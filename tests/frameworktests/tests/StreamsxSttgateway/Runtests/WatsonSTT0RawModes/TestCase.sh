@@ -4,8 +4,6 @@
 ##--variantList='fusedMode1'
 #--timeout=1200
 
-setCategory 'quick'
-
 TT_mainComposite='WatsonSTT0RawModes'
 TT_sabFile="output/WatsonSTT0RawModes.sab"
 
