@@ -349,6 +349,7 @@
 			<arg value="${releasefilename}"/>
 			<arg value="--exclude=**/.toolkitList"/>
 			<arg value="--exclude=**/.git*"/>
+			<arg value="--exclude=**/.apt_generated"/>
 			<arg value="--exclude=${toolkit.dir}/.settings"/>
 			<arg value="--exclude=${toolkit.dir}/**/.theFileNameList"/>
 			<arg value="--exclude=${toolkit.dir}/.externalToolBuilders"/>

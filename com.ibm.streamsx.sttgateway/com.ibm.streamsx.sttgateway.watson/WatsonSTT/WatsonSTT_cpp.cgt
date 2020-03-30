@@ -223,7 +223,7 @@ https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-websocke
 		} elsif (($op eq "getUtteranceNumber") || ($op eq "isFinalizedUtterance") ||
 				($op eq "getConfidence") || ($op eq "getUtteranceAlternatives")) {
 			if ($sttResultMode eq "complete") {
-				SPL::CodeGen::exitln("In sttResultMode complete, Output Function $op is not allowed", $model->getContext()->getSourceLocation());
+				SPL::CodeGen::warnln("In sttResultMode complete, Output Function $op does not deliver results", $model->getContext()->getSourceLocation());
 			}
 		# Type check for keyword result
 		} elsif ($op eq "getKeywordsSpottingResults") {
@@ -249,6 +249,8 @@ https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-websocke
 				if ($attributeType eq "int32") {
 					if ($sttResultMode ne "complete") {
 						$getUtteranceNumberName = "$name";
+					} else {
+						SPL::CodeGen::warnln("In sttResultMode complete, default attribute $name does not deliver results", $model->getContext()->getSourceLocation());
 					}
 				}
 			} elsif (($name eq "utteranceText") && ($getUtteranceTextName eq "")) {
@@ -259,12 +261,16 @@ https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-websocke
 				if ($attributeType eq "boolean") {
 					if ($sttResultMode ne "complete") {
 						$isFinalizedUtteranceName = "$name";
+					} else {
+						SPL::CodeGen::warnln("In sttResultMode complete, default attribute $name does not deliver results", $model->getContext()->getSourceLocation());
 					}
 				}
 			} elsif (($name eq "confidence") && ($getConfidenceName eq "")) {
 				if ($attributeType eq "float64") {
 					if ($sttResultMode ne "complete") {
 						$getConfidenceName = "$name";
+					} else {
+						SPL::CodeGen::warnln("In sttResultMode complete, default attribute $name does not deliver results", $model->getContext()->getSourceLocation());
 					}
 				}
 			} elsif (($name eq "sttErrorMessage") && ($getSTTErrorMessageName eq "")) {
@@ -281,6 +287,8 @@ https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-websocke
 					if ($sttResultMode ne "complete") {
 						$getUtteranceAlternativesName = "$name";
 						$utteranceAlternativesNeeded = 1;
+					} else {
+						SPL::CodeGen::warnln("In sttResultMode complete, default attribute $name does not deliver results", $model->getContext()->getSourceLocation());
 					}
 				}
 			} elsif (($name eq "wordAlternatives") && ($getWordAlternativesName eq "")) {
@@ -408,7 +416,7 @@ https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-websocke
 
 	my $maxUtteranceAlternatives = $model->getParameterByName("maxUtteranceAlternatives");
 	if (($sttResultMode eq "complete") && $maxUtteranceAlternatives) {
-		SPL::CodeGen::exitln("In sttResultMode complete, parameter maxUtteranceAlternatives is not allowed", $model->getContext()->getSourceLocation());
+		SPL::CodeGen::warnln("In sttResultMode complete, parameter maxUtteranceAlternatives is ignored", $model->getContext()->getSourceLocation());
 	}
 	# Default: 3
 	$maxUtteranceAlternatives = $maxUtteranceAlternatives ? $maxUtteranceAlternatives->getValueAt(0)->getCppExpression() : 3;

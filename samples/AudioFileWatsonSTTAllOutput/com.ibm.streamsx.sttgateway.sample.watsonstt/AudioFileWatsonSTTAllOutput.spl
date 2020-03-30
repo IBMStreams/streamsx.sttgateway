@@ -139,28 +139,7 @@ public composite AudioFileWatsonSTTAllOutput {
 		// Read the streamsx.sttgateway toolkit documentation to learn about
 		// what features are available, how they work and how different attributes are 
 		// related to those features.
-		STTResult_t = rstring conversationId, int32 utteranceNumber,
-			boolean finalizedUtterance,
-			boolean transcriptionCompleted,
-			rstring sttErrorMessage,
-			float64 confidence,
-			float64 utteranceStartTime,
-			float64 utteranceEndTime,
-			rstring utteranceText,
-			list<rstring> utteranceAlternatives, 
-			list<list<rstring>> wordAlternatives,
-			list<list<float64>> wordAlternativesConfidences,
-			list<float64> wordAlternativesStartTimes,
-			list<float64> wordAlternativesEndTimes,
-			list<rstring> utteranceWords,
-			list<float64> utteranceWordsConfidences,
-			list<float64> utteranceWordsStartTimes,
-			list<float64> utteranceWordsEndTimes,
-			list<int32> utteranceWordsSpeakers,
-			list<float64> utteranceWordsSpeakersConfidences,
-			list<tuple<float64 startTime, int32 speaker, float64 confidence>> utteranceWordsSpeakerUpdates,
-			map<rstring, list<map<rstring, float64>>> keywordsSpottingResults,
-			int32 sequence;
+		STTResultType = STTAllResult_t, tuple<int32 sequence>;
 
 	graph
 		// IMPORTANT: IBM STT service on public cloud requires
@@ -231,7 +210,7 @@ public composite AudioFileWatsonSTTAllOutput {
 		// First input stream into this operator is the fully qualified audio file name.
 		// Second input stream into this operator is your STT service instance's IAM access token.
 		@parallel(width = $numberOfSTTEngines, broadcast=[AT])
-		stream<STTResult_t> STTResult = 
+		stream<STTResultType> STTResult = 
 			WatsonSTT(AudioFileNameFlagged as AFN; IamAccessToken as AT) {
 			logic
 				state: {

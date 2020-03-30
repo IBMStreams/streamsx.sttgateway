@@ -4,36 +4,37 @@ namespace com.ibm.streamsx.sttgateway.watson;
 	 * This type STTResult_t is the basic STT result type with essential transcription results.
 	 */
 type STTResult_t = 
+		boolean transcriptionCompleted,
+		rstring sttErrorMessage,
+		boolean finalizedUtterance,
 		int32 utteranceNumber,
-		boolean transcriptionCompleted, boolean finalizedUtterance,
 		float64 confidence,
 		float64 utteranceStartTime,
 		float64 utteranceEndTime,
 		rstring utteranceText,
-		rstring sttErrorMessage,
 		rstring conversationId;
 
 	/**
 	 * This type STTAllResult_t is the STT result type with all transcription results.
 	 */
 type STTAllResult_t =
-		int32 utteranceNumber,
-		boolean finalizedUtterance,
 		boolean transcriptionCompleted,
 		rstring sttErrorMessage,
+		boolean finalizedUtterance,
+		int32 utteranceNumber,
 		float64 confidence,
 		float64 utteranceStartTime,
 		float64 utteranceEndTime,
 		rstring utteranceText,
-		list<rstring> utteranceAlternatives, 
-		list<list<rstring>> wordAlternatives,
-		list<list<float64>> wordAlternativesConfidences,
-		list<float64> wordAlternativesStartTimes,
-		list<float64> wordAlternativesEndTimes,
+		list<rstring> utteranceAlternatives,
 		list<rstring> utteranceWords,
 		list<float64> utteranceWordsConfidences,
 		list<float64> utteranceWordsStartTimes,
 		list<float64> utteranceWordsEndTimes,
+		list<list<rstring>> wordAlternatives,
+		list<list<float64>> wordAlternativesConfidences,
+		list<float64> wordAlternativesStartTimes,
+		list<float64> wordAlternativesEndTimes,
 		list<int32> utteranceWordsSpeakers,
 		list<float64> utteranceWordsSpeakersConfidences,
 		list<tuple<float64 startTime, int32 speaker, float64 confidence>> utteranceWordsSpeakerUpdates,

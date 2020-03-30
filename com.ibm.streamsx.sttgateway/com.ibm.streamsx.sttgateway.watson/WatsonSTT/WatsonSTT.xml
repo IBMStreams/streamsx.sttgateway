@@ -182,7 +182,7 @@
             <description>
             Returns a float64 confidence value for the utterance. Default attribute name **confidence**
             
-            **Note:** This function is not available if `sttResult` mode equals `complete`.
+            **Note:** This function does not deliver results if `sttResult` mode equals `complete`.
             </description>
             <prototype><![CDATA[float64 getConfidence()]]></prototype>
           </function>
@@ -204,7 +204,7 @@
             <description>
             Returns an int32 number indicating the utterance number. Default attribute name **utteranceNumber**
             
-            **Note:** This function is not available if `sttResult` mode equals `complete`.
+            **Note:** This function does not deliver results if `sttResult` mode equals `complete`.
             </description>
             <prototype><![CDATA[int32 getUtteranceNumber()]]></prototype>
           </function>
@@ -213,7 +213,7 @@
             Returns a boolean value to indicate if this is an interim partial utterance or a finalized utterance. 
             Default attribute name **finalizedUtterance**
             
-            **Note:** This function is not available if `sttResult` mode equals `complete`.
+            **Note:** The function does not deliver results if `sttResult` mode equals `complete`.
             </description>
             <prototype><![CDATA[boolean isFinalizedUtterance()]]></prototype>
           </function>
@@ -223,7 +223,7 @@
             List will have the very best guess first followed by the next best ones in that order. 
             Default attribute name **utteranceAlternatives**
             
-            **Note:** This function is not available if `sttResult` mode equals `complete`.
+            **Note:** This function does not deliver results if `sttResult` mode equals `complete`.
             **Note:** n-best alternative hypotheses are available only for final `utterances`.
             </description>
             <prototype><![CDATA[list<rstring> getUtteranceAlternatives()]]></prototype>
@@ -547,7 +547,7 @@
         This parameter indicates the required number of n-best alternative hypotheses for the transcription results. (Default is 3)
         see: [https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-output#max_alternatives] 
         
-        **Note:** This parameter is not valid if `sttResultMode` equals `complete`.
+        **Note:** This parameter is ignored if `sttResultMode` equals `complete`.
         </description>
         <optional>true</optional>
         <rewriteAllowed>true</rewriteAllowed>
@@ -562,8 +562,6 @@
         This parameter controls the density of the word alternatives results (a.k.a. Confusion Networks). A value of 0.6 
         disables this feature. Valid value must be less than 1.0 (Default is 0.0)
         see: [https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-output#word_alternatives] 
-        
-        **Note:** This parameter is not valid if `sttResultMode` equals `complete`.
         </description>
         <optional>true</optional>
         <rewriteAllowed>true</rewriteAllowed>
@@ -591,8 +589,6 @@
         This parameter specifies the minimum confidence level that the STT service must have for an utterance word to 
         match a given keyword. A value of 0.0 disables this feature. Valid value must be less than 1.0. (Default is 0.3)
         see: [https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-output#keyword_spotting] 
-        
-        **Note:** This parameter is not valid if `sttResultMode` equals `complete`.
         </description>
         <optional>true</optional>
         <rewriteAllowed>true</rewriteAllowed>
@@ -605,8 +601,6 @@
         <name>keywordsToBeSpotted</name>
         <description>
         This parameter specifies a list (array) of strings to be spotted. (Default is an empty list)
-        
-        **Note:** This parameter is not valid if `sttResultMode` equals `complete`.
         </description>
         <optional>true</optional>
         <rewriteAllowed>true</rewriteAllowed>

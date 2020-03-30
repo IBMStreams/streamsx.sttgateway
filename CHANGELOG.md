@@ -5,6 +5,7 @@
 * WatsonSTT: Make error logs more verbose in case of connection failure
 * WatsonSTT: Output should use default outputs (issue #43)
 * WatsonSTT: Keyword spotting results are now available as typle type COF getKeywordsSpottingResults
+* WatsonSTT: Relax output and parameter checks, make errors to warnings: Output schema may be used in all sstResult modes
 * WatsonSTT: Correction: Sporadicaly Transcription Failures (issue #44)
 
 ## v2.1.2
