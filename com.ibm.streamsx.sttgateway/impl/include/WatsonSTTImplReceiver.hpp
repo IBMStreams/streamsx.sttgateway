@@ -993,8 +993,8 @@ void KeywordProcessor::getKeywordsSpottingResults(SPL::map<SPL::rstring, SPL::li
 			SPL::list<T> i;
 			for (const auto & emergence : keyw.second) {
 				T t;
-				t.set_start_time(emergence.start_time);
-				t.set_end_time(emergence.end_time);
+				t.set_startTime(emergence.start_time);
+				t.set_endTime(emergence.end_time);
 				t.set_confidence(emergence.confidence);
 				i.push_back(t);
 			}

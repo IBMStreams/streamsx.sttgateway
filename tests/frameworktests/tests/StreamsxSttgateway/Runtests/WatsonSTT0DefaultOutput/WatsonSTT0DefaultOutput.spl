@@ -1,0 +1,115 @@
+use spl.file::*;
+use com.ibm.streamsx.sttgateway.watson::IAMAccessTokenGenerator;
+use com.ibm.streamsx.sttgateway.watson::IAMAccessToken;
+use com.ibm.streamsx.sttgateway.watson::WatsonSTT;
+use com.ibm.streamsx.testframe::FileSink1;
+
+composite WatsonSTT0DefaultOutput {
+	param
+		expression<rstring> $apiKey :      getSubmissionTimeValue("apiKey", "invalid");
+		expression<rstring> $audioDir:     getSubmissionTimeValue("audioDir");
+		
+		expression<rstring> $sttBaseLanguageModel : getSubmissionTimeValue("sttBaseLanguageModel", "en-US_NarrowbandModel");
+		expression<rstring> $contentType : getSubmissionTimeValue("contentType", "audio/wav");
+		expression<rstring> $iamTokenURL : getSubmissionTimeValue("iamTokenURL", "https://iam.cloud.ibm.com/identity/token");
+		expression<rstring> $uri : getSubmissionTimeValue("uri");
+		expression<uint32>  $audioBlobFragmentSize: (uint32)getSubmissionTimeValue("audioBlobFragmentSize", "256");
+		
+		/*expression<list<rstring>> $filesList :
+				["01-call-center-10sec.wav", "02-call-center-25sec.wav", "03-call-center-28sec.wav",
+				"04-empty-audio.wav", "05-gettysburg-address-2min.wav", "07-ibm-earnings-2min.wav",
+				"08-ibm-watson-ai-3min.wav", "10-invalid-audio.wav", "12-jfk-speech-12sec.wav"];*/
+		expression<list<rstring>> $filesList :
+				["01-call-center-10sec.wav", "03-call-center-28sec.wav",
+				"05-gettysburg-address-2min.wav", "10-invalid-audio.wav",
+				"12-jfk-speech-12sec.wav"];
+
+	type
+		STTResult = rstring conversationId,
+			uint64 myseq,
+			//<!complete>int32 utteranceNumber,
+			//<!complete>boolean finalizedUtterance,
+			//<!complete>boolean transcriptionCompleted,
+			rstring utteranceText,
+			rstring sttErrorMessage
+			//<!complete>,float64 confidence
+			//<*_tim* complete>,float64 utteranceStartTime
+			//<*_tim* complete>,float64 utteranceEndTime
+			//<*_wrd*>,list<rstring> utteranceWords
+			//<*_wrd*>,list<float64> utteranceWordsConfidences
+			//<*_wrd*>,list<float64> utteranceWordsStartTimes
+			//<*_wrd*>,list<float64> utteranceWordsEndTimes
+			//<*_alt*>,list<rstring> utteranceAlternatives
+			//<*_cfn*>,list<list<rstring>> wordAlternatives
+			//<*_cfn*>,list<list<float64>> wordAlternativesConfidences
+			//<*_cfn*>,list<float64> wordAlternativesStartTimes
+			//<*_cfn*>,list<float64> wordAlternativesEndTimes
+			//<*_spk*>,list<int32> utteranceWordsSpeakers
+			//<*_spk*>,list<float64> utteranceWordsSpeakersConfidences
+			//<*_spk*>,list<tuple<float64 startTime, int32 speaker, float64 confidence>> utteranceWordsSpeakerUpdates
+			//<*Mode1 *Mode2>,map<rstring, list<tuple<float64 startTime, float64 endTime, float64 confidence>>> keywordsSpottingResults
+			;
+		
+	graph
+		
+		stream<rstring fileName> FileNameStream as O = Beacon() {
+			param
+				iterations: size($filesList);
+				initDelay: 5.0;
+			output O:
+				fileName = $audioDir + "/" + $filesList[IterationCount()];
+			config
+				placement : partitionColocation("somePartitionColocationId");
+		}
+
+		stream<uint64 sequence, rstring conversationId, blob speech> AudioContentStream as O = FileSource(FileNameStream as I) {
+			logic
+				state: {
+					mutable uint64 fileCounter = 0ul;
+					mutable rstring tmp = "";
+				}
+				onTuple I:
+					tmp = fileName;
+			param
+				format: block;
+				blockSize: $audioBlobFragmentSize;
+			output O:
+				conversationId = tmp,
+				sequence = fileCounter++;
+			config
+				placement : partitionColocation("somePartitionColocationId");
+		}
+		
+		stream<IAMAccessToken> IAMAccessTokenStream = IAMAccessTokenGenerator() {
+			param
+				appConfigName: "";
+				apiKey: $apiKey;
+				iamTokenURL: $iamTokenURL;
+			config
+				placement : partitionColocation("somePartitionColocationId");
+		}
+
+		stream<STTResult> STTResultStream as O = WatsonSTT(AudioContentStream as I; IAMAccessTokenStream) {
+			param
+				uri: $uri;
+				baseLanguageModel: $sttBaseLanguageModel;
+				contentType: $contentType;
+				//<*_alt*>maxUtteranceAlternatives: 5;
+				//<*_cfn*>wordAlternativesThreshold: 0.97;
+				//<complete>sttResultMode: complete;
+				//<final*>sttResultMode: partial;
+				//<final*>nonFinalUtterancesNeeded: false;
+			output O:
+				myseq = sequence;
+			config
+				placement : partitionColocation("somePartitionColocationId");
+		}
+		
+		() as Sink = FileSink1(STTResultStream) {
+			config
+				placement : partitionColocation("somePartitionColocationId");
+		}
+
+	config
+		restartable: false;
+}

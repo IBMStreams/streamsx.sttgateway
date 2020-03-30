@@ -228,21 +228,22 @@ https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-websocke
 		# Type check for keyword result
 		} elsif ($op eq "getKeywordsSpottingResults") {
 			if (($attributeType eq "map<rstring,list<map<rstring,float64>>>")
-					|| ($attributeType eq "map<rstring,list<tuple<float64 start_time,float64 end_time,float64 confidence>>>")) {
+					|| ($attributeType eq "map<rstring,list<tuple<float64 startTime,float64 endTime,float64 confidence>>>")) {
 				$keywordsSpottingResultType = "$attributeType";
 			} else {
-				SPL::CodeGen::exitln("Attribute %s has wrong type! It must be of type map<rstring,list<tuple<float64 start_time,float64 end_time,float64 confidence>>> or map<rstring,list<map<rstring,float64>>>", "$name", $oport->getSourceLocation());
+				SPL::CodeGen::exitln("Attribute %s has wrong type! It must be of type map<rstring,list<tuple<float64 startTime,float64 endTime,float64 confidence>>> or map<rstring,list<map<rstring,float64>>>", "$name", $oport->getSourceLocation());
 			}
 		}
 	}
 	
 	# second loop to determine the default assignemnts
+	print "// attributes with assignments:";
 	foreach my $attribute (@{$oport->getAttributes()}) {
 		my $name = $attribute->getName(); 
 		my $paramValues = $attribute->getAssignmentOutputFunctionParameterValues();
 		my $attributeType = $attribute->getSPLType();
 		if ($attribute->hasAssignment() || $attribute->hasAssignmentWithOutputFunction()) {
-			print "// $name has assignemnt\n";
+			print " $name";
 		} else {
 			if (($name eq "utteranceNumber") && ($getUtteranceNumberName eq "")) {
 				if ($attributeType eq "int32") {
@@ -254,7 +255,7 @@ https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-websocke
 				if ($attributeType eq "rstring") {
 					$getUtteranceTextName = "$name";
 				}
-			} elsif (($name eq "isFinalizedUtterance") && ($isFinalizedUtteranceName eq "")) {
+			} elsif (($name eq "finalizedUtterance") && ($isFinalizedUtteranceName eq "")) {
 				if ($attributeType eq "boolean") {
 					if ($sttResultMode ne "complete") {
 						$isFinalizedUtteranceName = "$name";
@@ -344,7 +345,7 @@ https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-websocke
 					$identifySpeakers = 1;
 				}
 			} elsif (($name eq "utteranceWordsSpeakerUpdates") && ($getUtteranceWordsSpeakerUpdatesName eq "")) {
-				if ($attributeType eq "tuple<float64 startTime,int32 speaker,float64 confidence>") {
+				if ($attributeType eq "list<tuple<float64 startTime,int32 speaker,float64 confidence>>") {
 					$getUtteranceWordsSpeakerUpdatesName = "$name";
 					$wordTimestampNeeded = 1;
 					$identifySpeakers = 1;
@@ -352,7 +353,7 @@ https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-websocke
 				}
 			} elsif (($name eq "keywordsSpottingResults") && ($getKeywordsSpottingResultsName eq "")) {
 				if (($attributeType eq "map<rstring,list<map<rstring,float64>>>")
-						|| $attributeType eq "map<rstring,list<tuple<float64 start_time,float64 end_time,float64 confidence>>>") {
+						|| $attributeType eq "map<rstring,list<tuple<float64 startTime,float64 endTime,float64 confidence>>>") {
 					$getKeywordsSpottingResultsName = "$name";
 					$keywordsSpottingResultType = "$attributeType";
 				}
@@ -360,6 +361,7 @@ https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-websocke
 			
 		}
 	}
+	print "\n";
 	print "// wordConfidenceNeeded=$wordConfidenceNeeded wordTimestampNeeded=$wordTimestampNeeded\n";
 	print "// identifySpeakers=$identifySpeakers speakerUpdatesNeeded=$speakerUpdatesNeeded\n";
 	print "// isTranscriptionCompletedRequested=$isTranscriptionCompletedRequested\n";

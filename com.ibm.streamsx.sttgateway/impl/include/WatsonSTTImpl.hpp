@@ -244,13 +244,8 @@ WatsonSTTImpl<OP, OT>::WatsonSTTImpl(OP & splOperator_,Conf config_)
 
 	// The parameters maxUtteranceAlternatives, wordAlternativesThreshold, keywordsSpottingThreshold, keywordsToBeSpotted
 	// are not available in sttResultMose complete
-	// The COF getUtteranceWordsConfidences, getUtteranceWordsStartTimes, getUtteranceWordsEndTimes,
-	// getUtteranceStartTime, getUtteranceEndTime, getUtteranceWordsSpeakers, getUtteranceWordsSpeakersConfidences,
-	// getUtteranceNumber, isFinalizedUtterance, getConfidence, isTranscriptionCompleted, getUtteranceAlternatives,
-	// getWordAlternatives, getWordAlternativesConfidences, getWordAlternativesStartTimes, getWordAlternativesEndTimes,
-	// getUtteranceWords, getUtteranceWordsConfidences, getUtteranceWordsStartTimes, getUtteranceWordsEndTimes,
-	// getUtteranceWordsSpeakers, getUtteranceWordsSpeakersConfidences, getKeywordsSpottingResults are not available
-	// in sttResultMose complete
+	// The COF getUtteranceNumber, isFinalizedUtterance, getConfidence, getUtteranceAlternatives
+	// are not available in sttResultMose complete
 
 	// Update the operator metric.
 	sttOutputResultModeMetric->setValueNoLock(Conf::sttOutputResultMode);
