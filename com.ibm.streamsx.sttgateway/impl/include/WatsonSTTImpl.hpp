@@ -81,11 +81,11 @@ protected:
 	// Processing for websocket receiver and ping threads
 	//void process(uint32_t idx);
 
-	// Tuple processing for mutating data port 0
+	// Tuple processing for non mutating data port 0
 	template<typename IT0, typename DATA_TYPE, DATA_TYPE const & (IT0::*GETTER)() const>
 	void process_0(IT0 const & inputTuple);
 
-	// Tuple processing for authentication port 1
+	// Tuple processing for non mutating authentication port 1
 	template<typename IT1, SPL::rstring const & (IT1::*GETTER)()const>
 	void process_1(IT1 const & inputTuple);
 

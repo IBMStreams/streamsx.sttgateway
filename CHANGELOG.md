@@ -1,4 +1,11 @@
 # Changes
+## v2.2.0
+* WatsonSTT: Enhancement: Output Speaker Label Updates COF getUtteranceWordsSpeakerUpdates (issue #38)
+* WatsonSTT: Use useful default paramters: maxUtteranceAlternatives, wordAlternativesThreshold and keywordsSpottingThreshold (issue #40)
+* WatsonSTT: Make error logs more verbose in case of connection failure
+* WatsonSTT: Output should use default outputs (issue #43)
+* WatsonSTT: Keyword spotting results are now available as typle type COF getKeywordsSpottingResults
+* WatsonSTT: Correction: Sporadicaly Transcription Failures (issue #44)
 
 ## v2.1.2
 * WatsonSTT: Correction issue #39: There should be no output tuples if non final utterances are received and parameter nonFinalUtterancesNeeded is false.
