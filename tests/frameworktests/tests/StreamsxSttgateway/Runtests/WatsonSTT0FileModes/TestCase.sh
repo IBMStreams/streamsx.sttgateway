@@ -3,8 +3,6 @@
 #--             unFusedMode1 unFusedMode2 unFusedMode3 unFusedTokenDelay'
 #--timeout=1200
 
-setCategory 'quick'
-
 TT_mainComposite='WatsonSTT0FileModes'
 TT_sabFile="output/WatsonSTT0FileModes.sab"
 
