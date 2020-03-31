@@ -4,8 +4,6 @@
 ##--variantList='fusedMode1'
 #--timeout=1200
 
-setCategory 'quick'
-
 TT_mainComposite='WatsonSTT0RawModes'
 TT_sabFile="output/WatsonSTT0RawModes.sab"
 
@@ -46,37 +44,40 @@ FINS=(
 
 myEvaluate() {
 	if [[ ( $TTRO_variantCase == *Mode3 ) || ( $TTRO_variantCase == *TokenDelay ) ]]; then
-		local x
-		for ((x=0; x<${#RequiredLinesFull[*]};x++)) do
-			linewisePatternMatchInterceptAndSuccess "$TTRO_workDirCase/data/Tuples" 'true' "${RequiredLinesFull[$x]}"
-		done
+		TTTT_patternList=(
+			'*01-call-center-10sec*utteranceText="hi I am John Smith *'
+			'*02-call-center-25sec*utteranceText="I went on the*'
+			'*03-call-center-28sec*utteranceText="my email is change*'
+			'*04-empty-audio.wav*sttErrorMessage="Stream was 0 bytes but needs*'
+			'*05-gettysburg-address-2min.wav*utteranceText="four score and seven years ago*'
+			'*07-ibm-earnings-2min.wav*utteranceText="also includes certain*'
+			'*08-ibm-watson-ai-3min.wav*a brand new integration*'
+			'*10-invalid-audio.wav*ttErrorMessage="unable to transcode*'
+			'*12-jfk-speech-12sec.wav*utteranceText="and so my fellow Americans*'
+		)
 	else
-		local x
-		for ((x=0; x<${#RequiredLines[*]};x++)) do
-			linewisePatternMatchInterceptAndSuccess "$TTRO_workDirCase/data/Tuples" 'true' "${RequiredLines[$x]}"
-		done
+		TTTT_patternList=(
+			'*01-call-center-10sec*="hi I am John Smith *'
+			'*01-call-center-10sec*transcriptionCompleted=true*'
+			'*02-call-center-25sec.wav*="I went on the*'
+			'*02-call-center-25sec*transcriptionCompleted=true*'
+			'*03-call-center-28sec.wav*="my email is change*'
+			'*03-call-center-28sec*transcriptionCompleted=true*'
+			'*04-empty-audio.wav*sttErrorMessage="Stream was 0 bytes but needs*'
+			'*04-empty-audio.wav*transcriptionCompleted=true*'
+			'*05-gettysburg-address-2min.wav*="four score and seven years ago*'
+			'*05-gettysburg-address-2min.wav*transcriptionCompleted=true*'
+			'*07-ibm-earnings-2min.wav*="also includes certain*'
+			'*07-ibm-earnings-2min.wav*transcriptionCompleted=true*'
+			'*08-ibm-watson-ai-3min.wav*a brand new integration*'
+			'*08-ibm-watson-ai-3min.wav*transcriptionCompleted=true*'
+			'*10-invalid-audio.wav*ttErrorMessage="unable to transcode*'
+			'*10-invalid-audio.wav*transcriptionCompleted=true*'
+			'*12-jfk-speech-12sec.wav*="and so my fellow Americans*'
+			'*12-jfk-speech-12sec.wav*transcriptionCompleted=true*'
+		)
+	fi
+	if ! linewisePatternMatchArray "$TTRO_workDirCase/data/Tuples" 'true'; then
+		setError "Not enough pattern matches found"
 	fi
 }
-
-RequiredLinesFull=(
-'*01-call-center-10sec*utteranceText="hi I am John Smith *'
-'*02-call-center-25sec.wav*utteranceText="I went on the*'
-'*03-call-center-28sec.wav*utteranceText="my email is change*'
-'*04-empty-audio.wav*sttErrorMessage="Stream was 0 bytes but needs*'
-'*05-gettysburg-address-2min.wav*utteranceText="four score and seven years ago*'
-'*07-ibm-earnings-2min.wav*utteranceText="also includes certain*'
-'*08-ibm-watson-ai-3min.wav*a brand new integration*'
-'*10-invalid-audio.wav*ttErrorMessage="unable to transcode*'
-'*12-jfk-speech-12sec.wav*utteranceText="and so my fellow Americans*'
-)
-RequiredLines=(
-'*01-call-center-10sec*="hi I am John Smith *'
-'*02-call-center-25sec.wav*="I went on the*'
-'*03-call-center-28sec.wav*="my email is change*'
-'*04-empty-audio.wav*sttErrorMessage="Stream was 0 bytes but needs*'
-'*05-gettysburg-address-2min.wav*="four score and seven years ago*'
-'*07-ibm-earnings-2min.wav*="also includes certain*'
-'*08-ibm-watson-ai-3min.wav*a brand new integration*'
-'*10-invalid-audio.wav*ttErrorMessage="unable to transcode*'
-'*12-jfk-speech-12sec.wav*="and so my fellow Americans*'
-)

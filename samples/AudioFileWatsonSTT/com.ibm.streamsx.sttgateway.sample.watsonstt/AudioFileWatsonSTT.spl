@@ -92,18 +92,8 @@ public composite AudioFileWatsonSTT {
 		expression<boolean> $nonFinalUtterancesNeeded: (boolean)getSubmissionTimeValue("nonFinalUtterancesNeeded", "false");
 
 	type
-		// This STT result type
-		STTResult = 
-			uint64 myseq,
-			int32 utteranceNumber,
-			boolean transcriptionCompleted, boolean finalizedUtterance,
-			float64 confidence,
-			float64 utteranceStartTime,
-			float64 utteranceEndTime,
-			rstring utteranceText,
-			rstring sttErrorMessage,
-			rstring conversationId;
-
+		STTResult = tuple<uint64 myseq>, STTResult_t;
+	
 	graph
 
 		// Scan a directory periodically to pick up the audio files and 
@@ -165,15 +155,7 @@ public composite AudioFileWatsonSTT {
 				sttResultMode: partial;
 				nonFinalUtterancesNeeded: $nonFinalUtterancesNeeded;
 			output O:
-				conversationId = speech,
-				utteranceNumber = getUtteranceNumber(),
-				utteranceText = getUtteranceText(),
-				finalizedUtterance = isFinalizedUtterance(),
-				confidence = getConfidence(),
-				transcriptionCompleted = isTranscriptionCompleted(),
-				utteranceStartTime = getUtteranceStartTime(),
-				utteranceEndTime = getUtteranceEndTime(),
-				sttErrorMessage = getSTTErrorMessage();
+				conversationId = speech;
 			config
 				placement : partitionColocation("somePartitionColocationId");
 		}

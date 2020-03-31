@@ -3,8 +3,6 @@
 #--             unFusedMode1 unFusedMode2 unFusedMode3 unFusedTokenDelay'
 #--timeout=1200
 
-setCategory 'quick'
-
 TT_mainComposite='WatsonSTT0FileModes'
 TT_sabFile="output/WatsonSTT0FileModes.sab"
 
@@ -45,42 +43,40 @@ FINS=(
 
 myEvaluate() {
 	if [[ ( $TTRO_variantCase == *Mode3 ) || ( $TTRO_variantCase == *TokenDelay ) ]]; then
-		local x
-		for ((x=0; x<${#RequiredLinesFull[*]};x++)) do
-			linewisePatternMatchInterceptAndSuccess "$TTRO_workDirCase/data/Tuples" 'true' "${RequiredLinesFull[$x]}"
-		done
+		TTTT_patternList=(
+			'*01-call-center-10sec*utteranceText="hi I am John Smith *myseq=0*'
+			'*02-call-center-25sec*utteranceText="I went on the*myseq=1*'
+			'*03-call-center-28sec*utteranceText="my email is change*myseq=2*'
+			'*04-empty-audio.wav*sttErrorMessage="Stream was 0 bytes but needs*myseq=3*'
+			'*05-gettysburg-address-2min.wav*utteranceText="four score and seven years ago*myseq=4*'
+			'*07-ibm-earnings-2min.wav*utteranceText="also includes certain*myseq=5*'
+			'*08-ibm-watson-ai-3min.wav*a brand new integration*myseq=6*'
+			'*10-invalid-audio.wav*ttErrorMessage="unable to transcode*myseq=7*'
+			'*12-jfk-speech-12sec.wav*utteranceText="and so my fellow Americans*myseq=8*'
+		)
 	else
-		local x
-		for ((x=0; x<${#RequiredLines[*]};x++)) do
-			linewisePatternMatchInterceptAndSuccess "$TTRO_workDirCase/data/Tuples" 'true' "${RequiredLines[$x]}"
-		done
+		TTTT_patternList=(
+			'*01-call-center-10sec*="hi I am John Smith *myseq=0*'
+			'*01-call-center-10sec*transcriptionCompleted=true*myseq=0*'
+			'*02-call-center-25sec.wav*="I went on the*myseq=1*'
+			'*02-call-center-25sec*transcriptionCompleted=true*myseq=1*'
+			'*03-call-center-28sec.wav*="my email is change*myseq=2*'
+			'*03-call-center-28sec*transcriptionCompleted=true*myseq=2*'
+			'*04-empty-audio.wav*sttErrorMessage="Stream was 0 bytes but needs*myseq=3*'
+			'*04-empty-audio.wav*transcriptionCompleted=true*myseq=3*'
+			'*05-gettysburg-address-2min.wav*="four score and seven years ago*myseq=4*'
+			'*05-gettysburg-address-2min.wav*transcriptionCompleted=true*myseq=4*'
+			'*07-ibm-earnings-2min.wav*="also includes certain*myseq=5*'
+			'*07-ibm-earnings-2min.wav*transcriptionCompleted=true*myseq=5*'
+			'*08-ibm-watson-ai-3min.wav*a brand new integration*myseq=6*'
+			'*08-ibm-watson-ai-3min.wav*transcriptionCompleted=true*myseq=6*'
+			'*10-invalid-audio.wav*ttErrorMessage="unable to transcode*myseq=7*'
+			'*10-invalid-audio.wav*transcriptionCompleted=true*myseq=7*'
+			'*12-jfk-speech-12sec.wav*="and so my fellow Americans*myseq=8*'
+			'*12-jfk-speech-12sec.wav*transcriptionCompleted=true*myseq=8*'
+		)
+	fi
+	if ! linewisePatternMatchArray "$TTRO_workDirCase/data/Tuples" 'true'; then
+		setError "Not enough pattern matches found"
 	fi
 }
-
-RequiredLinesFull=(
-'*01-call-center-10sec*utteranceText="hi I am John Smith *myseq=0*'
-'*02-call-center-25sec.wav*utteranceText="I went on the*myseq=1*'
-'*03-call-center-28sec.wav*utteranceText="my email is change*myseq=2*'
-'*04-empty-audio.wav*sttErrorMessage="Stream was 0 bytes but needs*myseq=3*'
-'*05-gettysburg-address-2min.wav*utteranceText="four score and seven years ago*myseq=4*'
-'*07-ibm-earnings-2min.wav*utteranceText="also includes certain*myseq=5*'
-'*08-ibm-watson-ai-3min.wav*a brand new integration*myseq=6*'
-'*10-invalid-audio.wav*ttErrorMessage="unable to transcode*myseq=7*'
-'*12-jfk-speech-12sec.wav*utteranceText="and so my fellow Americans*myseq=8*'
-)
-RequiredLines=(
-'*01-call-center-10sec*="hi I am John Smith *myseq=0*'
-'*02-call-center-25sec.wav*="I went on the*myseq=1*'
-'*03-call-center-28sec.wav*="my email is change*myseq=2*'
-'*04-empty-audio.wav*sttErrorMessage="Stream was 0 bytes but needs*myseq=3*'
-'*05-gettysburg-address-2min.wav*="four score and seven years ago*myseq=4*'
-'*07-ibm-earnings-2min.wav*="also includes certain*myseq=5*'
-'*08-ibm-watson-ai-3min.wav*a brand new integration*myseq=6*'
-'*10-invalid-audio.wav*ttErrorMessage="unable to transcode*myseq=7*'
-'*12-jfk-speech-12sec.wav*="and so my fellow Americans*myseq=8*'
-)
-
-#'*09-ibm-watson-law-4min.wav*fullTranscriptionText="you know*transcriptionCompleted=true,myseq=4*'
-#'*11-ibm-culture-2min.wav*fullTranscriptionText="we had standing together*transcriptionCompleted=true,myseq=5*'
-#'*06-ibm-earnings-1min.wav*fullTranscriptionText="welcome and thank you*transcriptionCompleted=true,myseq=8'
-#'*08-ibm-watson-ai-3min.wav*a brand new integration*transcriptionCompleted=true,myseq=9*'

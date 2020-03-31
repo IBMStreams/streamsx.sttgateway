@@ -12,6 +12,8 @@
 #include "DecoderResultIndex.hpp"
 #include "DecoderSpeakerLabels.hpp"
 
+#include <sstream>
+
 namespace com { namespace ibm { namespace streams { namespace sttgateway {
 /*
  * Decoder class to convert the received json documents into the required structures
@@ -81,7 +83,20 @@ public:
 			SPLAPPTRC(L_TRACE, configuration.traceIntro << "-->dec confusion word: " << DecoderWordAlternatives::getWordAlternatives(), WATSON_DECODER);
 		}
 		if (DecoderKeywordsResult::hasResult()) {
-			SPLAPPTRC(L_TRACE, configuration.traceIntro << "-->dec keywords: " << DecoderKeywordsResult::getKeywordsSpottingResults(), WATSON_DECODER);
+			const auto & kwresults = DecoderKeywordsResult::getKeywordsSpottingResults();
+			std::stringstream ss;
+			ss << "{";
+			for (const auto & kwentry : kwresults) {
+				ss << kwentry.first << ":";
+				const auto & emergences = kwentry.second;
+				ss << "[";
+				for (const auto & emergence : emergences) {
+					ss << "{start_time:" << emergence.start_time << ";end_time:" << emergence.end_time << ";confidence:" << emergence.confidence << "}";
+				}
+				ss << "],";
+			}
+			ss << "}";
+			SPLAPPTRC(L_TRACE, configuration.traceIntro << "-->dec keywords: " << ss.str(), WATSON_DECODER);
 		}
 
 		DecoderCommons::doWorkEnd();

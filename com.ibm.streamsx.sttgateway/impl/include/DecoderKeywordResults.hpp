@@ -7,19 +7,25 @@
 #define COM_IBM_STREAMS_STTGATEWAY_DECODER_KEYWORD_RESULT_H_
 
 #include "DecoderCommons.hpp"
+
 #include <vector>
+#include <unordered_map>
+#include <utility>
+#include <string>
 
 namespace com { namespace ibm { namespace streams { namespace sttgateway {
 
 class DecoderKeywordsResult : public virtual DecoderCommons {
 public:
-	typedef SPL::map<SPL::rstring, SPL::list<SPL::map<SPL::rstring, SPL::float64> > > resultMapType;
+	// do not use SPL list and map because the KeywordEmergence has no serialization implementation
+	struct KeywordEmergenceStruct { double start_time; double end_time; double confidence; };
+	typedef std::unordered_map<std::string, std::vector<KeywordEmergenceStruct> > ResultMapType;
 private:
-	resultMapType kwmaplist;
+	ResultMapType kwmaplist;
 
 public:
 	bool                  hasResult() const noexcept                  { return kwmaplist.size() > 0; }
-	const resultMapType & getKeywordsSpottingResults() const noexcept { return kwmaplist; }
+	const ResultMapType & getKeywordsSpottingResults() const noexcept { return kwmaplist; }
 
 protected:
 	DecoderKeywordsResult(const WatsonSTTConfig & config) :
@@ -50,7 +56,7 @@ void DecoderKeywordsResult::doWork(const rapidjson::Value& result, const std::st
 				throw DecoderException("Keyword " + kw.string() + " is not an array in " + ppname.str());
 			}
 
-			SPL::list<SPL::map<SPL::rstring, SPL::float64> > innerList;
+			std::vector<KeywordEmergenceStruct> innerList;
 			rapidjson::SizeType sz = keyword_->Size();
 			for (rapidjson::SizeType i = 0; i < sz; i++) {
 				std::stringstream pppname;
@@ -61,12 +67,12 @@ void DecoderKeywordsResult::doWork(const rapidjson::Value& result, const std::st
 				const rapidjson::Value & end_time        = getRequiredMember<NumberLabel>(match, "end_time", pppname.str().c_str());
 				const rapidjson::Value & confidence      = getRequiredMember<NumberLabel>(match, "confidence", pppname.str().c_str());
 				SPL::map<SPL::rstring, SPL::float64> innerMap;
-				innerMap.insert(SPL::map<SPL::rstring, SPL::float64>::value_type(SPL::rstring("start_time"), start_time.GetDouble()));
-				innerMap.insert(SPL::map<SPL::rstring, SPL::float64>::value_type(SPL::rstring("end_time"),   end_time.GetDouble()));
-				innerMap.insert(SPL::map<SPL::rstring, SPL::float64>::value_type(SPL::rstring("confidence"), confidence.GetDouble()));
-				innerList.push_back(innerMap);
+				const double st = start_time.GetDouble();
+				const double et = end_time.GetDouble();
+				const double cf = confidence.GetDouble();
+				innerList.push_back(KeywordEmergenceStruct{st, et, cf});
 			}
-			kwmaplist.insert(resultMapType::value_type(kw, innerList));
+			kwmaplist.insert(ResultMapType::value_type(kw, innerList));
 		}
 	}
 }

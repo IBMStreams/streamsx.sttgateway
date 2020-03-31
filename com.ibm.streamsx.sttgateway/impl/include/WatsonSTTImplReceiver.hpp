@@ -12,14 +12,20 @@
 #define COM_IBM_STREAMS_STTGATEWAY_WATSONSTTIMPLRECEIVER_HPP_
 
 #include <string>
+#include <vector>
 #include <atomic>
 #include <typeinfo>
 #include <unordered_map>
+#include <unordered_set>
 
 // This operator heavily relies on the Websocket++ header only library.
 // https://docs.websocketpp.org/index.html
 // This C++11 library code does the asynchronous full duplex Websocket communication with
 // the Watson STT service via a series of event handlers (a.k.a callback methods).
+// The websocketpp gives c++11 support also for older compilers
+// With c++11 capable compiler the stdlib is used
+#include <websocketpp/common/functional.hpp>
+
 // Bulk of the logic in this operator class appears in those event handler methods below.
 #include <websocketpp/config/asio_client.hpp>
 #include <websocketpp/client.hpp>
@@ -52,19 +58,25 @@ typedef websocketpp::lib::shared_ptr<boost::asio::ssl::context> context_ptr;
 
 enum class WsState : char {
 	idle,       // initial idle state
-	start,      // start a new connection
-	connecting, // trying to connect to stt
-	open,       // connection is opened
-	listening,  // listening received
-	error,      // error received during transcription
-	closed,     // connection has closed
-	failed,     // connection has failed
-	crashed     // Error was caught in ws_init tread
+	start,      // start a new connection request (set from sender thread) - transient
+	connecting, // connection attempt started (from receiver tread) - transient
+	open,       // connection is opened (on open event) - transient
+	listening,  // listening received (on message event) - stable state
+	closing,    // connection is closing (set from receiver thread thread) - transient
+	error,      // error received during transcription (error message received on message) - transient
+	closed,     // connection has closed (on close event) - stable state
+	failed,     // connection has failed (on fail event) - stable state
+	crashed     // Error was caught in ws_init (receiver thread)- stable state
 };
 // helper function to make a pretty print
 const char * wsStateToString(WsState ws);
 // helper function to determine whether the receiver has reached an inactive state
 bool receiverHasStopped(WsState ws);
+// helper function to determine whether the receiver is in a transient state
+bool receiverHasTransientState(WsState ws);
+
+class SpeakerProcessor;
+class KeywordProcessor;
 
 /*
  * Implementation class for operator Watson STT
@@ -77,6 +89,7 @@ template<typename OP, typename OT>
 class WatsonSTTImplReceiver : public WatsonSTTConfig {
 public:
 	typedef WatsonSTTConfig Config;
+	typedef struct { SPL::float64 startTime; SPL::int32 speaker; SPL::float64 confidence; } SpeakerUpdatesStruct;
 	//Constructors
 	WatsonSTTImplReceiver(OP & splOperator_, Config config_);
 	//WatsonSTTImpl(WatsonSTTImpl const &) = delete;
@@ -110,6 +123,10 @@ private:
 	// Webscoket connection failure event handler
 	void on_fail(client* c, websocketpp::connection_hdl hdl);
 
+	//bool on_ping(client* c, websocketpp::connection_hdl hdl, std::string mess);
+
+	//void on_pong(client* c, websocketpp::connection_hdl hdl, std::string mess);
+
 	// Websocket initialization thread method
 	void ws_init();
 
@@ -124,12 +141,22 @@ protected:
 	// this flag us set from receiver thread and reset from sender thread
 	// it is set at the end of the on_message method, when the stt service sends a 'listening' event
 	// after transcription
-	bool transcriptionFinalized;
+	std::atomic<bool> transcriptionFinalized;
+
+	// This is set from the sender thread when the the next conversation is queued
+	// If this flag is set when a transcription completes, the connection is kept
+	// Otherwise the connection is closed to avoid the race condition when the next conversation arrives
+	std::atomic<bool> nextConversationQueued;
 
 	// This values are set from receiver thread when state is connecting
 	// the sender thread requires the values but should not use them during connecting state
 	client *wsClient;
 	websocketpp::connection_hdl wsHandle;
+
+	// the access token used in receiver-thread during ws_init after wsState changes to 'start'
+	// the value is copied from the sender- to receiver-thread before a 'makeNewWebsocketConnection' has been flagged
+	// this is a change of wsStae from any state to 'start'
+	std::string accessToken;
 
 	// The tuple with assignments from the input port
 	// to be used if transcription results or error indications have to be sent
@@ -137,16 +164,16 @@ protected:
 	// this otuple may change during a transcription when the input receives new input tuples for the
 	// current transcription. The previous value remains valid until transcriptionFinalized is flagged.
 	std::atomic<OT *> recentOTuple;
+private:
 	// when the on_message method is about to send something, this member is used to store the
-	// output tuple pointer. The output tuple contains the utterances and related attributes.
+	// output tuple pointer.
+	// First we expect the results for utterance, alternatives, and word alternatives
+	// Then we expect the speaker results.
+	// This value is used to store the non output tuple contains with the utterances and related attributes
+	// until the appropriate speaker result is received.
 	// The member is reset, after the tuple was submitted
 	OT * oTupleUsedForSubmission;
 
-	// the access token for the sender thread
-	// the value is copied from the sender thread before makeNewWebsocketConnection has been flagged
-	std::string accessToken;
-
-private:
 	std::atomic<SPL::int64> nWebsocketConnectionAttemptsCurrent;
 	std::atomic<SPL::int64> nFullAudioConversationsTranscribed;
 	std::atomic<SPL::int64> nFullAudioConversationsFailed;
@@ -161,6 +188,9 @@ private:
 	SPL::Metric * const nFullAudioConversationsFailedMetric;
 	SPL::Metric * const wsConnectionStateMetric;
 
+	static const SpeakerProcessor emptySpeakerResults;
+	static const KeywordProcessor emptyKeywordProcessor;
+
 protected:
 	// Helper functions
 	void setWsState(WsState ws);
@@ -168,7 +198,84 @@ protected:
 	inline void incrementNFullAudioConversationsTranscribed();
 	inline void incrementNFullAudioConversationsFailed();
 	inline SPL::float64 getNWebsocketConnectionAttemptsCurrent() { return nWebsocketConnectionAttemptsCurrent.load(); };
+
+private:
+	// send out the error with the wit the specified reason
+	// This function consumes a non finalized output tuple (oTupleUsedForSubmission) if any
+	// Or uses a the recent output tuple (recentOTuple).
+	// If no recent output tuple is available, no tuple is sent and an error log is emitted
+	// increment the FullAudioConversationsFailed
+	void sendErrorTuple(const std::string & reason);
+
+	// send the finalization tuple of an conversation
+	void sendTranscriptionCompletedTuple(OT * otuple);
 };
+
+/*
+ * Data structure and and functions for the processing of the speaker labels
+ * The run function splits the speaker labels into two lists:
+ * 1. the list that corresponds to the utterance word list
+ * 2. the speaker updates lists
+ * Get the first list with getUtteranceWordsSpeakers() and getUtteranceWordsSpeakersConfidences()
+ * Get the second list with getUtteranceWordsSpeakerUpdates()
+ */
+class SpeakerProcessor {
+	const rapidjson::SizeType spkSize;
+	const SPL::list<SPL::float64> & spkFrom;
+	const SPL::list<SPL::int32> &   spkSpk;
+	const SPL::list<SPL::float64> & spkCfd;
+	const size_t wordListSize;
+	const SPL::list<SPL::float64> & myUtteranceWordsStartTimes;
+	const std::string & traceIntro;
+	const std::string & payload;
+	// the speaker result lists - each entry corresponds to the entry in the word list
+	SPL::list<SPL::float64> spkFromNew;
+	SPL::list<SPL::int32>   spkSpkNew;
+	SPL::list<SPL::float64> spkCfdNew;
+	// indexes of speaker update
+	std::vector<rapidjson::SizeType> spkUpdateIndexes;
+
+public:
+	SpeakerProcessor(
+			const Decoder & dec_,
+			const SPL::list<SPL::float64> & myUtteranceWordsStartTimes_,
+			const std::string & traceIntro_,
+			const std::string & payload_);
+
+	SpeakerProcessor();
+
+	SpeakerProcessor(const SpeakerProcessor&) = delete;
+	SpeakerProcessor(SpeakerProcessor&&) = delete;
+	SpeakerProcessor& operator=(const SpeakerProcessor&) = delete;
+	SpeakerProcessor& operator=(const SpeakerProcessor&&) = delete;
+
+	void run();
+
+	SPL::list<SPL::int32> getUtteranceWordsSpeakers() const { return spkSpkNew; }
+
+	SPL::list<SPL::float64> getUtteranceWordsSpeakersConfidences() const { return spkCfdNew; }
+
+	template<typename TUPLE>
+	SPL::list<TUPLE> getUtteranceWordsSpeakerUpdates() const;
+};
+
+/* data struct and function to get the keyword result */
+class KeywordProcessor {
+	const bool isEmpty;
+	const DecoderKeywordsResult::ResultMapType & keywordResults;
+
+public:
+	KeywordProcessor(const DecoderKeywordsResult::ResultMapType & keywordResults_);
+	KeywordProcessor();
+	KeywordProcessor(const KeywordProcessor&) = delete;
+	KeywordProcessor(KeywordProcessor&&) = delete;
+	KeywordProcessor& operator=(const KeywordProcessor&) = delete;
+	KeywordProcessor& operator=(const KeywordProcessor&&) = delete;
+	template<typename T>
+	void getKeywordsSpottingResults(SPL::map<SPL::rstring, SPL::list<T> > & destination) const;
+};
+
+typename SPL::map<SPL::rstring, SPL::float64> KeyWordEmergenceMap;
 
 template<typename OP, typename OT>
 WatsonSTTImplReceiver<OP, OT>::WatsonSTTImplReceiver(OP & splOperator_,Config config_)
@@ -178,12 +285,14 @@ WatsonSTTImplReceiver<OP, OT>::WatsonSTTImplReceiver(OP & splOperator_,Config co
 
 		wsState{WsState::idle},
 		transcriptionFinalized(true),
+		nextConversationQueued(false),
 		wsClient(nullptr),
 		wsHandle{},
-		recentOTuple{},
-		oTupleUsedForSubmission{},
 
 		accessToken{},
+
+		recentOTuple{},
+		oTupleUsedForSubmission{},
 
 		nWebsocketConnectionAttemptsCurrent{0},
 		nFullAudioConversationsTranscribed{0},
@@ -232,7 +341,7 @@ void WatsonSTTImplReceiver<OP, OT>::prepareToShutdown() {
 				SPLAPPTRC(L_INFO, traceIntro <<
 					"-->Client is closing the Websocket connection to the Watson STT service.",
 					"prepareToShutdown");
-				wsClient->close(wsHandle,websocketpp::close::status::normal,"");
+				wsClient->close(wsHandle, websocketpp::close::status::internal_endpoint_error, "Shutdown");
 			}
 		} else {
 			SPLAPPTRC(L_INFO, traceIntro <<
@@ -342,6 +451,8 @@ void WatsonSTTImplReceiver<OP, OT>::ws_init() {
 			wsClient->set_fail_handler(bind(&WatsonSTTImplReceiver<OP, OT>::on_fail,this,wsClient,::_1));
 			wsClient->set_message_handler(bind(&WatsonSTTImplReceiver<OP, OT>::on_message,this,wsClient,::_1,::_2));
 			wsClient->set_close_handler(bind(&WatsonSTTImplReceiver<OP, OT>::on_close,this,wsClient,::_1));
+			//wsClient->set_ping_handler(bind(&WatsonSTTImplReceiver<OP, OT>::on_ping,this,wsClient,::_1,::_2));
+			//wsClient->set_pong_handler(bind(&WatsonSTTImplReceiver<OP, OT>::on_pong,this,wsClient,::_1,::_2));
 
 			// Create a connection to the given URI and queue it for connection once
 			// the event loop starts
@@ -349,7 +460,7 @@ void WatsonSTTImplReceiver<OP, OT>::ws_init() {
 			websocketpp::lib::error_code ec;
 			// https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-basic-request#using-the-websocket-interface
 			client::connection_ptr con = wsClient->get_connection(uri, ec);
-			SPLAPPTRC(L_DEBUG, traceIntro << "-->RE4 (after get_connection) ec.value=" << ec.value(), "ws_receiver");
+			SPLAPPTRC(L_DEBUG, traceIntro << "-->RE4 (after get_connection) ec=" << ec, "ws_receiver");
 			if (ec)
 				throw ec;
 
@@ -366,7 +477,8 @@ void WatsonSTTImplReceiver<OP, OT>::ws_init() {
 			//SPL::Functions::Utility::abort(__FILE__, __LINE__);
 		} catch (const websocketpp::lib::error_code & e) {
 			//websocketpp::lib::error_code is a class -> catching by reference makes sense
-			SPLAPPTRC(L_ERROR, traceIntro << "-->RE92 websocketpp::lib::error_code: " << e.message(), "ws_receiver");
+			SPLAPPTRC(L_ERROR, traceIntro << "-->RE92 websocketpp::lib::error_code: e=" << e <<
+					" message=" << e.message(), "ws_receiver");
 			setWsState(WsState::crashed);
 			//SPL::Functions::Utility::abort(__FILE__, __LINE__);
 		} catch (...) {
@@ -490,8 +602,8 @@ void WatsonSTTImplReceiver<OP, OT>::on_open(client* c, websocketpp::connection_h
 	wsHandle = hdl;
 	// c->get_alog().write(websocketpp::log::alevel::app, "Sent Message: "+msg);
 	SPLAPPTRC(L_INFO, traceIntro <<
-			"-->RE7 A recognition request start message was sent to the Watson STT service:" <<
-			msg, "ws_receiver");
+			"-->RE7 A recognition request start message was sent to the Watson STT service at host:" <<
+			c->get_con_from_hdl(hdl)->get_host() << " message=" << msg, "ws_receiver");
 } //End: WatsonSTTImpl<OP, OT>::on_open
 
 // Whenever a message (transcription result, STT service message or an STT error message) is
@@ -521,7 +633,7 @@ void WatsonSTTImplReceiver<OP, OT>::on_message(client* c, websocketpp::connectio
 	WsState entryState = wsState.load();
 	SPLAPPTRC(L_DEBUG, traceIntro << "-->on_message entyState: " << wsStateToString(entryState), "ws_receiver");
 	if ((entryState != WsState::open) && (entryState != WsState::listening))
-		throw std::runtime_error(traceIntro + "RE80-->Unexpected entryState in ws on_message; state: " + std::string(wsStateToString(entryState)));
+		throw std::runtime_error(traceIntro + "-->RE80 Unexpected entryState in ws on_message; state: " + std::string(wsStateToString(entryState)));
 
 	// Local state variables
 	bool fullTranscriptionCompleted_ = false;	// Is set when a second listening event is received
@@ -561,7 +673,7 @@ void WatsonSTTImplReceiver<OP, OT>::on_message(client* c, websocketpp::connectio
 	// in sttResultMode 3 (complete result) utterance and speaker may be in one responmse message
 	if ((numFound > 2) || ((numFound == 2) && (not utteranceResultFound_ || not speakerResultFound_))) {
 		std::stringstream message;
-		message << traceIntro << "-->RE82 Unexpected decoding results - stateFound_ : " << stateFound_ << " sttErrorFound_: "
+		message << traceIntro << "-->RE88 Unexpected decoding results - stateFound_ : " << stateFound_ << " sttErrorFound_: "
 				<< sttErrorFound_ << " utteranceResultFound_: " << utteranceResultFound_ << " speakerResultFound_: "
 				<< speakerResultFound_ << " payload:" << payload_;
 		throw std::runtime_error(message.str());
@@ -593,9 +705,23 @@ void WatsonSTTImplReceiver<OP, OT>::on_message(client* c, websocketpp::connectio
 			// transcription completion for the audio data that was sent earlier.
 			// This response also indicates that the STT service is ready to do a new transcription.
 			fullTranscriptionCompleted_ = true;
-
-			SPLAPPTRC(L_DEBUG, traceIntro <<
-				"-->RE21 Websocket connection established - transcription completion.", "ws_receiver");
+			// But we close the connection now if further conversation is queued:
+			// see issue #44
+			// There is no reliable way to keep the connection forever open (except to send idle payload?)
+			// Ping messages do not keep the connection open
+			// The session timeout can not be switched off https://cloud.ibm.com/docs/speech-to-text?topic=speech-to-text-websockets#WSkeep
+			// Thus the stt service closes the connection after approx. 30 sec.
+			// This may produce is rare cases a race condition of the connection close from stt and the transmission of
+			// new speech samples. In this case a whole file may get lost.
+			if (nextConversationQueued.load()) {
+				SPLAPPTRC(L_DEBUG, traceIntro <<
+					"-->RE85 Transcription completion and nextConversationQueued - Keep connection", "ws_receiver");
+			} else {
+				setWsState(WsState::closing);
+				wsClient->close(hdl, websocketpp::close::status::going_away, "");
+				SPLAPPTRC(L_DEBUG, traceIntro <<
+					"-->RE86 Transcription completion and no nextConversationQueued. Going to close", "ws_receiver");
+			}
 		}
 	}
 
@@ -605,36 +731,7 @@ void WatsonSTTImplReceiver<OP, OT>::on_message(client* c, websocketpp::connectio
 
 		std::string sttErrorString_ = dec.DecoderError::getResult();
 		SPLAPPTRC(L_ERROR, traceIntro << "-->RE25 STT error message=" << sttErrorString_, "ws_receiver");
-
-		// send out the error with the non finalized output if any
-		if (oTupleUsedForSubmission) {
-			SPLAPPTRC(L_DEBUG, traceIntro << "-->RE26 send a non finalized oTupleUsedForSubmission", "ws_receiver");
-			splOperator.appendErrorAttribute(oTupleUsedForSubmission, sttErrorString_);
-			splOperator.submit(*oTupleUsedForSubmission, 0);
-			oTupleUsedForSubmission = nullptr;
-		} else {
-
-			// send stand alone error tuple if there is a recent otuple
-			OT * myRecentOTuple = recentOTuple.load(); // load atomic
-			if (myRecentOTuple) {
-				SPLAPPTRC(L_WARN, traceIntro << "-->RE27 append error attribute and send error tuple", "ws_receiver");
-				incrementNFullAudioConversationsFailed();
-				// clean the previous set values in the output tuple
-				splOperator.setResultAttributes(myRecentOTuple, -1, false, -1.0, 0.0, 0.0, "", SPL::list<SPL::rstring>(),
-				SPL::list<SPL::rstring>(), SPL::list<SPL::float64>(), SPL::list<SPL::float64>(), SPL::list<SPL::float64>(),
-				SPL::list<SPL::list<SPL::rstring> >(), SPL::list<SPL::list<SPL::float64> >(),
-				SPL::list<SPL::float64>(), SPL::list<SPL::float64>(),
-				SPL::map<SPL::rstring, SPL::list<SPL::map<SPL::rstring, SPL::float64> > >());
-				if (Config::identifySpeakers)
-					splOperator.setSpeakerResultAttributes(myRecentOTuple, SPL::list<SPL::int32>(), SPL::list<SPL::float64>(), SPL::list<SPL::float64>());
-				// set required output values
-				splOperator.appendErrorAttribute(myRecentOTuple, sttErrorString_);
-				splOperator.submit(*myRecentOTuple, 0);
-			} else {
-				SPLAPPTRC(L_WARN, traceIntro << "-->RE28 no recent output tuple: send no error tuple", "ws_receiver");
-			}
-		}
-
+		sendErrorTuple(sttErrorString_);
 		setWsState(WsState::error);
 		return;
 
@@ -645,6 +742,7 @@ void WatsonSTTImplReceiver<OP, OT>::on_message(client* c, websocketpp::connectio
 		// metric
 		incrementNFullAudioConversationsTranscribed();
 
+		// The conversation should end with a completed submission cycle (speaker labels and utterances are sent)
 		if (oTupleUsedForSubmission) {
 			SPLAPPTRC(L_ERROR, traceIntro << "-->RE29 fullTranscriptionCompleted_ but non finalized oTupleUsedForSubmission available", "ws_receiver");
 			splOperator.submit(*oTupleUsedForSubmission, 0);
@@ -652,19 +750,10 @@ void WatsonSTTImplReceiver<OP, OT>::on_message(client* c, websocketpp::connectio
 		}
 		if (Config::isTranscriptionCompletedRequested) {
 			OT * myRecentOTuple = recentOTuple.load(); // load atomic
+			// there should be a conversation which means recentOTuple must not be null
+			// log an error if not
 			if (myRecentOTuple) {
-				SPLAPPTRC(L_DEBUG, traceIntro << "-->RE 30 send transcription completed tuple.", "ws_receiver");
-				// clean the previous set values in the output tuple
-				splOperator.setResultAttributes(myRecentOTuple, -1, false, -1.0, 0.0, 0.0, "", SPL::list<SPL::rstring>(),
-				SPL::list<SPL::rstring>(), SPL::list<SPL::float64>(), SPL::list<SPL::float64>(), SPL::list<SPL::float64>(),
-				SPL::list<SPL::list<SPL::rstring> >(), SPL::list<SPL::list<SPL::float64> >(),
-				SPL::list<SPL::float64>(), SPL::list<SPL::float64>(),
-				SPL::map<SPL::rstring, SPL::list<SPL::map<SPL::rstring, SPL::float64> > >());
-				if (Config::identifySpeakers)
-					splOperator.setSpeakerResultAttributes(myRecentOTuple, SPL::list<SPL::int32>(), SPL::list<SPL::float64>(), SPL::list<SPL::float64>());
-				// set required output values
-				splOperator.setTranscriptionCompleteAttribute(myRecentOTuple);
-				splOperator.submit(*myRecentOTuple, 0);
+				sendTranscriptionCompletedTuple(myRecentOTuple);
 			} else {
 				SPLAPPTRC(L_ERROR, traceIntro << "-->RE 31 no recent output tuple available but non finalized fullTranscriptionCompleted_. payload_: " << payload_, "ws_receiver");
 			}
@@ -673,8 +762,9 @@ void WatsonSTTImplReceiver<OP, OT>::on_message(client* c, websocketpp::connectio
 		// delete the recentOTuple if end of conversation was reached
 		// flag transcriptionFinalized
 		recentOTuple.store(nullptr);
+		// flag the conversation end in any case
 		splOperator.submit(SPL::Punctuation::WindowMarker, 0);
-		transcriptionFinalized = true;
+		transcriptionFinalized.store(true);
 
 		return;
 	}
@@ -710,7 +800,9 @@ void WatsonSTTImplReceiver<OP, OT>::on_message(client* c, websocketpp::connectio
 			}
 			// clean speaker values which are probably set
 			if (Config::identifySpeakers)
-				splOperator.setSpeakerResultAttributes(myRecentOTuple, SPL::list<SPL::int32>(), SPL::list<SPL::float64>(), SPL::list<SPL::float64>());
+				splOperator.setSpeakerResultAttributes(myRecentOTuple, emptySpeakerResults);
+			// prepare keywords
+			const KeywordProcessor keywordProc(dec.DecoderKeywordsResult::getKeywordsSpottingResults());
 			// set utterance result attributes
 			splOperator.setResultAttributes(
 					myRecentOTuple,
@@ -733,7 +825,7 @@ void WatsonSTTImplReceiver<OP, OT>::on_message(client* c, websocketpp::connectio
 					dec.DecoderWordAlternatives::getWordAlternativesConfidences(),
 					dec.DecoderWordAlternatives::getWordAlternativesStartTimes(),
 					dec.DecoderWordAlternatives::getWordAlternativesEndTimes(),
-					dec.DecoderKeywordsResult::getKeywordsSpottingResults()
+					keywordProc
 			);
 
 			// output logic of the tuple
@@ -769,47 +861,10 @@ void WatsonSTTImplReceiver<OP, OT>::on_message(client* c, websocketpp::connectio
 		} else {
 			if (oTupleUsedForSubmission) {
 				SPLAPPTRC(L_DEBUG, traceIntro << "-->RE38 send queued utterance results tuple with speaker info", "ws_receiver");
-				// speaker consistency check - check the from time of the speaker labels against the from time of the words list
-				// this test guarantees that for each word in word list, a speaker label is correctly assigned
-				// if a speaker label is missing for a specific from time, the value -1 is assigned
-				rapidjson::SizeType spkSize = dec.DecoderSpeakerLabels::getSize();
-				const SPL::list<SPL::float64> & spkFrom = dec.DecoderSpeakerLabels::getFrom();
-				const SPL::list<SPL::int32> &   spkSpk  = dec.DecoderSpeakerLabels::getSpeaker();
-				const SPL::list<SPL::float64> & spkCfd  = dec.DecoderSpeakerLabels::getConfidence();
-				std::unordered_map<SPL::float64, rapidjson::SizeType> spkIndexMap;
-				for (rapidjson::SizeType i = 0; i < spkSize; i++) {
-					spkIndexMap.insert(std::pair<const SPL::float64, rapidjson::SizeType>(spkFrom[i], i));
-				}
-				auto wordListSize = myUtteranceWordsStartTimes.size();
-				if (spkSize != wordListSize) {
-					SPLAPPTRC(L_INFO, traceIntro << "-->RE41 Word list size " << wordListSize <<
-							" and spaker list size " << spkSize << " are not equal.", "ws_receiver");
-				}
-				SPL::list<SPL::float64> spkFromNew; spkFromNew.reserve(wordListSize);
-				SPL::list<SPL::int32>   spkSpkNew;  spkSpkNew.reserve(wordListSize);
-				SPL::list<SPL::float64> spkCfdNew;  spkCfdNew.reserve(wordListSize);
-				for (rapidjson::SizeType i = 0; i < wordListSize; i++) {
-					SPL::float64 startt = myUtteranceWordsStartTimes[i];
-					auto it = spkIndexMap.find(startt);
-					if (it != spkIndexMap.end()) {
-						rapidjson::SizeType idx = it->second;
-						spkFromNew.push_back(spkFrom[idx]);
-						spkSpkNew.push_back(spkSpk[idx]);
-						spkCfdNew.push_back(spkCfd[idx]);
-					} else {
-						SPLAPPTRC(L_ERROR, traceIntro << "-->RE40 No speaker label at: " << startt << " insert -1. payload_: " << payload_, "ws_receiver");
-						spkFromNew.push_back(startt);
-						spkSpkNew.push_back(-1);
-						spkCfdNew.push_back(-1.0);
-					}
-				}
+				SpeakerProcessor spkproc(dec, myUtteranceWordsStartTimes, traceIntro, payload_);
+				spkproc.run();
 				// assign speaker labels to output tuple
-				splOperator.setSpeakerResultAttributes(
-						oTupleUsedForSubmission,
-						spkSpkNew,
-						spkCfdNew,
-						spkFromNew
-				);
+				splOperator.setSpeakerResultAttributes(oTupleUsedForSubmission, spkproc);
 				splOperator.submit(*oTupleUsedForSubmission, 0);
 				oTupleUsedForSubmission = nullptr;
 			} else {
@@ -820,6 +875,153 @@ void WatsonSTTImplReceiver<OP, OT>::on_message(client* c, websocketpp::connectio
 	}
 } // End of the on_message method.
 
+SpeakerProcessor::SpeakerProcessor(
+		const Decoder & dec_,
+		const SPL::list<SPL::float64> & myUtteranceWordsStartTimes_,
+		const std::string & traceIntro_,
+		const std::string & payload_) :
+	spkSize(dec_.DecoderSpeakerLabels::getSize()),
+	spkFrom(dec_.DecoderSpeakerLabels::getFrom()),
+	spkSpk(dec_.DecoderSpeakerLabels::getSpeaker()),
+	spkCfd(dec_.DecoderSpeakerLabels::getConfidence()),
+	wordListSize(myUtteranceWordsStartTimes_.size()),
+	myUtteranceWordsStartTimes(myUtteranceWordsStartTimes_),
+	traceIntro(traceIntro_),
+	payload(payload_),
+	spkFromNew(),
+	spkSpkNew(),
+	spkCfdNew(),
+	spkUpdateIndexes() {
+		spkFromNew.reserve(wordListSize);
+		spkSpkNew.reserve(wordListSize);
+		spkCfdNew.reserve(wordListSize);
+}
+
+SpeakerProcessor::SpeakerProcessor() :
+	spkSize(0),
+	// the references to the temporary lists are invalid but are never used in this instance in get...
+	// spkUpdateIndexes.size() is zero in this instance
+	spkFrom(SPL::list<SPL::float64>()),
+	spkSpk(SPL::list<SPL::int32>()),
+	spkCfd(SPL::list<SPL::float64>()),
+	wordListSize(0),
+	myUtteranceWordsStartTimes(SPL::list<SPL::float64>()),
+	traceIntro(""),
+	payload(""),
+	spkFromNew(),
+	spkSpkNew(),
+	spkCfdNew(),
+	spkUpdateIndexes() {
+}
+
+void SpeakerProcessor::run() {
+	// speaker consistency check - check the from time of the speaker labels against the from time of the words list
+	// this test guarantees that for each word in word list, a speaker label is correctly assigned
+	// if a speaker label is missing for a specific word from time, the value -1 is assigned
+	// speaker index map - key: skpFromTime value: speaker list index
+	std::unordered_map<SPL::float64, rapidjson::SizeType> spkIndexMap;
+	for (rapidjson::SizeType i = 0; i < spkSize; i++) {
+		spkIndexMap.insert(std::pair<const SPL::float64, rapidjson::SizeType>(spkFrom[i], i));
+	}
+	// size check
+	auto wordListSize = myUtteranceWordsStartTimes.size();
+	if (spkSize != wordListSize) {
+		SPLAPPTRC(L_DEBUG, traceIntro << "-->RE41 Word list size " << wordListSize <<
+				" and speaker list size " << spkSize << " are not equal.", "ws_receiver");
+	}
+	// the result lists - each entry corresponds to the entry in the word list
+	// a set with all indexes used from the word list
+	std::unordered_set<rapidjson::SizeType> usedSpkIndexes;
+	for (rapidjson::SizeType i = 0; i < wordListSize; i++) {
+		SPL::float64 startt = myUtteranceWordsStartTimes[i];
+		auto it = spkIndexMap.find(startt);
+		if (it != spkIndexMap.end()) {
+			rapidjson::SizeType idx = it->second;
+			spkFromNew.push_back(spkFrom[idx]);
+			spkSpkNew.push_back(spkSpk[idx]);
+			spkCfdNew.push_back(spkCfd[idx]);
+			usedSpkIndexes.insert(idx);
+		} else {
+			SPLAPPTRC(L_ERROR, traceIntro << "-->RE40 No speaker label at: " << startt << " insert -1. payload_: " << payload, "ws_receiver");
+			spkFromNew.push_back(startt);
+			spkSpkNew.push_back(-1);
+			spkCfdNew.push_back(-1.0);
+		}
+	}
+	// the skp updates list
+	for (rapidjson::SizeType i = 0; i < spkSize; i++) {
+		std::unordered_set<rapidjson::SizeType>::const_iterator got = usedSpkIndexes.find(i);
+		if (got == usedSpkIndexes.end()) {
+			spkUpdateIndexes.push_back(i);
+		}
+	}
+}
+
+template<typename TUPLE>
+SPL::list<TUPLE> SpeakerProcessor::getUtteranceWordsSpeakerUpdates() const {
+	SPL::list<TUPLE> destination;
+	// spkUpdateIndexes.size() is zero in empty instance, so no invalid references are used
+	for (size_t i = 0; i < spkUpdateIndexes.size(); ++i) {
+		TUPLE theTuple;
+		auto indx = spkUpdateIndexes[i];
+		theTuple.set_startTime(spkFrom[indx]);
+		theTuple.set_speaker(spkSpk[indx]);
+		theTuple.set_confidence(spkCfd[indx]);
+		destination.push_back(theTuple);
+	}
+	return destination;
+}
+
+KeywordProcessor::KeywordProcessor(const DecoderKeywordsResult::ResultMapType & keywordResults_) :
+	isEmpty(false),
+	keywordResults(keywordResults_) {
+}
+
+KeywordProcessor::KeywordProcessor() :
+	// the references to the keywordResults is invalid in this instance
+	// the reference is never used due to isEmpty == true
+	isEmpty(true),
+	keywordResults(DecoderKeywordsResult::ResultMapType()) {
+}
+
+template<typename T>
+void KeywordProcessor::getKeywordsSpottingResults(SPL::map<SPL::rstring, SPL::list<T> > & destination) const {
+	destination.clear();
+	if (not isEmpty) {
+		for (const auto & keyw : keywordResults) {
+			const auto & keyword = keyw.first;
+			SPL::list<T> i;
+			for (const auto & emergence : keyw.second) {
+				T t;
+				t.set_startTime(emergence.start_time);
+				t.set_endTime(emergence.end_time);
+				t.set_confidence(emergence.confidence);
+				i.push_back(t);
+			}
+			destination.insert(typename SPL::map<SPL::rstring, SPL::list<T> >::value_type(keyword, i));
+		}
+	}
+}
+
+template<>
+void KeywordProcessor::getKeywordsSpottingResults<SPL::map<SPL::rstring, SPL::float64> >(SPL::map<SPL::rstring, SPL::list<SPL::map<SPL::rstring, SPL::float64> > > & destination) const {
+	destination.clear();
+	if (not isEmpty) {
+		for (const auto & keyw : keywordResults) {
+			const auto & keyword = keyw.first;
+			SPL::list<SPL::map<SPL::rstring, SPL::float64> > i;
+			for (const auto & emergence : keyw.second) {
+				SPL::map<SPL::rstring, SPL::float64> t;
+				t.insert(SPL::map<SPL::rstring, SPL::float64>::value_type("start_time", emergence.start_time));
+				t.insert(SPL::map<SPL::rstring, SPL::float64>::value_type("set_end_time", emergence.end_time));
+				t.insert(SPL::map<SPL::rstring, SPL::float64>::value_type("confidence", emergence.confidence));
+				i.push_back(t);
+			}
+			destination.insert(SPL::map<SPL::rstring, SPL::list<SPL::map<SPL::rstring, SPL::float64>> >::value_type(keyword, i));
+		}
+	}
+}
+
 // Whenever our existing Websocket connection to the Watson STT service is closed,
 // this callback method will be called from the websocketpp layer.
 // Close will be called exactly once for every connection that open was called for. Close is not called for failed connections.
@@ -829,27 +1031,70 @@ void WatsonSTTImplReceiver<OP, OT>::on_close(client* c, websocketpp::connection_
 	// closed right after an on_open event without actually receiving the "listening" response
 	// in the on_message event from the Watson STT service. This condition clearly means
 	// that this is not a normal connection closure. Instead, the connection attempt has failed.
-	// We must flag this as a connection error so that a connection retry attempt
-	// can be triggered inside the ws_audio_blob_sender method.
-	recentOTuple.store(nullptr);
+	// In this case the connection does not reach the state listening and the connection attempt will be repeated in
+	// the connect function of the sender thread
+
+	// get information from ws lib
+	client::connection_ptr con = c->get_con_from_hdl(hdl);
+	int val = con->get_ec().value();
+	std::string mess = con->get_ec().message();
+	int closecode = con->get_remote_close_code();
+	const std::string & closemess = con->get_remote_close_reason();
+
 	WsState st = wsState.load();
-	if ((st != WsState::listening) && (st != WsState::error)) {
+	if (st == WsState::closing) {
+		// a connection close was requested
+		SPLAPPTRC(L_INFO, traceIntro <<
+				"-->RE87 Connection closed. wsState=" << wsStateToString(st) << " ec.value=" << val << " ec.message=" << mess <<
+				" remote_close_code=" << closecode << " remote_close_mesage=" << closemess, "ws_receiver");
+
+	} else if (st == WsState::listening) {
+		// This connection was fully established before but a error was not received in on_message
+		// Sent the error tuple now
+		std::stringstream errmess;
+		errmess << traceIntro << "-->RE81 Websocket connection closed from listening state ec.value=" << val <<
+				" ec.message=" << mess << " remote_close_code=" << closecode << " remote_close_mesage=" << closemess;
+		sendErrorTuple(errmess.str());
+		SPLAPPTRC(L_ERROR, errmess.str(), "ws_receiver");
+
+		// send a end tuple and window punctuation if a conversation was ongoing
+		OT * myRecentOTuple = recentOTuple.load(); // load atomic
+		if (myRecentOTuple) {
+			if (Config::isTranscriptionCompletedRequested)
+				sendTranscriptionCompletedTuple(myRecentOTuple);
+			splOperator.submit(SPL::Punctuation::WindowMarker, 0);
+		}
+
+	} else if (st == WsState::error) {
 		// This connection was not fully established before.
-		// This closure happened during an ongoing connection attempt.
-		// Let us flag this as a connection error.
+		// This closure happened during an ongoing connection.
+		// The error tuple was sent in on_message
 		SPLAPPTRC(L_ERROR, traceIntro <<
-				"RE81 -->Partially established Websocket connection closed with the Watson STT service during an ongoing "
-				"connection attempt. wsState=" << wsStateToString(st), "ws_receiver");
+				"-->RE81a Fully established Websocket connection closed with the Watson STT service."
+				" wsState=" << wsStateToString(st) << " ec.value=" << val << " ec.message=" << mess <<
+				" remote_close_code=" << closecode << " remote_close_mesage=" << closemess, "ws_receiver");
+
+		// send a end tuple and window punctuation if a conversation was ongoing
+		OT * myRecentOTuple = recentOTuple.load(); // load atomic
+		if (myRecentOTuple) {
+			if (Config::isTranscriptionCompletedRequested)
+				sendTranscriptionCompletedTuple(myRecentOTuple);
+			splOperator.submit(SPL::Punctuation::WindowMarker, 0);
+		}
+
 	} else {
 		// c->get_alog().write(websocketpp::log::alevel::app, "Websocket connection closed with the Watson STT service.");
 		SPLAPPTRC(L_ERROR, traceIntro <<
-				"-->RE82 Fully established Websocket connection closed with the Watson STT service."
-				" wsState=" << wsStateToString(st), "ws_receiver");
+				"-->RE82 Partially established Websocket connection closed with the Watson STT service during an ongoing "
+				"connection attempt. wsState=" << wsStateToString(st) << " ec.value=" << val << " ec.message=" << mess <<
+				" remote_close_code=" << closecode << " remote_close_mesage=" << closemess, "ws_receiver");
 	}
+
+	recentOTuple.store(nullptr);
 	setWsState(WsState::closed);
 }
 
-// When a Websocket connection handshake happens with the Watson STT serice for enabling
+// When a Websocket connection handshake happens with the Watson STT service for enabling
 // TLS security, this callback method will be called from the websocketpp layer.
 template<typename OP, typename OT>
 context_ptr WatsonSTTImplReceiver<OP, OT>::on_tls_init(client* c, websocketpp::connection_hdl) {
@@ -878,8 +1123,73 @@ void WatsonSTTImplReceiver<OP, OT>::on_fail(client* c, websocketpp::connection_h
 	recentOTuple.store(nullptr);
 	setWsState(WsState::failed);
 	// c->get_alog().write(websocketpp::log::alevel::app, "Websocket connection to the Watson STT service failed.");
-	SPLAPPTRC(L_ERROR, traceIntro << "-->RE83 Websocket connection to the Watson STT service failed.", "ws_receiver");
+	client::connection_ptr con = c->get_con_from_hdl(hdl);
+	int val = con->get_ec().value();
+	std::string mess = con->get_ec().message();
+	SPLAPPTRC(L_ERROR, traceIntro << "-->RE89 Websocket connection to the Watson STT service failed. ec.value=" << val <<
+			" ec.message=" << mess, "ws_receiver");
 }
+
+template<typename OP, typename OT>
+void WatsonSTTImplReceiver<OP, OT>::sendErrorTuple(const std::string & reason) {
+	// send out the error with the non finalized output if any
+	if (oTupleUsedForSubmission) {
+		SPLAPPTRC(L_ERROR, traceIntro << "-->RE26 send a non finalized oTupleUsedForSubmission", "ws_receiver");
+		splOperator.appendErrorAttribute(oTupleUsedForSubmission, reason);
+		splOperator.submit(*oTupleUsedForSubmission, 0);
+		splOperator.clearErrorAttribute(oTupleUsedForSubmission);
+		oTupleUsedForSubmission = nullptr;
+	} else {
+
+		// send stand alone error tuple if there is a recent otuple
+		OT * myRecentOTuple = recentOTuple.load(); // load atomic
+		if (myRecentOTuple) {
+			SPLAPPTRC(L_DEBUG, traceIntro << "-->RE27 append error attribute and send error tuple", "ws_receiver");
+			incrementNFullAudioConversationsFailed();
+			// clean the previous set values in the output tuple
+			splOperator.setResultAttributes(myRecentOTuple, -1, false, -1.0, 0.0, 0.0, "", SPL::list<SPL::rstring>(),
+				SPL::list<SPL::rstring>(), SPL::list<SPL::float64>(), SPL::list<SPL::float64>(), SPL::list<SPL::float64>(),
+				SPL::list<SPL::list<SPL::rstring> >(), SPL::list<SPL::list<SPL::float64> >(),
+				SPL::list<SPL::float64>(), SPL::list<SPL::float64>(),
+				emptyKeywordProcessor);
+			if (Config::identifySpeakers)
+				splOperator.setSpeakerResultAttributes(myRecentOTuple, emptySpeakerResults);
+			// set required output values
+			splOperator.appendErrorAttribute(myRecentOTuple, reason);
+			splOperator.submit(*myRecentOTuple, 0);
+			splOperator.clearErrorAttribute(myRecentOTuple);
+		} else {
+			SPLAPPTRC(L_ERROR, traceIntro << "-->RE28 no recent output tuple: send no error tuple", "ws_receiver");
+		}
+	}
+}
+
+template<typename OP, typename OT>
+void WatsonSTTImplReceiver<OP, OT>::sendTranscriptionCompletedTuple(OT * otuple) {
+	SPLAPPTRC(L_DEBUG, traceIntro << "-->RE 30 send transcription completed tuple.", "ws_receiver");
+	// clean the previous set values in the output tuple
+	splOperator.setResultAttributes(otuple, -1, false, -1.0, 0.0, 0.0, "", SPL::list<SPL::rstring>(),
+		SPL::list<SPL::rstring>(), SPL::list<SPL::float64>(), SPL::list<SPL::float64>(), SPL::list<SPL::float64>(),
+		SPL::list<SPL::list<SPL::rstring> >(), SPL::list<SPL::list<SPL::float64> >(),
+		SPL::list<SPL::float64>(), SPL::list<SPL::float64>(),
+		emptyKeywordProcessor);
+	if (Config::identifySpeakers)
+		splOperator.setSpeakerResultAttributes(otuple, emptySpeakerResults);
+	// set required output values
+	splOperator.setTranscriptionCompleteAttribute(otuple);
+	splOperator.submit(*otuple, 0);
+}
+
+/*template<typename OP, typename OT>
+bool WatsonSTTImplReceiver<OP, OT>::on_ping(client* c, websocketpp::connection_hdl hdl, std::string mess) {
+	SPLAPPTRC(L_DEBUG, traceIntro << "-->RE99 Websocket ping message=" << mess, "ws_receiver");
+	return true;
+}
+
+template<typename OP, typename OT>
+void WatsonSTTImplReceiver<OP, OT>::on_pong(client* c, websocketpp::connection_hdl hdl, std::string mess) {
+	SPLAPPTRC(L_DEBUG, traceIntro << "-->RE99 Websocket pong message=" << mess, "ws_receiver");
+}*/
 
 template<typename OP, typename OT>
 void WatsonSTTImplReceiver<OP, OT>::setWsState(WsState ws) {
@@ -913,15 +1223,16 @@ void WatsonSTTImplReceiver<OP, OT>::incrementNFullAudioConversationsFailed() {
 
 const char * wsStateToString(WsState ws) {
 	switch (ws) {
-	case WsState::idle:       return "idle";
-	case WsState::start:      return "start";
-	case WsState::connecting: return "connecting";
-	case WsState::open:       return "open";
-	case WsState::listening:  return "listening";
-	case WsState::error:      return "error";
-	case WsState::closed:     return "closed";
-	case WsState::failed:     return "failed";
-	case WsState::crashed:    return "crashed";
+		case WsState::idle:       return "idle";
+		case WsState::start:      return "start";
+		case WsState::connecting: return "connecting";
+		case WsState::open:       return "open";
+		case WsState::listening:  return "listening";
+		case WsState::closing:    return "closing";
+		case WsState::error:      return "error";
+		case WsState::closed:     return "closed";
+		case WsState::failed:     return "failed";
+		case WsState::crashed:    return "crashed";
 	}
 	return "*****";
 }
@@ -929,6 +1240,16 @@ const char * wsStateToString(WsState ws) {
 bool receiverHasStopped(WsState ws) {
 	return (ws == WsState::closed) || (ws == WsState::failed) || (ws == WsState::crashed);
 }
+bool receiverHasTransientState(WsState ws) {
+	return ws == WsState::start || ws == WsState::connecting || ws == WsState::open || ws == WsState::closing;
+}
+
+template<typename OP, typename OT>
+const SpeakerProcessor WatsonSTTImplReceiver<OP, OT>::emptySpeakerResults;
+
+template<typename OP, typename OT>
+const KeywordProcessor WatsonSTTImplReceiver<OP, OT>::emptyKeywordProcessor;
+
 }}}}
 
 #endif /* COM_IBM_STREAMS_STTGATEWAY_WATSONSTTIMPLRECEIVER_HPP_ */

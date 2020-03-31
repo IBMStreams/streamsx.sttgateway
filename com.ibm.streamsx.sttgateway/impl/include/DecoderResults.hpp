@@ -6,6 +6,7 @@
 #ifndef COM_IBM_STREAMS_STTGATEWAY_DECODER_RESULTS_H_
 #define COM_IBM_STREAMS_STTGATEWAY_DECODER_RESULTS_H_
 
+#include "DecoderCommons.hpp"
 #include "DecoderFinal.hpp"
 #include "DecoderAlternatives.hpp"
 #include "DecoderKeywordResults.hpp"

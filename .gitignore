@@ -19,6 +19,8 @@ com.ibm.streamsx.sttgateway/build.info
 com.ibm.streamsx.sttgateway/impl/nl/*.dat
 com.ibm.streamsx.sttgateway/impl/nl/include/SttGatewayResource.h
 com.ibm.streamsx.sttgateway/impl/nl/include/SttGatewayResource.pm
+# the language settings are changed all the way, thus must enter these settings via eclipse
+com.ibm.streamsx.sttgateway/.settings/language.settings.xml
 
 # ignore these toolkit specific external dependency files and directories
 com.ibm.streamsx.sttgateway/include/

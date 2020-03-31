@@ -85,6 +85,7 @@ composite WatsonSTT0FileModes {
 				//<*Mode3>sttResultMode: complete;
 				//<*Mode1>nonFinalUtterancesNeeded: true;
 				//<*Mode2>nonFinalUtterancesNeeded: false;
+				//<*Mode1 *Mode2>keywordsToBeSpotted: ["IBM", "IBMs", "pay", "bill", "Thomas", "Watson", "Watsons", "Abraham", "Lincoln", "Ginni", "Rometty", "business", "technology", "cloud", "platform", "innovation", "computer", "underpayment","payment", "freedom", "government", "performance", "service", " internet", "risk", "skill", "skills"];
 			output O:
 				conversationId = speech,
 				//<*Mode1 *Mode2>utteranceNumber = getUtteranceNumber(),

@@ -30,8 +30,6 @@
       operator doesn't specify a Websocket server port number, then a default port number of 443 will be used.
       
       Requirements: 
-      * Intel RHEL6 or RHEL7 hosts installed with IBM Streams. 
-      
       See the samples folder inside this toolkit for a working example that show how to use this operator.
       
       For a detailed documentation about the operator design, usage patterns and in-depth technical

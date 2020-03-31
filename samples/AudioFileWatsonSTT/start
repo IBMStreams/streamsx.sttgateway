@@ -6,8 +6,8 @@ if [[ $1 == '-h' || $1 == '--help' || $1 == 'help' ]]; then
 	exit 0;
 fi
 
-rm data/Tuples
-rm jobno.log
+rm -f data/Tuples
+rm -f jobno.log
 
 streamtool submitjob --outfile jobno.log -C tracing=trace "$@" output/com.ibm.streamsx.sttgateway.sample.watsonstt.AudioFileWatsonSTT.sab
 

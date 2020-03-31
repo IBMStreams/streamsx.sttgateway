@@ -107,17 +107,17 @@ public composite AudioFileWatsonSTTAllOutput {
 			(float64)getSubmissionTimeValue("customizationWeight", "0.30");
 		expression<int32> $sttBatchSize : (int32)getSubmissionTimeValue("sttBatchSize", "0");
 		expression<int32> $maxUtteranceAlternatives : 
-			(int32)getSubmissionTimeValue("maxUtteranceAlternatives", "1");	
+			(int32)getSubmissionTimeValue("maxUtteranceAlternatives", "3");	
 		expression<boolean> $sttRequestLogging : 
 			(boolean)getSubmissionTimeValue("sttRequestLogging", "false");
 		expression<boolean> $filterProfanity : 
 			(boolean)getSubmissionTimeValue("filterProfanity", "false");
 		expression<float64> $wordAlternativesThreshold : 
-			(float64)getSubmissionTimeValue("wordAlternativesThreshold", "0.0");
+			(float64)getSubmissionTimeValue("wordAlternativesThreshold", "0.6");
 		expression<boolean> $smartFormattingNeeded : 
 			(boolean)getSubmissionTimeValue("smartFormattingNeeded", "false");
 		expression<float64> $keywordsSpottingThreshold : 
-			(float64)getSubmissionTimeValue("keywordsSpottingThreshold", "0.0");
+			(float64)getSubmissionTimeValue("keywordsSpottingThreshold", "0.3");
 		expression<list<rstring>> $keywordsToBeSpotted : 
 			(list<rstring>)getSubmissionTimeValue("keywordsToBeSpotted", "[]");	
 		expression<boolean> $websocketLoggingNeeded : 
@@ -139,27 +139,7 @@ public composite AudioFileWatsonSTTAllOutput {
 		// Read the streamsx.sttgateway toolkit documentation to learn about
 		// what features are available, how they work and how different attributes are 
 		// related to those features.
-		STTResult_t = rstring conversationId, int32 utteranceNumber,
-			boolean finalizedUtterance,
-			boolean transcriptionCompleted,
-			rstring sttErrorMessage,
-			float64 confidence,
-			float64 utteranceStartTime,
-			float64 utteranceEndTime,
-			rstring utteranceText,
-			list<rstring> utteranceAlternatives, 
-			list<list<rstring>> wordAlternatives,
-			list<list<float64>> wordAlternativesConfidences,
-			list<float64> wordAlternativesStartTimes,
-			list<float64> wordAlternativesEndTimes,
-			list<rstring> utteranceWords,
-			list<float64> utteranceWordsConfidences,
-			list<float64> utteranceWordsStartTimes,
-			list<float64> utteranceWordsEndTimes,
-			list<int32> utteranceWordsSpeakers,
-			list<float64> utteranceWordsSpeakersConfidences,
-			map<rstring, list<map<rstring, float64>>> keywordsSpottingResults,
-			int32 sequence;
+		STTResultType = STTAllResult_t, tuple<int32 sequence>;
 
 	graph
 		// IMPORTANT: IBM STT service on public cloud requires
@@ -230,7 +210,7 @@ public composite AudioFileWatsonSTTAllOutput {
 		// First input stream into this operator is the fully qualified audio file name.
 		// Second input stream into this operator is your STT service instance's IAM access token.
 		@parallel(width = $numberOfSTTEngines, broadcast=[AT])
-		stream<STTResult_t> STTResult = 
+		stream<STTResultType> STTResult = 
 			WatsonSTT(AudioFileNameFlagged as AFN; IamAccessToken as AT) {
 			logic
 				state: {
@@ -315,6 +295,7 @@ public composite AudioFileWatsonSTTAllOutput {
 					// Speaker label a.k.a. Speaker id
 					utteranceWordsSpeakers = getUtteranceWordsSpeakers(),
 					utteranceWordsSpeakersConfidences = getUtteranceWordsSpeakersConfidences(),
+					utteranceWordsSpeakerUpdates = getUtteranceWordsSpeakerUpdates(),
 					// Results from keywords spotting (matching) in an utterance.
 					keywordsSpottingResults = getKeywordsSpottingResults();
 

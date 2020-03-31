@@ -1,6 +1,6 @@
 #--variantCount=3
 
-setCategory quick
+setCategory 'quick'
 
 TT_mainComposite='WatsonSTTCompileChecks'
 TT_sabFile="output/WatsonSTTCompileChecks.sab"

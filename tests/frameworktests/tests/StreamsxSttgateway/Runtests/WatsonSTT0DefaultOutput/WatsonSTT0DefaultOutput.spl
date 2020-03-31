@@ -4,7 +4,7 @@ use com.ibm.streamsx.sttgateway.watson::IAMAccessToken;
 use com.ibm.streamsx.sttgateway.watson::WatsonSTT;
 use com.ibm.streamsx.testframe::FileSink1;
 
-composite WatsonSTT0OutputFunctions {
+composite WatsonSTT0DefaultOutput {
 	param
 		expression<rstring> $apiKey :      getSubmissionTimeValue("apiKey", "invalid");
 		expression<rstring> $audioDir:     getSubmissionTimeValue("audioDir");
@@ -33,8 +33,8 @@ composite WatsonSTT0OutputFunctions {
 			rstring utteranceText,
 			rstring sttErrorMessage
 			//<!complete>,float64 confidence
-			//<*_tim*>,float64 utteranceStartTime
-			//<*_tim*>,float64 utteranceEndTime
+			//<*_tim* complete>,float64 utteranceStartTime
+			//<*_tim* complete>,float64 utteranceEndTime
 			//<*_wrd*>,list<rstring> utteranceWords
 			//<*_wrd*>,list<float64> utteranceWordsConfidences
 			//<*_wrd*>,list<float64> utteranceWordsStartTimes
@@ -47,7 +47,7 @@ composite WatsonSTT0OutputFunctions {
 			//<*_spk*>,list<int32> utteranceWordsSpeakers
 			//<*_spk*>,list<float64> utteranceWordsSpeakersConfidences
 			//<*_spk*>,list<tuple<float64 startTime, int32 speaker, float64 confidence>> utteranceWordsSpeakerUpdates
-			//<*Mode1 *Mode2>,map<rstring, list<map<rstring, float64>>> keywordsSpottingResults
+			//<*Mode1 *Mode2>,map<rstring, list<tuple<float64 startTime, float64 endTime, float64 confidence>>> keywordsSpottingResults
 			;
 		
 	graph
@@ -100,30 +100,7 @@ composite WatsonSTT0OutputFunctions {
 				//<final*>sttResultMode: partial;
 				//<final*>nonFinalUtterancesNeeded: false;
 			output O:
-				myseq = sequence,
-				//<!complete>utteranceNumber = getUtteranceNumber(),
-				utteranceText = getUtteranceText(),
-				sttErrorMessage = getSTTErrorMessage()
-				//<!complete>,finalizedUtterance = isFinalizedUtterance()
-				//<!complete>,confidence = getConfidence()
-				//<!complete>,transcriptionCompleted = isTranscriptionCompleted()
-				//<*_tim*>,utteranceStartTime = getUtteranceStartTime()
-				//<*_tim*>,utteranceEndTime = getUtteranceEndTime()
-				//<*_wrd*>,utteranceWords = getUtteranceWords()
-				//<*_wrd*>,utteranceWordsConfidences = getUtteranceWordsConfidences()
-				//<*_wrd*>,utteranceWordsStartTimes = getUtteranceWordsStartTimes()
-				//<*_wrd*>,utteranceWordsEndTimes = getUtteranceWordsEndTimes()
-				//<*_alt*>,utteranceAlternatives = getUtteranceAlternatives()
-				//<*_cfn*>,wordAlternatives = getWordAlternatives()
-				//<*_cfn*>,wordAlternativesConfidences = getWordAlternativesConfidences()
-				//<*_cfn*>,wordAlternativesStartTimes = getWordAlternativesStartTimes()
-				//<*_cfn*>,wordAlternativesEndTimes = getWordAlternativesEndTimes()
-				//<*_spk*>,utteranceWordsSpeakers = getUtteranceWordsSpeakers()
-				//<*_spk*>,utteranceWordsSpeakersConfidences = getUtteranceWordsSpeakersConfidences()
-				//<*_spk*>,utteranceWordsSpeakerUpdates = getUtteranceWordsSpeakerUpdates()
-				// Results from keywords spotting (matching) in an utterance.
-				//<*Mode1 *Mode2>keywordsSpottingResults = getKeywordsSpottingResults(),
-				;
+				myseq = sequence;
 			config
 				placement : partitionColocation("somePartitionColocationId");
 		}

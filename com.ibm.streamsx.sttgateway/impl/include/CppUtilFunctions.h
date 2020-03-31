@@ -16,7 +16,7 @@ Last modified on: Jun/10/2019
 #define FUNCTIONS_H_
 
 // Include this SPL file so that we can use the SPL functions and types in this C++ code.
-#include "SPL/Runtime/Function/SPLFunctions.h"
+#include <SPL/Runtime/Function/SPLFunctions.h>
 #include <vector>
 #include <sstream>
 #include <iostream>

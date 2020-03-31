@@ -349,6 +349,7 @@
 			<arg value="${releasefilename}"/>
 			<arg value="--exclude=**/.toolkitList"/>
 			<arg value="--exclude=**/.git*"/>
+			<arg value="--exclude=**/.apt_generated"/>
 			<arg value="--exclude=${toolkit.dir}/.settings"/>
 			<arg value="--exclude=${toolkit.dir}/**/.theFileNameList"/>
 			<arg value="--exclude=${toolkit.dir}/.externalToolBuilders"/>
@@ -394,7 +395,7 @@
 		<delete file="${release.info.file}"/>
 	</target>
 	
-	<!--- Targets to purge the workspace before a release archive is ptroduced -->
+	<!--- Targets to purge the workspace before a release archive is produced -->
 	<target name="clean-ignored" depends="warn-unclean">
 	</target>
 	

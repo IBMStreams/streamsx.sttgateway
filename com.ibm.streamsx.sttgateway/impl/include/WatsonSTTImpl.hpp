@@ -13,13 +13,16 @@
 
 #include <string>
 #include <atomic>
-#include <memory>
 #include <cmath>
 
 // This operator heavily relies on the Websocket++ header only library.
 // https://docs.websocketpp.org/index.html
 // This C++11 library code does the asynchronous full duplex Websocket communication with
 // the Watson STT service via a series of event handlers (a.k.a callback methods).
+// The websocketpp gives c++11 support also for older compilers
+// With c++11 capable compiler the stdlib is used
+#include <websocketpp/common/memory.hpp>
+
 // Bulk of the logic in this operator class appears in those event handler methods below.
 #include <websocketpp/config/asio_client.hpp>
 #include <websocketpp/client.hpp>
@@ -38,8 +41,9 @@
 #include <SPL/Runtime/Utility/Mutex.h>
 #include <SPL/Runtime/Operator/Port/Punctuation.h>
 
-#include <WatsonSTTImplReceiver.hpp>
 #include <SttGatewayResource.h>
+
+#include "WatsonSTTImplReceiver.hpp"
 
 namespace com { namespace ibm { namespace streams { namespace sttgateway {
 
@@ -71,11 +75,17 @@ public:
 	~WatsonSTTImpl();
 
 protected:
-	// Tuple processing for mutating data port 0
+	// Notify port readiness
+	//void allPortsReady();
+
+	// Processing for websocket receiver and ping threads
+	//void process(uint32_t idx);
+
+	// Tuple processing for non mutating data port 0
 	template<typename IT0, typename DATA_TYPE, DATA_TYPE const & (IT0::*GETTER)() const>
 	void process_0(IT0 const & inputTuple);
 
-	// Tuple processing for authentication port 1
+	// Tuple processing for non mutating authentication port 1
 	template<typename IT1, SPL::rstring const & (IT1::*GETTER)()const>
 	void process_1(IT1 const & inputTuple);
 
@@ -97,6 +107,10 @@ private:
 	// send the action stop if connection is in listening state
 	void sendActionStop();
 
+	// The ping thread send a ping periodically with period
+	// senderPingPeriod if the wsState is listening
+	void ping_init();
+
 private:
 	// Access Token mutex this should be a different to portMutex
 	// Concurrent access to the access token from port 0 and port 1 is managed by the accessTokenMutex
@@ -114,10 +128,10 @@ private:
 	//In - out related variables set from sender thread only controlled by portMutex
 	int numberOfAudioBlobFragmentsReceivedInCurrentConversation;
 	SPL::int64 numberOfAudioSendInCurrentConversation;
-	bool mediaEndReached;
+	// is set when a media end is detected
 	// In parallel regions window marker are broadcasted to all chains
 	// so if an window marker is directly followed by a window marker, it will be ignored
-	bool ignoreNextWindowMarker;
+	bool mediaEndReached;
 
 	// The list of all o tuples of an conversation
 	// The wastebasked is emptied after transcription was finalized and before a new conversation starts
@@ -139,6 +153,7 @@ private:
 	SPL::Metric * const nWebsocketConnectionAttemptsMetric;
 	SPL::Metric * const nWebsocketConnectionAttemptsFailedMetric;
 	SPL::Metric * const nAudioBytesSendMetric;
+	//int pingSequenceNumber;
 };
 
 // The extraction function to extract the blob or reads the blob from file
@@ -170,7 +185,6 @@ WatsonSTTImpl<OP, OT>::WatsonSTTImpl(OP & splOperator_,Conf config_)
 		numberOfAudioBlobFragmentsReceivedInCurrentConversation(0),
 		numberOfAudioSendInCurrentConversation(0),
 		mediaEndReached(true),
-		ignoreNextWindowMarker(true),
 		oTupleWastebasket(),
 
 		nFullAudioConversationsReceived(0),
@@ -187,6 +201,7 @@ WatsonSTTImpl<OP, OT>::WatsonSTTImpl(OP & splOperator_,Conf config_)
 		nWebsocketConnectionAttemptsMetric{ & Rec::splOperator.getContext().getMetrics().getCustomMetricByName("nWebsocketConnectionAttempts")},
 		nWebsocketConnectionAttemptsFailedMetric{& Rec::splOperator.getContext().getMetrics().getCustomMetricByName("nWebsocketConnectionAttemptsFailed")},
 		nAudioBytesSendMetric{ & Rec::splOperator.getContext().getMetrics().getCustomMetricByName("nAudioBytesSend")}
+		//pingSequenceNumber(0)
 {
 	if (Conf::sttOutputResultMode == Conf::partial)
 		if (not Conf::nonFinalUtterancesNeeded)
@@ -229,13 +244,8 @@ WatsonSTTImpl<OP, OT>::WatsonSTTImpl(OP & splOperator_,Conf config_)
 
 	// The parameters maxUtteranceAlternatives, wordAlternativesThreshold, keywordsSpottingThreshold, keywordsToBeSpotted
 	// are not available in sttResultMose complete
-	// The COF getUtteranceWordsConfidences, getUtteranceWordsStartTimes, getUtteranceWordsEndTimes,
-	// getUtteranceStartTime, getUtteranceEndTime, getUtteranceWordsSpeakers, getUtteranceWordsSpeakersConfidences,
-	// getUtteranceNumber, isFinalizedUtterance, getConfidence, isTranscriptionCompleted, getUtteranceAlternatives,
-	// getWordAlternatives, getWordAlternativesConfidences, getWordAlternativesStartTimes, getWordAlternativesEndTimes,
-	// getUtteranceWords, getUtteranceWordsConfidences, getUtteranceWordsStartTimes, getUtteranceWordsEndTimes,
-	// getUtteranceWordsSpeakers, getUtteranceWordsSpeakersConfidences, getKeywordsSpottingResults are not available
-	// in sttResultMose complete
+	// The COF getUtteranceNumber, isFinalizedUtterance, getConfidence, getUtteranceAlternatives
+	// are not available in sttResultMose complete
 
 	// Update the operator metric.
 	sttOutputResultModeMetric->setValueNoLock(Conf::sttOutputResultMode);
@@ -265,6 +275,7 @@ WatsonSTTImpl<OP, OT>::WatsonSTTImpl(OP & splOperator_,Conf config_)
 	<< "\nwordConfidenceNeeded                    = " << Conf::wordConfidenceNeeded
 	<< "\nwordTimestampNeeded                     = " << Conf::wordTimestampNeeded
 	<< "\nidentifySpeakers                        = " << Conf::identifySpeakers
+	<< "\nspeakerUpdatesNeeded                    = " << Conf::speakerUpdatesNeeded
 	<< "\nsmartFormattingNeeded                   = " << Conf::smartFormattingNeeded
 	<< "\nkeywordsSpottingThreshold               = " << Conf::keywordsSpottingThreshold
 	<< "\nkeywordsToBeSpotted                     = " << Conf::keywordsToBeSpotted
@@ -279,6 +290,27 @@ WatsonSTTImpl<OP, OT>::~WatsonSTTImpl() {
 	for (auto x : oTupleWastebasket)
 		delete x;
 }
+
+/* ping is not able to keep the connection
+template<typename OP, typename OT>
+void WatsonSTTImpl<OP, OT>::allPortsReady() {
+	// create the operator receiver thread and the ping thread
+	uint32_t userThreadIndex = Rec::splOperator.createThreads(2);
+	if (userThreadIndex != 0) {
+		throw std::invalid_argument(Conf::traceIntro +" WatsonSTTImpl invalid userThreadIndex");
+	}
+}
+
+template<typename OP, typename OT>
+void WatsonSTTImpl<OP, OT>::process(uint32_t idx) {
+	SPLAPPTRC(L_INFO, Conf::traceIntro << "-->Run thread idx=" << idx, "ws_receiver");
+	if (idx == 0)
+		// run the ping trhead
+		ping_init();
+	else
+		// run the operator receiver thread
+		Rec::ws_init();
+} */
 
 template<typename OP, typename OT>
 template<typename IT1, const SPL::rstring& (IT1::*GETTER)()const>
@@ -366,16 +398,7 @@ bool getSpeechSamples<SPL::rstring>(
 			audioBytes = nullptr;
 			audioSize = 0;
 		} else {
-			/*unsigned char * const data = new unsigned char[fsize];
-			unsigned char * datax = data;
-			std::istreambuf_iterator<char> it(inputStream);
-			std::istreambuf_iterator<char> it_end;
-			while (not it.equal(it_end)) {
-				*datax = *it;
-				++datax;
-				++it;
-			}*/
-			//TODO: error handling during read
+			//Known problem: No error handling during read. Low risk because the existence of the file was checked before
 			// Data buffer is assigned
 			audioBytes = buffer->data();
 			audioSize = fsize;
@@ -389,28 +412,27 @@ template<typename OP, typename OT>
 template<typename IT0, typename DATA_TYPE, DATA_TYPE const & (IT0::*GETTER)() const>
 void WatsonSTTImpl<OP, OT>::process_0(IT0 const & inputTuple) {
 
-	// serialize this method and protect from issues when multiple threads send
-	// to this port
+	// serialize this method and processPunct and protect from issues when multiple threads send to this port
 	SPL::AutoMutex autoMutex(portMutex);
 
-	ignoreNextWindowMarker = false;
-	bool myMediaEndReached = mediaEndReached;
+	bool mediaEndReachedEntryState = mediaEndReached;
 	if (mediaEndReached) {
+		// We have a new connection attempt pending
+		Rec::nextConversationQueued.store(true);
+
 		// this tuple starts a new conversation
 		++nFullAudioConversationsReceived;
 		SPLAPPTRC(L_INFO, Conf::traceIntro << "-->PR0 Start a new conversation number " <<
 				nFullAudioConversationsReceived, "ws_sender");
 		if (Conf::sttLiveMetricsUpdateNeeded)
 			nFullAudioConversationsReceivedMetric->setValueNoLock(nFullAudioConversationsReceived);
-	}
 
-	// If the media end of the previous translation was reached, we wait until the translation has finalized.
-	// A finalized transcription is signed through Rec::transcriptionFinalized
-	// The is no need to acquire the state mutex here because we make no changes, we just wait for the transition
-	// of Rec::transcriptionFinalized to false or an inactive receiver state.
-	if (mediaEndReached) {
+		// If the media end of the previous translation was reached, we wait until the translation has finalized.
+		// A finalized transcription is signed through Rec::transcriptionFinalized
+		// The is no need to acquire the state mutex here because we make no changes, we just wait for the transition
+		// of Rec::transcriptionFinalized to false or an inactive receiver state.
 		WsState myWsState = Rec::wsState.load();
-		while (not Rec::transcriptionFinalized && not receiverHasStopped(myWsState)) {
+		while (not Rec::transcriptionFinalized.load() && not receiverHasStopped(myWsState)) {
 			SPLAPPTRC(L_TRACE, Conf::traceIntro <<
 					"-->PR1 We have something to send but the previous transcription is not finalized, "
 					" wsState=" << wsStateToString(myWsState) << " block for " <<
@@ -423,7 +445,7 @@ void WatsonSTTImpl<OP, OT>::process_0(IT0 const & inputTuple) {
 		}
 		// Here is the receiver either dead or a transcription has finalized
 		// A new transcription has not yet been started, hence no race condition can occur
-		Rec::transcriptionFinalized = false;
+		Rec::transcriptionFinalized.store(false);
 		mediaEndReached = false;
 		// this is the first blob in a conversation
 		numberOfAudioBlobFragmentsReceivedInCurrentConversation = 0;
@@ -438,7 +460,7 @@ void WatsonSTTImpl<OP, OT>::process_0(IT0 const & inputTuple) {
 		for (OT* x : oTupleWastebasket)
 			delete x;
 		oTupleWastebasket.clear();
-	}
+	} // END if (mediaEndReached)
 
 	// Get the file and the file read result here
 	//get input
@@ -476,7 +498,7 @@ void WatsonSTTImpl<OP, OT>::process_0(IT0 const & inputTuple) {
 	// log the file read error occurred
 	if (not fileReadResult) {
 		std::string errorMsg;
-		if (myMediaEndReached) {
+		if (mediaEndReachedEntryState) {
 			errorMsg = Conf::traceIntro +
 					"-->Read error in the first segment of an conversation. Skipping STT task. File: " + currentFile;
 			SPLAPPTRC(L_ERROR, errorMsg, "ws_sender");
@@ -486,6 +508,8 @@ void WatsonSTTImpl<OP, OT>::process_0(IT0 const & inputTuple) {
 			SPLAPPTRC(L_ERROR, errorMsg, "ws_sender");
 		}
 		connect();
+		if (Rec::splOperator.getPE().getShutdownRequested())
+			return;
 		// Do not send a tuple here because of probably multi threading issues
 		// Create an output tuple with the error text and auto assign from current input tuple
 		OT * myOTuple = Rec::splOperator.createOutTupleAndAutoAssign(inputTuple);
@@ -496,10 +520,13 @@ void WatsonSTTImpl<OP, OT>::process_0(IT0 const & inputTuple) {
 		// here we must be in listening state
 		// ignore race condition if state enters a different state
 		mediaEndReached = true;
+		Rec::nextConversationQueued.store(false);
 		sendActionStop();
 
 	} else { // Result success
 		connect();
+		if (Rec::splOperator.getPE().getShutdownRequested())
+			return;
 		// here we must be in listening state
 		// ignore race condition if state enters a different state
 		OT * nextOTuple = Rec::splOperator.createOutTupleAndAutoAssign(inputTuple);
@@ -515,9 +542,9 @@ void WatsonSTTImpl<OP, OT>::process_0(IT0 const & inputTuple) {
 		sendDataToSTT(myAudioBytes, myAudioSize);
 		// send end in case of empty data blob
 		if (myAudioBytes == 0) {
-			sendActionStop();
 			mediaEndReached = true;
-			ignoreNextWindowMarker = true;
+			Rec::nextConversationQueued.store(false);
+			sendActionStop();
 		}
 	}
 } // End: WatsonSTTImpl<OP, OT>::process_0
@@ -525,23 +552,22 @@ void WatsonSTTImpl<OP, OT>::process_0(IT0 const & inputTuple) {
 // Punctuation processing for data port 0 Window Markers
 template<typename OP, typename OT>
 void WatsonSTTImpl<OP, OT>::processPunct_0(SPL::Punctuation const & punct) {
-	// serialize this method and protect from issues when multiple threads send
-	// to this port
+	// serialize this method and process and protect from issues when multiple threads send to this port
 	SPL::AutoMutex autoMutex(portMutex);
 
 	if (punct == SPL::Punctuation::WindowMarker) {
-		if (not ignoreNextWindowMarker) {
+		if (not mediaEndReached) {
 			// Ignore message if not in listening state
-			sendActionStop();
 			mediaEndReached = true;
-			ignoreNextWindowMarker = true;
+			Rec::nextConversationQueued.store(false);
+			sendActionStop();
 		} else {
 			SPLAPPTRC(L_TRACE, Conf::traceIntro << "PP1 Ignore window marker without data", "ws_sender");
 		}
 	} else if (punct == SPL::Punctuation::FinalMarker) {
 		// final marker wait until the current conversation ends if any
 		WsState myWsState = Rec::wsState.load();
-		while(not Rec::transcriptionFinalized && not receiverHasStopped(myWsState) && not Rec::splOperator.getPE().getShutdownRequested()) {
+		while(not Rec::transcriptionFinalized.load() && not receiverHasStopped(myWsState) && not Rec::splOperator.getPE().getShutdownRequested()) {
 			SPLAPPTRC(L_TRACE, Conf::traceIntro <<
 					"-->PP2 Final punct received wait for transcription end, "
 					" wsState=" << wsStateToString(myWsState) << " block for " <<
@@ -560,18 +586,17 @@ void WatsonSTTImpl<OP, OT>::connect() {
 
 	// We make a new connection or use a existing connection if data are to send
 	WsState myWsState = Rec::wsState.load();
+	bool firstLog = true;
 	while (myWsState != WsState::listening) {
 
-		if (myWsState == WsState::start || myWsState == WsState::connecting || myWsState == WsState::open) {
-			// Connection was already triggered
-			SPLAPPTRC(L_TRACE, Conf::traceIntro <<
-					"-->CS3 Something to sent but receiver is in transient state " <<
-					wsStateToString(myWsState) << " wait " << Conf::senderWaitTimeForFinalReceiverState, "ws_sender");
-			SPL::Functions::Utility::block(Conf::senderWaitTimeForFinalReceiverState);
-		} else if (myWsState == WsState::error){
-			SPLAPPTRC(L_ERROR, Conf::traceIntro <<
-					"-->>CS4 Something to sent but receiver is in transient state error "
-					" wait " << Conf::senderWaitTimeForFinalReceiverState, "ws_sender");
+		if (receiverHasTransientState(myWsState)) {
+			// Connection was already triggered or is shutting down
+			if (firstLog) {
+				firstLog = false;
+				SPLAPPTRC(L_DEBUG, Conf::traceIntro <<
+						"-->CS3 Something to sent but receiver is in transient state: " << wsStateToString(myWsState)
+						<< " wait " << Conf::senderWaitTimeForFinalReceiverState, "ws_sender");
+			}
 			SPL::Functions::Utility::block(Conf::senderWaitTimeForFinalReceiverState);
 		} else {
 			// Make a new connection attempt
@@ -644,12 +669,13 @@ void WatsonSTTImpl<OP, OT>::sendDataToSTT(unsigned char const * audioBytes, uint
 		Rec::wsClient->send(Rec::wsHandle, audioBytes, audioSize, websocketpp::frame::opcode::binary, ec);
 		//Rec::statusOfAudioDataTransmissionToSTT = AUDIO_BLOB_FRAGMENTS_BEING_SENT_TO_STT;
 		if (ec) {
-			SPLAPPTRC(L_ERROR, Conf::traceIntro << "CS9 -->Error when send connectAndSendDataToSTT ec=" << ec, "ws_sender");
+			SPLAPPTRC(L_ERROR, Conf::traceIntro << "-->CS9 Error when send connectAndSendDataToSTT ec=" << ec <<
+					" message=" << ec.message(), "ws_sender");
 		}
 	} // END: if (audioSize > 0)
 
 	return;
-} // End: WatsonSTTImpl<OP, OT>::connectAndSendDataToSTT
+} // End: WatsonSTTImpl<OP, OT>::sendDataToSTT
 
 template<typename OP, typename OT>
 void WatsonSTTImpl<OP, OT>::sendActionStop() {
@@ -657,7 +683,7 @@ void WatsonSTTImpl<OP, OT>::sendActionStop() {
 	WsState myWsState = Rec::wsState.load();
 	if (myWsState == WsState::listening) {
 
-		SPLAPPTRC(L_DEBUG, Conf::traceIntro << "-->CS6 Send \"action\" : \"stop\"", "ws_sender");
+		SPLAPPTRC(L_INFO, Conf::traceIntro << "-->CS6 Send \"action\" : \"stop\"", "ws_sender");
 		// We reached the end of the blob data as sent/streamed from the SPL application.
 		// Signal end of the audio data.
 		// https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-websockets#WSstop
@@ -667,7 +693,8 @@ void WatsonSTTImpl<OP, OT>::sendActionStop() {
 		// So set this flag to indicate that.
 		//Rec::statusOfAudioDataTransmissionToSTT = FULL_AUDIO_DATA_SENT_TO_STT;
 		if (ec) {
-			SPLAPPTRC(L_ERROR, Conf::traceIntro << "-->CS10 Error in sendActionStop ec=" << ec, "ws_sender");
+			SPLAPPTRC(L_ERROR, Conf::traceIntro << "-->CS10 Error in sendActionStop ec=" << ec <<
+					" message=" << ec.message(), "ws_sender");
 		}
 	} else {
 		SPLAPPTRC(L_ERROR, Conf::traceIntro <<
@@ -678,6 +705,23 @@ void WatsonSTTImpl<OP, OT>::sendActionStop() {
 	return;
 }
 
+/* ping is not able to keep the connection
+template<typename OP, typename OT>
+void WatsonSTTImpl<OP, OT>::ping_init() {
+	while (not Rec::splOperator.getPE().getShutdownRequested()) {
+		SPL::Functions::Utility::block(Conf::senderPingPeriod);
+		if (not Rec::splOperator.getPE().getShutdownRequested()) {
+
+			if (Rec::wsState.load() == WsState::listening) {
+				std::string pingmessage{"pong_" + std::to_string(pingSequenceNumber++)};
+				websocketpp::lib::error_code ec{};
+				Rec::wsClient->ping(Rec::wsHandle, pingmessage, ec);
+				if (ec)
+					SPLAPPTRC(L_ERROR, Conf::traceIntro << "-->CS99 Error when send ping ec=" << ec << " message=" << ec.message(), "ws_sender");
+			}
+		}
+	}
+} */
 }}}}
 
 #endif /* COM_IBM_STREAMS_STTGATEWAY_WATSONSTTIMPL_HPP_ */

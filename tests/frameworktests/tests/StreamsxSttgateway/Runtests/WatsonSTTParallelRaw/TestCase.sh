@@ -2,8 +2,6 @@
 #--timeout=1200
 #--exclusive=true
 
-setCategory 'quick'
-
 TT_mainComposite='WatsonSTTParallelRaw'
 TT_sabFile="output/WatsonSTTParallelRaw.sab"
 
