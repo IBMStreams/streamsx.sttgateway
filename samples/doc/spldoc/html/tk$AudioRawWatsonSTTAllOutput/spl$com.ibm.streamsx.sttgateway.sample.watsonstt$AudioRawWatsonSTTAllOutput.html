@@ -256,17 +256,17 @@ ffmpeg -i MyFile.wav -ac 1 -ar 8000 MyNewFile.wav
  			(float64)getSubmissionTimeValue("customizationWeight", "0.30");
  		expression&lt;int32&gt; $sttBatchSize : (int32)getSubmissionTimeValue("sttBatchSize", "0");
  		expression&lt;int32&gt; $maxUtteranceAlternatives : 
- 			(int32)getSubmissionTimeValue("maxUtteranceAlternatives", "1");	
+ 			(int32)getSubmissionTimeValue("maxUtteranceAlternatives", "3");	
  		expression&lt;boolean&gt; $sttRequestLogging : 
  			(boolean)getSubmissionTimeValue("sttRequestLogging", "false");
  		expression&lt;boolean&gt; $filterProfanity : 
  			(boolean)getSubmissionTimeValue("filterProfanity", "false");
  		expression&lt;float64&gt; $wordAlternativesThreshold : 
- 			(float64)getSubmissionTimeValue("wordAlternativesThreshold", "0.0");
+ 			(float64)getSubmissionTimeValue("wordAlternativesThreshold", "0.6");
  		expression&lt;boolean&gt; $smartFormattingNeeded : 
  			(boolean)getSubmissionTimeValue("smartFormattingNeeded", "false");
  		expression&lt;float64&gt; $keywordsSpottingThreshold : 
- 			(float64)getSubmissionTimeValue("keywordsSpottingThreshold", "0.0");
+ 			(float64)getSubmissionTimeValue("keywordsSpottingThreshold", "0.3");
  		expression&lt;list&lt;rstring&gt;&gt; $keywordsToBeSpotted : 
  			(list&lt;rstring&gt;)getSubmissionTimeValue("keywordsToBeSpotted", "[]");	
  		expression&lt;boolean&gt; $websocketLoggingNeeded : 
@@ -309,6 +309,7 @@ ffmpeg -i MyFile.wav -ac 1 -ar 8000 MyNewFile.wav
  			list&lt;float64&gt; utteranceWordsEndTimes,
  			list&lt;int32&gt; utteranceWordsSpeakers,
  			list&lt;float64&gt; utteranceWordsSpeakersConfidences,
+ 			list&lt;tuple&lt;float64 startTime, int32 speaker, float64 confidence&gt;&gt; utteranceWordsSpeakerUpdates,
  			map&lt;rstring, list&lt;map&lt;rstring, float64&gt;&gt;&gt; keywordsSpottingResults,
  			int32 sequence;
  
@@ -635,6 +636,7 @@ ffmpeg -i MyFile.wav -ac 1 -ar 8000 MyNewFile.wav
  					// Speaker label a.k.a. Speaker id
  					utteranceWordsSpeakers = getUtteranceWordsSpeakers(),
  					utteranceWordsSpeakersConfidences = getUtteranceWordsSpeakersConfidences(),
+ 					utteranceWordsSpeakerUpdates = getUtteranceWordsSpeakerUpdates(),
  					// Results from keywords spotting (matching) in an utterance.
  					keywordsSpottingResults = getKeywordsSpottingResults();
  					

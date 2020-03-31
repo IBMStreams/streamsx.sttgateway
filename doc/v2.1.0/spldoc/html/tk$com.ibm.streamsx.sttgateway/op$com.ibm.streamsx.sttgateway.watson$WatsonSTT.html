@@ -22,7 +22,7 @@
 <div class="body refbody">
 <div class="section">
 <p class="p">
-<a class="xref" href="../toolkits/toolkits.html">Gateway to the IBM Speech To Text (STT) cloud service</a> &gt; <a class="xref" href="tk$com.ibm.streamsx.sttgateway.html">com.ibm.streamsx.sttgateway 2.2.0</a> &gt; <a class="xref" href="ns$com.ibm.streamsx.sttgateway.watson.html">com.ibm.streamsx.sttgateway.watson</a> &gt; WatsonSTT</p>
+<a class="xref" href="../toolkits/toolkits.html">Gateway to the IBM Speech To Text (STT) cloud service</a> &gt; <a class="xref" href="tk$com.ibm.streamsx.sttgateway.html">com.ibm.streamsx.sttgateway 2.1.2</a> &gt; <a class="xref" href="ns$com.ibm.streamsx.sttgateway.watson.html">com.ibm.streamsx.sttgateway.watson</a> &gt; WatsonSTT</p>
 
 </div>
 
@@ -41,7 +41,7 @@
 <p class="p">      This operator must be configured with a Websocket URL, a Watson STT authentication token and       a base language model (see in parameter section).       This operator may also be customized with many other optional parameters including        custom patch files and appropriate custom patch weights.
 </p>
 
-<div class="p">      The operator parameter <tt class="ph tt">sttResultMode</tt> specifies what type of STT result is produced:
+<div class="p">      The operator parameter <tt class="ph tt">sttResultMode</tt> specifies what type of STT result is needed:
 <ul class="ul">
 <li class="li"> partial: to get partial utterances,</li>
 
@@ -49,6 +49,14 @@
 
 </ul>
       The setting of this this parameter influences the validity of output functions and parameters. In <tt class="ph tt">sttResultMode</tt>        <tt class="ph tt">partial</tt> the parameter <tt class="ph tt">nonFinalUtterancesNeeded</tt> controls the output of non final utterances.
+</div>
+
+<div class="p">      Requirements: 
+<ul class="ul">
+<li class="li"> Intel RHEL6 or RHEL7 hosts installed with IBM Streams. </li>
+
+</ul>
+
 </div>
 
 <p class="p">      <strong class="ph b">Note:</strong> Multiple invocations of this operator can be fused to make        an efficient use of the available pool of CPU cores.
@@ -136,16 +144,13 @@
 
 <div class="p">        Attributes on this input port:
 <ul class="ul">
-<li class="li"> <strong class="ph b">speech</strong> (required, rstring/blob) - In the case of file-based input (.wav, .mp3 etc. for batch workload), </li>
+<li class="li"> <strong class="ph b">speech</strong> (required, rstring/blob) - In the case of file-based input (.wav, .mp3 etc. for batch workload), the expected value will be an absolute path of a file as an rstring. In the case of RAW audio data (received from a network switch for real-time workload), the expected input is of type blob.</li>
 
 </ul>
-        the expected value will be an absolute path of a file as an rstring. In the case of RAW audio data          (received from a network switch for real-time workload), the expected input is of type blob.
+
 </div>
 
-<p class="p">        A window punctuation marker or a empty speech blob may be used to mark the end of an conversation. Thus an          conversation can be a composite of multiple audio files. When the end of conversation is encountered,          the STT engine delivers all results of the current conversation and flushes all buffers.
-</p>
-
-<p class="p">        All the extra input attributes will be forwarded if matching output attributes are found.
+<p class="p">        A window punctuation marker or a empty speech blob may be used to mark the end of an conversation.          When the end of conversation is encountered,          the STT engine delivers all results of the current conversation and flushes all buffers.         All the extra input attributes will be forwarded if matching output attributes are found.
 </p>
 
    <dl class="dl">
@@ -274,26 +279,14 @@
 
                         
               <dt class="dt dlterm">
-                <tt class="ph tt">   rstring getSTTErrorMessage()</tt>              </dt>
+                <tt class="ph tt">   int32 getUtteranceNumber()</tt>              </dt>
 
             <dd class="dd">
 
-<p class="p">Returns the Watson STT error message if any. Default attribute name <strong class="ph b">sttErrorMessage</strong>
-</p>
-              <p class="p"/>
-
-            </dd>
-
-                        
-              <dt class="dt dlterm">
-                <tt class="ph tt">   boolean isTranscriptionCompleted()</tt>              </dt>
-
-            <dd class="dd">
-
-<p class="p">            Returns a boolean value to indicate whether the full transcription/conversation is completed.              Default attribute name <strong class="ph b">transcriptionCompleted</strong>
+<p class="p">            Returns an int32 number indicating the utterance number. 
 </p>
 
-<p class="p">            <strong class="ph b">Note:</strong> If this function is requested, the operator emits at conversation end a tuple with this flag equal              true. All other output functions deliver the default value for the final tuple of an conversation. If this              function is not requested, the operator does not send this final tuple for the conversation. The operator sends in any              case a window punctuation marker at the end of an conversation.
+<p class="p">            <strong class="ph b">Note:</strong> This function is not available if <tt class="ph tt">sttResult</tt> mode equals <tt class="ph tt">complete</tt>.
 </p>
               <p class="p"/>
 
@@ -305,61 +298,7 @@
 
             <dd class="dd">
 
-<p class="p">            Returns the transcription of audio in the form of a single utterance. Default attribute name <strong class="ph b">utteranceText</strong>
-</p>
-              <p class="p"/>
-
-            </dd>
-
-                        
-              <dt class="dt dlterm">
-                <tt class="ph tt">   float64 getConfidence()</tt>              </dt>
-
-            <dd class="dd">
-
-<p class="p">            Returns a float64 confidence value for the utterance. Default attribute name <strong class="ph b">confidence</strong>
-</p>
-
-<p class="p">            <strong class="ph b">Note:</strong> This function does not deliver results if <tt class="ph tt">sttResult</tt> mode equals <tt class="ph tt">complete</tt>.
-</p>
-              <p class="p"/>
-
-            </dd>
-
-                        
-              <dt class="dt dlterm">
-                <tt class="ph tt">   float64 getUtteranceStartTime()</tt>              </dt>
-
-            <dd class="dd">
-
-<p class="p">            Returns the start time of an utterance relative to the start of the audio.              Default attribute name <strong class="ph b">utteranceStartTime</strong>
-</p>
-              <p class="p"/>
-
-            </dd>
-
-                        
-              <dt class="dt dlterm">
-                <tt class="ph tt">   float64 getUtteranceEndTime()</tt>              </dt>
-
-            <dd class="dd">
-
-<p class="p">            Returns the end time of an utterance relative to the start of the audio.              Default attribute name <strong class="ph b">utteranceEndTime</strong>
-</p>
-              <p class="p"/>
-
-            </dd>
-
-                        
-              <dt class="dt dlterm">
-                <tt class="ph tt">   int32 getUtteranceNumber()</tt>              </dt>
-
-            <dd class="dd">
-
-<p class="p">            Returns an int32 number indicating the utterance number. Default attribute name <strong class="ph b">utteranceNumber</strong>
-</p>
-
-<p class="p">            <strong class="ph b">Note:</strong> This function does not deliver results if <tt class="ph tt">sttResult</tt> mode equals <tt class="ph tt">complete</tt>.
+<p class="p">Returns the transcription of audio in the form of a single utterance.
 </p>
               <p class="p"/>
 
@@ -371,10 +310,52 @@
 
             <dd class="dd">
 
-<p class="p">            Returns a boolean value to indicate if this is an interim partial utterance or a finalized utterance.              Default attribute name <strong class="ph b">finalizedUtterance</strong>
+<p class="p">            Returns a boolean value to indicate if this is an interim partial utterance or a finalized utterance.
 </p>
 
-<p class="p">            <strong class="ph b">Note:</strong> The function does not deliver results if <tt class="ph tt">sttResult</tt> mode equals <tt class="ph tt">complete</tt>.
+<p class="p">            <strong class="ph b">Note:</strong> This function is not available if <tt class="ph tt">sttResult</tt> mode equals <tt class="ph tt">complete</tt>.
+</p>
+              <p class="p"/>
+
+            </dd>
+
+                        
+              <dt class="dt dlterm">
+                <tt class="ph tt">   float64 getConfidence()</tt>              </dt>
+
+            <dd class="dd">
+
+<p class="p">            Returns a float64 confidence value for an interim partial utterance or for a finalized utterance or for the full text. 
+</p>
+
+<p class="p">            <strong class="ph b">Note:</strong> This function is not available if <tt class="ph tt">sttResult</tt> mode equals <tt class="ph tt">complete</tt>.
+</p>
+              <p class="p"/>
+
+            </dd>
+
+                        
+              <dt class="dt dlterm">
+                <tt class="ph tt">   rstring getSTTErrorMessage()</tt>              </dt>
+
+            <dd class="dd">
+
+<p class="p">Returns the Watson STT error message if any.
+</p>
+              <p class="p"/>
+
+            </dd>
+
+                        
+              <dt class="dt dlterm">
+                <tt class="ph tt">   boolean isTranscriptionCompleted()</tt>              </dt>
+
+            <dd class="dd">
+
+<p class="p">            Returns a boolean value to indicate whether the full transcription/conversation is completed. 
+</p>
+
+<p class="p">            <strong class="ph b">Note:</strong> If this function is requested, the operator emits at conversation end a tuple with this flag equal              true. All other output functions deliver the default value for the final tuple of an conversation. If this              function is not requested, the operator does not send a final tuple for the conversation. The operator sends in any              case a window punctuation marker at the end of an conversation.
 </p>
               <p class="p"/>
 
@@ -386,61 +367,10 @@
 
             <dd class="dd">
 
-<p class="p">            Returns a list of n-best alternative hypotheses for an utterance result.              List will have the very best guess first followed by the next best ones in that order.              Default attribute name <strong class="ph b">utteranceAlternatives</strong>
+<p class="p">            Returns a list of n-best alternative hypotheses for an utterance result.              List will have the very best guess first followed by the next best ones in that order. 
 </p>
 
-<p class="p">            <strong class="ph b">Note:</strong> This function does not deliver results if <tt class="ph tt">sttResult</tt> mode equals <tt class="ph tt">complete</tt>.             <strong class="ph b">Note:</strong> n-best alternative hypotheses are available only for final <tt class="ph tt">utterances</tt>.
-</p>
-              <p class="p"/>
-
-            </dd>
-
-                        
-              <dt class="dt dlterm">
-                <tt class="ph tt">   list&lt;rstring&gt; getUtteranceWords()</tt>              </dt>
-
-            <dd class="dd">
-
-<p class="p">            Returns a list of words in an utterance result. Default attribute name <strong class="ph b">utteranceWords</strong>
-</p>
-              <p class="p"/>
-
-            </dd>
-
-                        
-              <dt class="dt dlterm">
-                <tt class="ph tt">   list&lt;float64&gt; getUtteranceWordsConfidences()</tt>              </dt>
-
-            <dd class="dd">
-
-<p class="p">            Returns a list of confidences of the words in an utterance result.              Default attribute name <strong class="ph b">utteranceWordsConfidences</strong>
-</p>
-
-<p class="p">            <strong class="ph b">Note:</strong> word confidences are available only for final utterances.
-</p>
-              <p class="p"/>
-
-            </dd>
-
-                        
-              <dt class="dt dlterm">
-                <tt class="ph tt">   list&lt;float64&gt; getUtteranceWordsStartTimes()</tt>              </dt>
-
-            <dd class="dd">
-
-<p class="p">            Returns a list of start times of the words in an utterance result relative to the start of the audio.              Default attribute name <strong class="ph b">utteranceWordsStartTimes</strong>
-</p>
-              <p class="p"/>
-
-            </dd>
-
-                        
-              <dt class="dt dlterm">
-                <tt class="ph tt">   list&lt;float64&gt; getUtteranceWordsEndTimes()</tt>              </dt>
-
-            <dd class="dd">
-
-<p class="p">            Returns a list of end times of the words in an utterance result relative to the start of the audio.              Default attribute name <strong class="ph b">utteranceWordsEndTimes</strong>
+<p class="p">            <strong class="ph b">Note:</strong> This function is not available if <tt class="ph tt">sttResult</tt> mode equals <tt class="ph tt">complete</tt>.             <strong class="ph b">Note:</strong> n-best alternative hypotheses are available only for final <tt class="ph tt">utterances</tt>.
 </p>
               <p class="p"/>
 
@@ -452,10 +382,10 @@
 
             <dd class="dd">
 
-<p class="p">            Returns a nested list of word alternatives (Confusion Networks).              Default attribute name <strong class="ph b">wordAlternatives</strong>
+<p class="p">            Returns a nested list of word alternatives (Confusion Networks). 
 </p>
 
-<p class="p">            <strong class="ph b">Note:</strong> word alternatives are available only for final utterances.
+<p class="p">            <strong class="ph b">Note:</strong> word alternatives are available only for final <tt class="ph tt">utterances</tt>.
 </p>
               <p class="p"/>
 
@@ -467,10 +397,10 @@
 
             <dd class="dd">
 
-<p class="p">            Returns a nested list of word alternatives confidences (Confusion Networks).              Default attribute name <strong class="ph b">wordAlternativesConfidences</strong>
+<p class="p">            Returns a nested list of word alternatives confidences (Confusion Networks). 
 </p>
 
-<p class="p">            <strong class="ph b">Note:</strong> word alternative confidences are available only for final utterances.
+<p class="p">            <strong class="ph b">Note:</strong> word alternative confidences are available only for final <tt class="ph tt">utterances</tt>.
 </p>
               <p class="p"/>
 
@@ -482,10 +412,10 @@
 
             <dd class="dd">
 
-<p class="p">            Returns a list of word alternatives start times (Confusion Networks).              Default attribute name <strong class="ph b">wordAlternativesStartTimes</strong>
+<p class="p">            Returns a list of word alternatives start times (Confusion Networks). 
 </p>
 
-<p class="p">            <strong class="ph b">Note:</strong> word alternative start times are available only for final utterances.
+<p class="p">            <strong class="ph b">Note:</strong> word alternative start times are available only for final <tt class="ph tt">utterances</tt>.
 </p>
               <p class="p"/>
 
@@ -497,10 +427,85 @@
 
             <dd class="dd">
 
-<p class="p">            Returns a list of word alternatives end times (Confusion Networks).              Default attribute name <strong class="ph b">wordAlternativesEndTimes</strong>
+<p class="p">            Returns a list of word alternatives end times (Confusion Networks). 
 </p>
 
-<p class="p">            <strong class="ph b">Note:</strong> word alternative end times are available only for final utterances.
+<p class="p">            <strong class="ph b">Note:</strong> word alternative end times are available only for final <tt class="ph tt">utterances</tt>.
+</p>
+              <p class="p"/>
+
+            </dd>
+
+                        
+              <dt class="dt dlterm">
+                <tt class="ph tt">   list&lt;rstring&gt; getUtteranceWords()</tt>              </dt>
+
+            <dd class="dd">
+
+<p class="p">            Returns a list of words in an utterance result. 
+</p>
+              <p class="p"/>
+
+            </dd>
+
+                        
+              <dt class="dt dlterm">
+                <tt class="ph tt">   list&lt;float64&gt; getUtteranceWordsConfidences()</tt>              </dt>
+
+            <dd class="dd">
+
+<p class="p">            Returns a list of confidences of the words in an utterance result. 
+</p>
+
+<p class="p">            <strong class="ph b">Note:</strong> word confidences are available only for final <tt class="ph tt">utterances</tt>.
+</p>
+              <p class="p"/>
+
+            </dd>
+
+                        
+              <dt class="dt dlterm">
+                <tt class="ph tt">   list&lt;float64&gt; getUtteranceWordsStartTimes()</tt>              </dt>
+
+            <dd class="dd">
+
+<p class="p">            Returns a list of start times of the words in an utterance result relative to the start of the audio. 
+</p>
+              <p class="p"/>
+
+            </dd>
+
+                        
+              <dt class="dt dlterm">
+                <tt class="ph tt">   list&lt;float64&gt; getUtteranceWordsEndTimes()</tt>              </dt>
+
+            <dd class="dd">
+
+<p class="p">            Returns a list of end times of the words in an utterance result relative to the start of the audio. 
+</p>
+              <p class="p"/>
+
+            </dd>
+
+                        
+              <dt class="dt dlterm">
+                <tt class="ph tt">   float64 getUtteranceStartTime()</tt>              </dt>
+
+            <dd class="dd">
+
+<p class="p">            Returns the start time of an utterance relative to the start of the audio. 
+</p>
+              <p class="p"/>
+
+            </dd>
+
+                        
+              <dt class="dt dlterm">
+                <tt class="ph tt">   float64 getUtteranceEndTime()</tt>              </dt>
+
+            <dd class="dd">
+
+<p class="p">            Returns the end time of an utterance relative to the start of the audio. 
 </p>
               <p class="p"/>
 
@@ -512,10 +517,10 @@
 
             <dd class="dd">
 
-<p class="p">            Returns a list of speaker ids for the individual words in an utterance result. Each entry in this list corresponds              to the appropriate entry in the utterance words list delivered with function <tt class="ph tt">getUtteranceWords</tt>. In rare cases              the operator delivers a value of -1 for a speaker label. In this case there was no speaker label delivered              from STT service.             Default attribute name <strong class="ph b">utteranceWordsSpeakers</strong>
+<p class="p">            Returns a list of speaker ids for the individual words in an utterance result. Each entry in this list corresponds              to the appropriate entry in the utterance words list delivered with function <tt class="ph tt">getUtteranceWords</tt>. In rare cases              the operator delivers a value of -1 for a speaker label. In this case there was no speaker label delivered              from stt service.
 </p>
 
-<p class="p">            <strong class="ph b">Note:</strong> word speaker labels are available only for final utterances.
+<p class="p">            <strong class="ph b">Note:</strong> word speaker labels are available only for final <tt class="ph tt">utterances</tt>.
 </p>
               <p class="p"/>
 
@@ -527,10 +532,10 @@
 
             <dd class="dd">
 
-<p class="p">            Returns a list of confidences in identifying the speakers of the individual words in an utterance result.              Default attribute name <strong class="ph b">utteranceWordsSpeakersConfidences</strong>
+<p class="p">            Returns a list of confidences in identifying the speakers of the individual words in an utterance result. 
 </p>
 
-<p class="p">            <strong class="ph b">Note:</strong> word speaker label confidences are available only for final utterances.
+<p class="p">            <strong class="ph b">Note:</strong> word speaker label confidences are available only for final <tt class="ph tt">utterances</tt>.
 </p>
               <p class="p"/>
 
@@ -538,69 +543,14 @@
 
                         
               <dt class="dt dlterm">
-                <tt class="ph tt">   &lt;tuple T&gt; list&lt;T&gt; getUtteranceWordsSpeakerUpdates()</tt>              </dt>
+                <tt class="ph tt">   map&lt;rstring, list&lt;map&lt;rstring, float64&gt;&gt;&gt; getKeywordsSpottingResults()</tt>              </dt>
 
             <dd class="dd">
 
-<p class="p">            Return the speaker identifier updates for all emitted utterance words in the current conversation.              This function returns an update to previously sent word speaker identifiers without adding any new results.             Default attribute name <strong class="ph b">utteranceWordsSpeakerUpdates</strong>
+<p class="p">            Returns the STT keywords spotting results as a map of key/value pairs. Read this toolkit's documentation to learn about the map contents. 
 </p>
 
-<p class="p">            Speaker numbering starts at 0. The invalid index -1 identifies a non identified speaker.              It will typically take 5-10 seconds of speakers for diarization results to become reliable, and will continually              improve over the course of an audio conversation.
-</p>
-
-<div class="p">            The return type of this function is
-<pre class="pre codeblock">
-list&lt;tuple&lt;float64 startTime, int32 speaker, float64 confidence&gt;&gt;
-</pre>
-
-            The speaker label is given with respect to the start time of the utterance word.             No other tuple types are accepted as result type.
-</div>
-              <p class="p"/>
-
-            </dd>
-
-                        
-              <dt class="dt dlterm">
-                <tt class="ph tt">   &lt;any T&gt; T getKeywordsSpottingResults()</tt>              </dt>
-
-            <dd class="dd">
-
-<p class="p">            Returns the STT keywords spotting results as a map. The keys of the map are the spotted keywords. The values              of the map are lists with the keyword emergence. The the keyword emergence may be either 
-</p>
-
-<div class="p">
-<pre class="pre codeblock">
-tuple&lt;float64 startTime, float64 endTime, float64 confidence&gt;
-</pre>
-
-            or
-<pre class="pre codeblock">
-map&lt;rstring, float64&gt;
-</pre>
-
-
-</div>
-
-<p class="p">            In the latter case the inner map has the entries: <tt class="ph tt">start_time</tt>, <tt class="ph tt">end_time</tt>, <tt class="ph tt">confidence</tt>. Thus the complete              attribute type may be either:
-</p>
-
-<div class="p">
-<pre class="pre codeblock">
-map&lt;rstring, list&lt;tuple&lt;float64 startTime, float64 endTime, float64 confidence&gt;&gt;&gt;
-</pre>
-
-            or 
-<pre class="pre codeblock">
-map&lt;rstring, list&lt;map&lt;rstring, float64&gt;&gt;&gt;
-</pre>
-
-
-</div>
-
-<p class="p">            Default attribute name <strong class="ph b">keywordsSpottingResults</strong>
-</p>
-
-<p class="p">            <strong class="ph b">Note:</strong> keyword spotting results are available only for final utterances.
+<p class="p">            <strong class="ph b">Note:</strong> keyword spotting results are available only for final <tt class="ph tt">utterances</tt>.
 </p>
               <p class="p"/>
 
@@ -625,34 +575,8 @@ map&lt;rstring, list&lt;map&lt;rstring, float64&gt;&gt;&gt;
 <p class="p">        This port produces the output tuples that carry the result of the speech to text transcription.
 </p>
 
-<p class="p">        An output tuple is created for every utterance that is observed from the incoming audio data.          An utterance is a group of transcribed words meant to approximate a sentence.          This means there is a one to many relationship between an incoming tuple and outgoing tuples          (i.e. a single .wav file may result in 30 output utterances). If the input stream feeds audio samples, there may          be also a many to one relationship between an incoming tuple and outgoing tuples. It can happen that several          input tuples are consumed before an output tuple is generated.
+<p class="p">        An output tuple is created for every utterance that is observed from the incoming audio data.          An utterance is a group of transcribed words meant to approximate a sentence.          This means there is a one to many relationship between an incoming tuple and outgoing tuples          (i.e. a single .wav file may result in 30 output utterances).          Intermediate utterances are sent out on this output port only when the sttResultMode equals <tt class="ph tt">partial</tt> and         operator parameter <tt class="ph tt">nonFinalUtterancesNeeded</tt> equal true. If sttResultMode equals <tt class="ph tt">complete</tt>, then only the         fully transcribed text for the entire audio data will be sent on this output port after         the given audio is completely transcribed.          The port emits a window punctuation marker when a conversation has finished.          If sttResultMode equals <tt class="ph tt">partial</tt>, the operator sends out the results immediately without any further delay.          Thus, if output function <tt class="ph tt">isTranscriptionCompleted</tt> is requested, the operator sends additionally          a tuple with empty/default utterance attributes and the transcription complete flag.          <strong class="ph b">There are multiple available output functions</strong>, and output attributes can also be          assigned values with any SPL expression that evaluates to the proper type.
 </p>
-
-<p class="p">        Additionally an error during processing (connection error, invalid data, server error) triggers a outgoing tuple.          The custom output function <tt class="ph tt">getSTTErrorMessage</tt> returns the error message.
-</p>
-
-<p class="p">        Intermediate utterances are sent out on this output port only when the sttResultMode equals <tt class="ph tt">partial</tt> and         operator parameter <tt class="ph tt">nonFinalUtterancesNeeded</tt> equals true. If sttResultMode equals <tt class="ph tt">complete</tt>, then only the         fully transcribed text for the entire audio data will be sent on this output port after the given audio is          completely transcribed.
-</p>
-
-<p class="p">        The port emits a window punctuation marker when a conversation has finished.          If sttResultMode equals <tt class="ph tt">partial</tt>, the operator sends out the results immediately without any further delay.          If output function <tt class="ph tt">isTranscriptionCompleted</tt> is requested, the operator sends additionally          a tuple with empty/default utterance attributes and the transcription complete flag when a conversation has finished.
-</p>
-
-<p class="p">        <strong class="ph b">There are multiple available output functions</strong>, and output attributes can also be          assigned values with any SPL expression that evaluates to the proper type.
-</p>
-
-<div class="p">        Every custom output function has an appropriate default attribute. The operator assigns the results of the COF          automatically to the <strong class="ph b">default attribute</strong> if: 
-<ul class="ul">
-<li class="li"> the output stream has an attribute with the default name,</li>
-
-<li class="li"> the type of the attribute is the return type of the COF,</li>
-
-<li class="li"> this attribute has no assignment in the operator output clause,</li>
-
-<li class="li"> this attribute has no auto assignment from input port 0.</li>
-
-</ul>
-
-</div>
 
     <p class="p"/>
 
@@ -988,7 +912,10 @@ This operator supports 20 parameters.
      <dt class="dt dlterm"><a name="spldoc_operator__parameter__keywordsSpottingThreshold"><!-- --></a><tt class="ph tt">keywordsSpottingThreshold</tt></dt>
 
      <dd class="dd">
-<p class="p">        This parameter specifies the minimum confidence level that the STT service must have for an utterance word to          match a given keyword. A value of 0.0 disables this feature. Valid value must be less than 1.0. (Default is 0.3)         see: <a class="xref" href="https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-output#keyword_spotting">https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-output#keyword_spotting</a> 
+<p class="p">        This parameter specifies the minimum confidence level that the STT service must have for an utterance word to          match a given keyword. A value of 0.0 disables this feature. Valid value must be less than 1.0. (Default is 0.0)         see: <a class="xref" href="https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-output#keyword_spotting">https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-output#keyword_spotting</a> 
+</p>
+
+<p class="p">        <strong class="ph b">Note:</strong> This parameter is not valid if <tt class="ph tt">sttResultMode</tt> equals <tt class="ph tt">complete</tt>.
 </p>
 
   <dl class="dl">
@@ -1024,6 +951,9 @@ This operator supports 20 parameters.
 
      <dd class="dd">
 <p class="p">        This parameter specifies a list (array) of strings to be spotted. (Default is an empty list)
+</p>
+
+<p class="p">        <strong class="ph b">Note:</strong> This parameter is not valid if <tt class="ph tt">sttResultMode</tt> equals <tt class="ph tt">complete</tt>.
 </p>
 
   <dl class="dl">
@@ -1093,10 +1023,10 @@ This operator supports 20 parameters.
      <dt class="dt dlterm"><a name="spldoc_operator__parameter__maxUtteranceAlternatives"><!-- --></a><tt class="ph tt">maxUtteranceAlternatives</tt></dt>
 
      <dd class="dd">
-<p class="p">        This parameter indicates the required number of n-best alternative hypotheses for the transcription results. (Default is 3)         see: <a class="xref" href="https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-output#max_alternatives">https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-output#max_alternatives</a> 
+<p class="p">        This parameter indicates the required number of n-best alternative hypotheses for the transcription results. (Default is 1)         see: <a class="xref" href="https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-output#max_alternatives">https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-output#max_alternatives</a> 
 </p>
 
-<p class="p">        <strong class="ph b">Note:</strong> This parameter is ignored if <tt class="ph tt">sttResultMode</tt> equals <tt class="ph tt">complete</tt>.
+<p class="p">        <strong class="ph b">Note:</strong> This parameter is not valid if <tt class="ph tt">sttResultMode</tt> equals <tt class="ph tt">complete</tt>.
 </p>
 
   <dl class="dl">
@@ -1382,7 +1312,10 @@ This operator supports 20 parameters.
      <dt class="dt dlterm"><a name="spldoc_operator__parameter__wordAlternativesThreshold"><!-- --></a><tt class="ph tt">wordAlternativesThreshold</tt></dt>
 
      <dd class="dd">
-<p class="p">        This parameter controls the density of the word alternatives results (a.k.a. Confusion Networks). A value of 0.6          disables this feature. Valid value must be less than 1.0 (Default is 0.0)         see: <a class="xref" href="https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-output#word_alternatives">https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-output#word_alternatives</a> 
+<p class="p">        This parameter controls the density of the word alternatives results (a.k.a. Confusion Networks). A value of 0.0          disables this feature. Valid value must be less than 1.0 (Default is 0.0)         see: <a class="xref" href="https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-output#word_alternatives">https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-output#word_alternatives</a> 
+</p>
+
+<p class="p">        <strong class="ph b">Note:</strong> This parameter is not valid if <tt class="ph tt">sttResultMode</tt> equals <tt class="ph tt">complete</tt>.
 </p>
 
   <dl class="dl">
@@ -1568,15 +1501,13 @@ This operator supports 20 parameters.
 
 <li class="li"> 4=listening: listening received</li>
 
-<li class="li"> 5=closing: transcription is finalized - close the connection</li>
+<li class="li"> 5=error: error received during transcription</li>
 
-<li class="li"> 6=error: error received during transcription</li>
+<li class="li"> 6=closed: connection has closed</li>
 
-<li class="li"> 7=closed: connection has closed</li>
+<li class="li"> 7=failed: connection has failed</li>
 
-<li class="li"> 8=failed: connection has failed</li>
-
-<li class="li"> 9=crashed: Error was caught in ws_init tread</li>
+<li class="li"> 8=crashed: Error was caught in ws_init tread</li>
 
 </ul>
 

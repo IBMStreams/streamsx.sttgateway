@@ -22,7 +22,7 @@
 <div class="body refbody">
 <div class="section">
 <p class="p">
-<a class="xref" href="../toolkits/toolkits.html">Gateway to the IBM Speech To Text (STT) cloud service</a> &gt; <a class="xref" href="tk$com.ibm.streamsx.sttgateway.html">com.ibm.streamsx.sttgateway 2.1.2</a> &gt; <a class="xref" href="ns$com.ibm.streamsx.sttgateway.watson.html">com.ibm.streamsx.sttgateway.watson</a> &gt; Utils.spl</p>
+<a class="xref" href="../toolkits/toolkits.html">Gateway to the IBM Speech To Text (STT) cloud service</a> &gt; <a class="xref" href="tk$com.ibm.streamsx.sttgateway.html">com.ibm.streamsx.sttgateway 2.2.0</a> &gt; <a class="xref" href="ns$com.ibm.streamsx.sttgateway.watson.html">com.ibm.streamsx.sttgateway.watson</a> &gt; Utils.spl</p>
 
 </div>
 
@@ -38,6 +38,22 @@
       <dd class="dd">
 <ul class="sl simple">
 <li class="sli"><strong class="ph b"><a class="xref" href="spl$com.ibm.streamsx.sttgateway.watson$Utils.html#spldoc_compilationunit__function__hourMinuteSecondMillisec.timestamp">hourMinuteSecondMillisec(timestamp)</a></strong>: Function hourMinuteSecondMillisec 
+</li>
+
+</ul>
+
+      </dd>
+
+    
+    
+      <dt class="dt dlterm splhead-2">Types</dt>
+
+      <dd class="dd">
+<ul class="sl simple">
+<li class="sli"><strong class="ph b"><a class="xref" href="spl$com.ibm.streamsx.sttgateway.watson$Utils.html#spldoc_compilationunit__type__STTAllResult_t">STTAllResult_t</a></strong>: This type STTAllResult_t is the STT result type with all transcription results.
+</li>
+
+<li class="sli"><strong class="ph b"><a class="xref" href="spl$com.ibm.streamsx.sttgateway.watson$Utils.html#spldoc_compilationunit__type__STTResult_t">STTResult_t</a></strong>: This type STTResult_t is the basic STT result type with essential transcription results.
 </li>
 
 </ul>
@@ -82,6 +98,44 @@
 <ul class="sl simple"><li class="sli">
 the formatted time string</li>
 </ul>
+
+</div>
+
+<div class="section"><h2 class="title sectiontitle splhead-1">Types</h2>
+  
+</div>
+
+<div class="section" id="spldoc_compilationunit__type__STTResult_t"><h2 class="title sectiontitle splpart">STTResult_t</h2>
+  
+</div>
+<div class="section">
+
+<p class="p">This type STTResult_t is the basic STT result type with essential transcription results. 
+</p>
+
+</div>
+
+<div class="section">
+   <p class="p">
+<tt class="ph tt">STTResult_t = boolean transcriptionCompleted, rstring sttErrorMessage, boolean finalizedUtterance, int32 utteranceNumber, float64 confidence, float64 utteranceStartTime, float64 utteranceEndTime, rstring utteranceText, rstring conversationId;</tt>
+   </p>
+
+</div>
+
+<div class="section" id="spldoc_compilationunit__type__STTAllResult_t"><h2 class="title sectiontitle splpart">STTAllResult_t</h2>
+  
+</div>
+<div class="section">
+
+<p class="p">This type STTAllResult_t is the STT result type with all transcription results. 
+</p>
+
+</div>
+
+<div class="section">
+   <p class="p">
+<tt class="ph tt">STTAllResult_t = boolean transcriptionCompleted, rstring sttErrorMessage, boolean finalizedUtterance, int32 utteranceNumber, float64 confidence, float64 utteranceStartTime, float64 utteranceEndTime, rstring utteranceText, list&lt;rstring&gt; utteranceAlternatives, list&lt;rstring&gt; utteranceWords, list&lt;float64&gt; utteranceWordsConfidences, list&lt;float64&gt; utteranceWordsStartTimes, list&lt;float64&gt; utteranceWordsEndTimes, list&lt;list&lt;rstring&gt;&gt; wordAlternatives, list&lt;list&lt;float64&gt;&gt; wordAlternativesConfidences, list&lt;float64&gt; wordAlternativesStartTimes, list&lt;float64&gt; wordAlternativesEndTimes, list&lt;int32&gt; utteranceWordsSpeakers, list&lt;float64&gt; utteranceWordsSpeakersConfidences, list&lt;tuple&lt;float64 startTime, int32 speaker, float64 confidence&gt;&gt; utteranceWordsSpeakerUpdates, map&lt;rstring, list&lt;tuple&lt;float64 startTime, float64 endTime, float64 confidence&gt;&gt;&gt; keywordsSpottingResults, rstring conversationId;</tt>
+   </p>
 
 </div>
 

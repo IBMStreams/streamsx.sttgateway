@@ -210,17 +210,17 @@ ffmpeg -i MyFile.wav -ac 1 -ar 8000 MyNewFile.wav
  			(float64)getSubmissionTimeValue("customizationWeight", "0.30");
  		expression&lt;int32&gt; $sttBatchSize : (int32)getSubmissionTimeValue("sttBatchSize", "0");
  		expression&lt;int32&gt; $maxUtteranceAlternatives : 
- 			(int32)getSubmissionTimeValue("maxUtteranceAlternatives", "1");	
+ 			(int32)getSubmissionTimeValue("maxUtteranceAlternatives", "3");	
  		expression&lt;boolean&gt; $sttRequestLogging : 
  			(boolean)getSubmissionTimeValue("sttRequestLogging", "false");
  		expression&lt;boolean&gt; $filterProfanity : 
  			(boolean)getSubmissionTimeValue("filterProfanity", "false");
  		expression&lt;float64&gt; $wordAlternativesThreshold : 
- 			(float64)getSubmissionTimeValue("wordAlternativesThreshold", "0.0");
+ 			(float64)getSubmissionTimeValue("wordAlternativesThreshold", "0.6");
  		expression&lt;boolean&gt; $smartFormattingNeeded : 
  			(boolean)getSubmissionTimeValue("smartFormattingNeeded", "false");
  		expression&lt;float64&gt; $keywordsSpottingThreshold : 
- 			(float64)getSubmissionTimeValue("keywordsSpottingThreshold", "0.0");
+ 			(float64)getSubmissionTimeValue("keywordsSpottingThreshold", "0.3");
  		expression&lt;list&lt;rstring&gt;&gt; $keywordsToBeSpotted : 
  			(list&lt;rstring&gt;)getSubmissionTimeValue("keywordsToBeSpotted", "[]");	
  		expression&lt;boolean&gt; $websocketLoggingNeeded : 
@@ -242,27 +242,7 @@ ffmpeg -i MyFile.wav -ac 1 -ar 8000 MyNewFile.wav
  		// Read the streamsx.sttgateway toolkit documentation to learn about
  		// what features are available, how they work and how different attributes are 
  		// related to those features.
- 		STTResult_t = rstring conversationId, int32 utteranceNumber,
- 			boolean finalizedUtterance,
- 			boolean transcriptionCompleted,
- 			rstring sttErrorMessage,
- 			float64 confidence,
- 			float64 utteranceStartTime,
- 			float64 utteranceEndTime,
- 			rstring utteranceText,
- 			list&lt;rstring&gt; utteranceAlternatives, 
- 			list&lt;list&lt;rstring&gt;&gt; wordAlternatives,
- 			list&lt;list&lt;float64&gt;&gt; wordAlternativesConfidences,
- 			list&lt;float64&gt; wordAlternativesStartTimes,
- 			list&lt;float64&gt; wordAlternativesEndTimes,
- 			list&lt;rstring&gt; utteranceWords,
- 			list&lt;float64&gt; utteranceWordsConfidences,
- 			list&lt;float64&gt; utteranceWordsStartTimes,
- 			list&lt;float64&gt; utteranceWordsEndTimes,
- 			list&lt;int32&gt; utteranceWordsSpeakers,
- 			list&lt;float64&gt; utteranceWordsSpeakersConfidences,
- 			map&lt;rstring, list&lt;map&lt;rstring, float64&gt;&gt;&gt; keywordsSpottingResults,
- 			int32 sequence;
+ 		STTResultType = STTAllResult_t, tuple&lt;int32 sequence&gt;;
  
  	graph
  		// IMPORTANT: IBM STT service on public cloud requires
@@ -333,7 +313,7 @@ ffmpeg -i MyFile.wav -ac 1 -ar 8000 MyNewFile.wav
  		// First input stream into this operator is the fully qualified audio file name.
  		// Second input stream into this operator is your STT service instance's IAM access token.
  		@parallel(width = $numberOfSTTEngines, broadcast=[AT])
- 		stream&lt;STTResult_t&gt; STTResult = 
+ 		stream&lt;STTResultType&gt; STTResult = 
  			WatsonSTT(AudioFileNameFlagged as AFN; IamAccessToken as AT) {
  			logic
  				state: {
@@ -418,6 +398,7 @@ ffmpeg -i MyFile.wav -ac 1 -ar 8000 MyNewFile.wav
  					// Speaker label a.k.a. Speaker id
  					utteranceWordsSpeakers = getUtteranceWordsSpeakers(),
  					utteranceWordsSpeakersConfidences = getUtteranceWordsSpeakersConfidences(),
+ 					utteranceWordsSpeakerUpdates = getUtteranceWordsSpeakerUpdates(),
  					// Results from keywords spotting (matching) in an utterance.
  					keywordsSpottingResults = getKeywordsSpottingResults();
  
