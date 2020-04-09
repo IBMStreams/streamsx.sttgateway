@@ -31,7 +31,6 @@ com.ibm.streamsx.sttgateway/lib/libboost_thread*
 
 # ignore downloads in ext dir but do not ignore rapidjson
 /ext/websocketpp*
-#/ext/boost-install-files/boost_1_69_0/
 /ext/boost*
 
 # ignore the toolkit documentation directory.
