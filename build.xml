@@ -17,7 +17,10 @@
 
 	<property name="websocket.version"  value="0.8.1"/>
 	<property name="boost.version"      value="1.69.0"/>
-	<property name="boost.achive"       value="boost_1_69_0.tar.gz"/>
+	<property name="boost.archive"      value="boost_1_69_0.tar.gz"/>
+	<!-- use a local archive name with pattern name-X.Y.Z.tar.gz to make the split into name and version easier for the
+	scripts in production -->
+	<property name="boost.archive.local" value="boost-${boost.version}.tar.gz"/>
 	<property name="rapidjson.version"  value="1.1.0"/>
 
 	<exec executable="bash" outputproperty="boost.version.name" failonerror="true">
@@ -28,9 +31,9 @@
 	<property name="websocket.archive"  value="https://github.com/zaphoyd/websocketpp/archive"/>
 	<!-- since download is not possible from archive 1 : returns 403 forbidden 
 	try to download from second archive -->
-	<property name="boost.archive0" value="http://syss114.pok.stglabs.ibm.com:8081/nexus/content/repositories/Streams.external/external/noarch/noarch/boost-sources/1.69.0/boost-sources-1.69.0.tar.gz"/>
-	<property name="boost.archive.location1" value="https://dl.bintray.com/boostorg/release"/>
-	<property name="boost.archive.location2" value="https://downloads.sourceforge.net/project/boost/boost"/>
+	<property name="boost.archive.src0" value="http://syss114.pok.stglabs.ibm.com:8081/nexus/content/repositories/Streams.external/external/noarch/noarch/boost-sources/1.69.0/boost-sources-1.69.0.tar.gz"/>
+	<property name="boost.archive.loc1" value="https://dl.bintray.com/boostorg/release"/>
+	<property name="boost.archive.loc2" value="https://downloads.sourceforge.net/project/boost/boost"/>
 	
 	<property name="boost.str"          value="boost"/>
 	<property name="websocket.str"      value="websocketpp"/>
@@ -64,7 +67,7 @@
 	
 	<available property="websocket.src.dir.exists" file="${ext.dir}/${websocket.str}-${websocket.version}/${websocket.str}" type="dir"/>
 	<available property="boost.exists" file="${ext.dir}/boost-install-files/${boost.str}_${boost.version.name}" type="dir"/>
-	<available property="boost.archive.exists" file="${ext.dir}/boost-install-files/${boost.achive}" type="file"/>
+	<available property="boost.archive.exists" file="${ext.dir}/boost-install-files/${boost.archive.local}" type="file"/>
 
 	<!-- Create the time stamp -->
 	<tstamp/>
@@ -136,7 +139,7 @@
 		<echo>Untar and bootstrap boost ${boost.version}</echo>
 		<exec dir="${ext.dir}/boost-install-files" executable="tar">
 			<arg value="xzf"/>
-			<arg value="${boost.achive}"/>
+			<arg value="${boost.archive.local}"/>
 		</exec>
 		<exec executable="./bootstrap.sh" dir="${ext.dir}/boost-install-files/boost_${boost.version.name}" failonerror="true">
 			<arg value="--prefix=${prefix.dir}"/>
@@ -145,20 +148,21 @@
 	
 	<!-- download from archive1 2 or 3-->
 	<target name="download-boost-target" depends="init" unless="${boost.archive.exists}">
-		<echo>Download from ${boost.archive0}</echo>
-		<get src="${boost.archive0}" dest="${ext.dir}/boost-install-files/${boost.achive}"
+		<echo>Download from ${boost.archive.src0}</echo>
+		<get src="${boost.archive.src0}" dest="${ext.dir}/boost-install-files/${boost.archive.local}"
 			verbose="true" ignoreerrors="true" skipexisting="true"/>
-		<echo>Download from ${boost.archive.location1}</echo>
-		<get src="${boost.archive.location1}/${boost.version}/source/${boost.achive}" dest="${ext.dir}/boost-install-files"
+		<echo>Download from ${boost.archive.loc1}</echo>
+		<get src="${boost.archive.loc1}/${boost.version}/source/${boost.archive}" dest="${ext.dir}/boost-install-files/${boost.archive.local}"
 			verbose="true" ignoreerrors="true" skipexisting="true"/>
-		<echo>Download from ${boost.archive.location2}</echo>
-		<get src="${boost.archive.location2}/${boost.version}/${boost.achive}" dest="${ext.dir}/boost-install-files"
-			verbose="true" skipexisting="true"/>
+		<echo>Download from ${boost.archive.loc2}</echo>
+		<get src="${boost.archive.loc2}/${boost.version}/${boost.archive}" dest="${ext.dir}/boost-install-files/${boost.archive.local}"
+			verbose="true" ignoreerrors="false" skipexisting="true"/>
 	</target>
 
 	<target name="download-clean"
 		description="Clean up downloaded library sources and the libraries build artifacts from ext directory">
 		<delete includeemptydirs="true">
+			<!-- do not delete rapidjson because this lib is not downloaded -->
 			<fileset dir="${ext.dir}" excludes="${rapidjson.str}/*"/>
 		</delete>
 	</target>
