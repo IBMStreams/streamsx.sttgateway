@@ -238,6 +238,7 @@ composite WatsonSTTParallelRaw {
 				utteranceWordsSpeakersConfidences = getUtteranceWordsSpeakersConfidences(),
 				keywordsSpottingResults = getKeywordsSpottingResults();
 			config
+				threadedPort : queue(I, Sys.Wait, 100000);
 				//<fused*>placement : partitionColocation("somePartitionColocationId");
 				//<unFused*>placement : partitionIsolation;
 			
