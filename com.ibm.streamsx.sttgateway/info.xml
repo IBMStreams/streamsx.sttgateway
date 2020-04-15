@@ -10,7 +10,7 @@
     This toolkit does Speech To Text transcription using an external provider such as the IBM Watson STT cloud service 
     or on the IBM Cloud Pak for Data (CP4D i.e. private cloud).
     </description>
-    <version>2.2.0</version>
+    <version>2.2.1</version>
     <requiredProductVersion>4.2.1.6</requiredProductVersion>
   </identity>
   <dependencies>

@@ -1,4 +1,7 @@
 # Changes
+## v2.2.1
+* Include the operator *.pm files into the toolkit bundle
+
 ## v2.2.0
 * WatsonSTT: Enhancement: Output Speaker Label Updates COF getUtteranceWordsSpeakerUpdates (issue #38)
 * WatsonSTT: Use useful default paramters: maxUtteranceAlternatives, wordAlternativesThreshold and keywordsSpottingThreshold (issue #40)

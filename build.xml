@@ -102,6 +102,7 @@
 		<exec executable="${spl-mt}" failonerror="true">
 			<arg value="--directory"/>
 			<arg value="${toolkit.dir}"/>
+			<arg value="-m"/>
 		</exec>
 	</target>
 
@@ -444,6 +445,11 @@
 			<arg value="clean"/>
 			<arg value="--dry-run"/>
 			<arg value="-d"/>
+			<!-- do no clean up for all studio files which are excluded from the release package -->
+			<arg value="--exclude=${toolkit.dir}/.settings"/>
+			<arg value="--exclude=${toolkit.dir}/.externalToolBuilders"/>
+			<arg value="--exclude=**/.apt_generated"/>
+			<arg value="--exclude=**/.toolkitList"/>
 			<arg value="-x"/>
 			<arg value="--"/>
 			<arg value="${toolkit.dir}"/>
