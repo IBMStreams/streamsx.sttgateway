@@ -102,6 +102,7 @@
 		<exec executable="${spl-mt}" failonerror="true">
 			<arg value="--directory"/>
 			<arg value="${toolkit.dir}"/>
+			<arg value="-m"/>
 		</exec>
 	</target>
 
