@@ -715,8 +715,6 @@ composite IBMWatsonSpeech2Text(input AudioBlobContent; output S2TResult, S2TDiag
 			getSubmissionTimeValue("watsonGrammarPatchWeights1", "0.7") ;
 		expression<rstring> $watsonAMPatchFile :
 			getSubmissionTimeValue("watsonAMPatchFile", "");
-		expression<boolean> $outputNBestUtterances :(boolean)
-			getSubmissionTimeValue("OutputNBestUtterances", "false") ;
 
 	graph
 		// This Custom operator receives the tuple sent by the Voice Gateway Source operator and
