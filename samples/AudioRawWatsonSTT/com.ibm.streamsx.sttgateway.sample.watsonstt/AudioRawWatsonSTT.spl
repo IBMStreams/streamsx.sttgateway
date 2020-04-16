@@ -206,6 +206,9 @@ public composite AudioRawWatsonSTT {
 				utterance = getUtteranceText();
 			config
 				placement : partitionColocation("somePartitionColocationId");
+				// The input queue must be big enough to store one ore more files
+				// otherwise one parallel channel may cause back pressure and the other channel may be starved out
+				threadedPort : queue(I, Sys.Wait, 100000);
 		}
 		
 		// Print the results

@@ -2,20 +2,13 @@
 # others. All Rights Reserved.                        
 .PHONY: build all distributed clean
 
-# You must ensure that the following line points to your 
-# correct STT Gateway toolkit directory that is of v1.0.5 or above.
+# You must ensure that the minimum required toolkits are stored under the 
+# following default locations
+# or set the aproppriate environment variable with your individual storage path
 STREAMS_STTGATEWAY_TOOLKIT ?= $(PWD)/../../com.ibm.streamsx.sttgateway
-# You must ensure that the following line points to your
-# correct JSON toolkit directory that is of v1.4.6 or above.
 STREAMS_JSON_TOOLKIT ?= $(STREAMS_INSTALL)/toolkits/com.ibm.streamsx.json
-# You must ensure that the following line points to your 
-# correct Network toolkit directory that is of v3.0.5.
-STREAMS_NETWORK_TOOLKIT ?= $(HOME)/streamsx.network-rtp-dev
-# You must ensure that the following line points to your 
-# correct Speech2Text toolkit directory that is of any version from v2.9.1 to v2.12.0.
+STREAMS_NETWORK_TOOLKIT ?= $(HOME)/streamsx.network-v3.4.0
 STREAMS_S2T_TOOLKIT ?= $(HOME)/toolkit.speech2text-v2.12.0
-# You must ensure that the following line points to your 
-# correct inet toolkit directory that is of v3.0.0 or above.
 STREAMS_INET_TOOLKIT ?= $(STREAMS_INSTALL)/toolkits/com.ibm.streamsx.inet
 
 ifeq ($(STREAMS_STUDIO_BUILDING), 1)
