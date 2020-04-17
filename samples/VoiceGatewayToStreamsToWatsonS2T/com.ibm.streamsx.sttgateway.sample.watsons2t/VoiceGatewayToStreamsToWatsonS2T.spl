@@ -104,6 +104,21 @@ stt_restults_http_receiver is the name of that test application.
 3) When the live calls are happening, you can watch the data directory in your copy of
 this application for specific files per call that will show you just the utterances or 
 the full transcription details for every voice call.
+
+E) Running this example without a IBM Voice Gateway
+You can use the VoiceDataSimulator program from the samples directory to emulate a voice gateway.
+In this case the VoiceDataSimulator must read audio files with 8-bit pcm u-law samples.
+You can convert the samples from the audio-files directory using the following command:
+
+sndfile-convert -ulaw 01-call-center-10sec.wav 01-call-center-10sec.gsm
+
+or all files:
+for x in *.wav; do y="${x%.wav}"; echo "$y"; sndfile-convert -ulaw "$x" "${y}.gsm"; done
+
+The command sndfile-convert is part of the package libsndfile-utils
+
+Play the gsm-file with command:
+play -t raw -r 8k -e mu-law -b 8 -c 1 JFKulaw.gsm
 ==============================================
 */
 
@@ -798,7 +813,11 @@ composite IBMWatsonSpeech2Text(input AudioBlobContent; output S2TResult, S2TDiag
 				watsonGrammarPatchWeights: $watsonGrammarPatchWeights1;
 				watsonAMPatchFile: $watsonAMPatchFile;
 				
-				//
+				// to enable consensus
+				// Argument threshold must be from range 0.0 .. 1.0 For value 0.0 no consensus will be computed. 
+				// Default is taken from configuration file.
+				consensusThreshold: 0.01;
+				
 				// If we set this to false, then it will process every incoming 
 				// partial blob fragment which may not have enough data to 
 				// result in a meaningful text. You are better off setting it to 

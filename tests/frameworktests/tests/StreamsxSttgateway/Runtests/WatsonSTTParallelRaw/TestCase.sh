@@ -13,7 +13,8 @@ declare -A description=(
 PREPS=(
 	'echo "${description[$TTRO_variantCase]}"'
 	'copyAndMorphSpl'
-	'splCompile --c++std=c++11'
+	'setVar TTPR_STTWidth 4'
+	'splCompile --c++std=c++11 width=$TTPR_STTWidth'
 	'TT_traceLevel="info"'
 )
 

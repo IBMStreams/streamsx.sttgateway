@@ -1,0 +1,197 @@
+use com.ibm.streams.speech2text.watson::*;
+use spl.file::*;
+use com.ibm.streamsx.testframe::FileSink1;
+
+type
+	STTResult = uint64 myseq, rstring conversationId, int32 utteranceNumber,
+		boolean transcriptionCompleted,
+		float64 confidence,
+		float64 utteranceStartTime,
+		float64 utteranceEndTime,
+		rstring utteranceText,
+		list<rstring> utteranceAlternatives,
+		list<rstring> utteranceWords,
+		list<float64> utteranceWordsConfidences,
+		list<float64> utteranceWordsStartTimes,
+		list<list<rstring>> wordAlternatives,
+		list<list<float64>> wordAlternativesConfidences,
+		list<float64> wordAlternativesStartTimes,
+		list<int32> utteranceWordsSpeakers;
+	
+	type
+		diagnosticsPayload = tuple<rstring log>;
+
+composite WatsonS2TParallelFile {
+	param
+		expression<rstring> $audioDir:     getSubmissionTimeValue("audioDir");
+		
+		expression<uint32>  $audioBlobFragmentSize: (uint32)getSubmissionTimeValue("audioBlobFragmentSize", "512");
+		expression<int32>   $width : (int32)getCompileTimeValue("width");
+		
+		expression<list<rstring>> $filesList :
+				["01-call-center-10sec.wav", "02-call-center-25sec.wav", "03-call-center-28sec.wav",
+				"04-empty-audio.wav", "05-gettysburg-address-2min.wav", "06-ibm-earnings-1min.wav",
+				"07-ibm-earnings-2min.wav", "08-ibm-watson-ai-3min.wav", "09-ibm-watson-law-4min.wav",
+				"10-invalid-audio.wav", "11-ibm-culture-2min.wav", "12-jfk-speech-12sec.wav"];
+				
+	graph
+		
+		stream<rstring fileName> FileNameStream as O = Beacon() {
+			param
+				iterations: size($filesList);
+				initDelay: 5.0;
+			output O:
+				fileName = $audioDir + "/" + $filesList[IterationCount()];
+			config
+				placement : partitionColocation("part1"), partitionExlocation("part2");
+		}
+		
+		(
+			stream<list<float32> samples, rstring conversationId, uint64 myseq> Samples as O;
+			stream<diagnosticsPayload> FileDiagnostics
+		) = AudioSource(FileNameStream) {
+			logic
+				state : mutable uint64 cnt = 0ul;
+			param
+				samplingRate : 8000u;
+				file : fileName;
+				samplesPerTuple : $audioBlobFragmentSize;
+				verbose : true;
+			output O:
+				samples = getSpeech(),
+				conversationId = fileName,
+				myseq = cnt++;
+			config
+				placement : partitionColocation("part1");
+		}
+
+		() as SinkFileDiagnostics = FileSink(FileDiagnostics) {
+			param
+				file: "fileDiagnostics.txt";
+				format : txt ;
+				writePunctuations : true;
+			config
+				placement : partitionColocation("part1");
+		}
+
+		@parallel(width = $width, partitionBy=[{port=I, attributes=[conversationId]}])
+		(
+			stream<STTResult> Utterances;
+			stream<diagnosticsPayload, tuple<rstring conversationId, uint64 myseq, int32 channel>> Diagnostics
+		) as SpeechToText = S2TSpeechProcessor(Samples as I) {
+		}
+
+		() as Sink = FileSink1(Utterances) { }
+
+		stream<uint64 myseq, rstring conversationId, int32 utteranceNumber, rstring utteranceText> UtterancesOnly as O
+		= Custom(Utterances as I) {
+			logic onTuple I : {
+				if (! transcriptionCompleted) {
+					O otuple = {myseq = myseq, conversationId = conversationId, utteranceNumber = utteranceNumber, utteranceText = utteranceText};
+					submit(otuple, O);
+				}
+			}
+			config
+				placement : partitionColocation("part2"), partitionExlocation("part1");
+		}
+
+		() as Sink1 = FileSink(UtterancesOnly) {
+			param
+				file: "utterances.txt";
+				format : txt ;
+				writePunctuations : true;
+			config
+				placement : partitionColocation("part2");
+		}
+		
+		() as SinkDiagnostics = FileSink(Diagnostics) {
+			param
+				file: "diagnostics.txt";
+				format : txt ;
+				writePunctuations : true;
+			config
+				placement : partitionColocation("part2");
+		}
+
+	config
+		restartable: false;
+}
+
+composite S2TSpeechProcessor(output stream<STTResult> Utterances, stream<diagnosticsPayload, tuple<rstring conversationId, uint64 myseq, int32 channel>> Diagnostics; input Samples) {
+	param
+		expression<rstring> $watsonModelDir   : getSubmissionTimeValue("watsonModelDir");
+		expression<rstring> $watsonModelFile  : getSubmissionTimeValue("watsonModelFile", "en_US.8kHz.general.pkg");
+		expression<rstring> $watsonConfigFile : getSubmissionTimeValue("watsonConfigFile", "en_US.8kHz.general.diarization.attention.pset");
+	
+	graph
+		(
+			stream<STTResult> Utterances0 as O;
+			stream<diagnosticsPayload, tuple<rstring conversationId, uint64 myseq, int32 channel>> Diagnostics as DIAG
+		) as SpeechToText = WatsonS2T(Samples as I) {
+			param
+				watsonConfigFile :  $watsonModelDir + "/" + $watsonConfigFile;
+				watsonModelFile  :  $watsonModelDir + "/" + $watsonModelFile;
+				resetOnPunct : true;
+				punctuationOnReset : true;
+				samplingRate : 8000.0l;
+				speech : samples;
+				includeTransparentWords : true;
+				// to enable consensus
+				consensusThreshold: 0.01;
+				//verbose : true; //remove the verbose parameter in production code
+			output
+				O :
+					utteranceNumber = getUtteranceNumber(),
+					transcriptionCompleted = false,
+					confidence = getUtteranceConfidence(),
+					utteranceStartTime = getUtteranceStartTime(),
+					utteranceEndTime = getUtteranceEndTime(),
+					utteranceText = getUtteranceText(),
+					utteranceAlternatives = getNBestHypotheses(),
+					utteranceWords = getUtteranceWords(),
+					utteranceWordsConfidences = getUtteranceWordConfidences(),
+					utteranceWordsStartTimes = getUtteranceWordStartTimes(),
+					// Confusion networks (a.k.a. Consensus)
+					wordAlternatives = getConsensusList(),
+					wordAlternativesConfidences = getConsensusConfidences(),
+					wordAlternativesStartTimes = getConsensusStartTimes(),
+					// Speaker label a.k.a. Speaker id
+					utteranceWordsSpeakers = getUtteranceSpeakers();
+				DIAG :
+					log = getDiagnosticsMessage(),
+					channel = getChannel();
+			config
+				threadedPort : queue(I, Sys.Wait, 100000);
+				placement :
+					partitionColocation("s2t_" + (rstring)getChannel()),
+					/*
+					 * Speech2Text operators may NOT run in the same PE (partition)
+					 * You can use operator parallelism, but you must ensure that they
+					 * are not fused together by adding the partitionExlocation configuration. 
+					 */
+					partitionExlocation("s2t_operators"),
+					partitionExlocation("part1"),
+					partitionExlocation("part2");
+		}
+	
+		stream<STTResult> Utterances as O = Custom(Utterances0 as I) {
+			logic
+				state : mutable rstring id = "";
+			onTuple I : {
+				id = conversationId;
+				submit(I, O);
+			}
+			onPunct I : {
+				if (currentPunct() == Sys.WindowMarker) {
+					if (id != "") {
+						mutable O otuple = {};
+						otuple.conversationId = id;
+						otuple.transcriptionCompleted = true;
+						submit(otuple, O);
+					}
+				}
+			}
+			config
+				placement : partitionColocation("s2t_" + (rstring)getChannel());
+		}
+}	
