@@ -16,6 +16,7 @@ composite WatsonSTTParallelRaw {
 		expression<rstring> $iamTokenURL : getSubmissionTimeValue("iamTokenURL", "https://iam.cloud.ibm.com/identity/token");
 		expression<rstring> $uri : getSubmissionTimeValue("uri");
 		expression<int64>   $audioBlobFragmentSize: (int64)getSubmissionTimeValue("audioBlobFragmentSize", "512");
+		expression<int32>   $width : (int32)getCompileTimeValue("width");
 		
 		expression<list<rstring>> $filesList :
 				["01-call-center-10sec.wav", "02-call-center-25sec.wav", "03-call-center-28sec.wav",
@@ -205,7 +206,7 @@ composite WatsonSTTParallelRaw {
 				//<unFused*>placement : partitionIsolation;
 		}
 
-		@parallel(width = 4, partitionBy=[{port=I, attributes=[conversationId]}], broadcast=[AT])
+		@parallel(width = $width, partitionBy=[{port=I, attributes=[conversationId]}], broadcast=[AT])
 		stream<STTResult> STTResultStream as O = WatsonSTT(AudioContentStream as I; IAMAccessTokenStream as AT) {
 			param
 				uri: $uri;

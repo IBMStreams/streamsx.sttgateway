@@ -14,7 +14,7 @@ composite WatsonSTTParallelFile {
 		expression<float64> $wordAlternativesThreshold : (float64)getSubmissionTimeValue("wordAlternativesThreshold", "0.93");
 		expression<rstring> $iamTokenURL : getSubmissionTimeValue("iamTokenURL", "https://iam.cloud.ibm.com/identity/token");
 		expression<rstring> $uri : getSubmissionTimeValue("uri");
-		
+		expression<int32>   $width : (int32)getCompileTimeValue("width");
 		
 		expression<list<rstring>> $filesList :
 				["01-call-center-10sec.wav", "02-call-center-25sec.wav", "03-call-center-28sec.wav",
@@ -76,7 +76,7 @@ composite WatsonSTTParallelFile {
 				//<unFused*>placement : partitionIsolation;
 		}
 
-		@parallel(width = 4, broadcast=[AT])
+		@parallel(width = $width, broadcast=[AT])
 		stream<STTResult> STTResultStream as O = WatsonSTT(FileNameStreamPunct as I; IAMAccessTokenStream as AT) {
 			param
 				uri: $uri;
@@ -110,6 +110,7 @@ composite WatsonSTTParallelFile {
 				utteranceWordsSpeakersConfidences = getUtteranceWordsSpeakersConfidences(),
 				keywordsSpottingResults = getKeywordsSpottingResults();
 			config
+				threadedPort : queue(I, Sys.Wait, 100);
 				//<fused*>placement : partitionColocation("somePartitionColocationId");
 				//<unFused*>placement : partitionIsolation;
 			
