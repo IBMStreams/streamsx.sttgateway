@@ -232,18 +232,11 @@ achieve Real-Time Speech-To-Text transcription to get the text ready for any fur
  		// int32 totalSpeechDataBytesReceived --&gt; Number of speech bytes received so far on a given channel (customer or agent) for a given vgwSessionId.
  		// int32 s2tEngineId --&gt; This attribute will be set in the next operator. (Please, read the comments there.)
  		// int32 s2tResultProcessorId --&gt; This attribute will be set in the next operator. (Please, read the comments there.)
- 		// blob payload --&gt; This is strictly needed only in the VoiceGatewayToStreamsToWatsonS2T application since it requires the
- 		//                  RtpDecode operator which expects this attribute to contain the mulaw formatted speech blob fragment.
- 		//                  In order to support this application's need, we are forced to copy the contents of the 
- 		//                  blob speech attribute into this payload attribute. This memory copy is an unavoidable 
- 		//                  performance overhead for the VoiceGatewayToStreamsToWatsonS2T application. We have to live with it.
- 		// int32 payloadLength --&gt; Description above for the payload attribute is applicable here as well.
  		BinarySpeech_t = blob speech, rstring vgwSessionId, boolean isCustomerSpeechData, 
  			int32 vgwVoiceChannelNumber, rstring id,
  			rstring callerPhoneNumber, rstring agentPhoneNumber, 
  			int32 speechDataFragmentCnt, int32 totalSpeechDataBytesReceived, 
- 			int32 s2tEngineId, int32 s2tResultProcessorId,
- 			blob payload, int32 payloadLength;
+ 			int32 s2tEngineId, int32 s2tResultProcessorId;
  		// The following schema is for the second output stream of the
  		// IBMVoiceGatewaySource operator. It has three attributes indicating
  		// the speaker channel (vgwVoiceChannelNumber) of a given voice call (vgwSessionId) who
@@ -374,7 +367,7 @@ achieve Real-Time Speech-To-Text transcription to get the text ready for any fur
  					_key = BSD.vgwSessionId + "_" + (rstring)BSD.vgwVoiceChannelNumber;
  					
  					// Check if this vgwSessionId_vgwVoiceChannelNumber combo already 
- 					// has an S2T engine allocated for it via an UDP channel.					
+ 					// has an S2T engine allocated for it via an UDP channel.
  					if (has(_vgwSessionIdToUdpChannelMap, _key) == true) {
  						// This is a speaker of an ongoing voice call who has 
  						// already been assigned to an S2T engine.

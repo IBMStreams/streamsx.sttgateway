@@ -201,12 +201,6 @@ You can build this example from command line via the make command by using the  
 <li class="sli"><strong class="ph b">cpuYieldTimeInAudioSenderThread</strong>: cpuYieldTimeInAudioSenderThread
 </li>
 
-<li class="sli"><strong class="ph b">waitTimeBeforeSTTServiceConnectionRetry</strong>: waitTimeBeforeSTTServiceConnectionRetry
-</li>
-
-<li class="sli"><strong class="ph b">connectionAttemptsThreshold</strong>: connectionAttemptsThreshold
-</li>
-
 <li class="sli"><strong class="ph b">sttLiveMetricsUpdateNeeded</strong>: sttLiveMetricsUpdateNeeded 
 </li>
 
@@ -336,10 +330,6 @@ You can build this example from command line via the make command by using the  
  			(boolean)getSubmissionTimeValue("sttWebsocketLoggingNeeded", "false");
  		expression&lt;float64&gt; $cpuYieldTimeInAudioSenderThread : 
  			(float64)getSubmissionTimeValue("cpuYieldTimeInAudioSenderThread", "0.001");
- 		expression&lt;float64&gt; $waitTimeBeforeSTTServiceConnectionRetry : 
- 			(float64)getSubmissionTimeValue("waitTimeBeforeSTTServiceConnectionRetry", "3.0");
- 		expression&lt;int32&gt; $connectionAttemptsThreshold : 
- 			(int32)getSubmissionTimeValue("connectionAttemptsThreshold", "10");
  		expression&lt;boolean&gt; $sttLiveMetricsUpdateNeeded : 
  			(boolean)getSubmissionTimeValue("sttLiveMetricsUpdateNeeded", "true");
  
