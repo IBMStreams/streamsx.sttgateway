@@ -38,6 +38,10 @@ It provides the following two operators to realize that purpose.
 ## Requirements
 There are certain important requirements that need to be satisfied in order to use the IBM Streams STT Gateway toolkit in Streams applications. Such requirements are explained below.
 
+**Note:** This toolkit is **not** supported on Red Hat Enterprise Linux Workstation release **6.x**
+    
+**Note:** This toolkit requires c++11 support.
+
 1. Network connectivity to the IBM Watson Speech To Text (STT) service running either on the public cloud or on the Cloud Pak for Data (CP4D) is needed from the IBM Streams Linux machines where this toolkit will be used. The same is true to integrate with the IBM Voice Gateway product for the use cases involving speech data ingestion for live voice calls.
 
 2. This toolkit uses Websocket to communicate with the IBM Voice Gateway and the Watson STT service. A valid IAM access token is needed to use the Watson STT service on the public cloud and a valid access token to use the Watson STT service on the CP4D. So, users of this toolkit must provide their public cloud STT service instance's API key or the CP4D STT service instance's access token when launching the Streams application(s) that will have a dependency on this toolkit. When using the API key from the public cloud, a utility SPL composite named IAMAccessTokenGenerator available in this toolkit will be able to generate the IAM access token and then subsequently refresh that token to keep it valid. A Streams application employing this toolkit can make use of that utility composite to generate the necessary IAM access token needed in the public cloud. Please do more reading about the IAM access token from [here](https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-websockets#WSopen).

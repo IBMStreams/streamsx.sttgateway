@@ -9,6 +9,10 @@
     <description>
     This toolkit does Speech To Text transcription using an external provider such as the IBM Watson STT cloud service 
     or on the IBM Cloud Pak for Data (CP4D i.e. private cloud).
+    
+    **Note:** This toolkit is **not** supported on Red Hat Enterprise Linux Workstation release **6.x**
+    
+    **Note:** This toolkit requires c++11 support.
     </description>
     <version>2.2.1</version>
     <requiredProductVersion>4.2.1.6</requiredProductVersion>
