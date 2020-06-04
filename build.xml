@@ -15,9 +15,9 @@
 	<property name="spl-md"             value="${env.STREAMS_INSTALL}/bin/spl-make-doc"/>
 	<property name="spl-st"             value="${env.STREAMS_INSTALL}/bin/streamtool"/>
 
-	<property name="websocket.version"  value="0.8.1"/>
-	<property name="boost.version"      value="1.69.0"/>
-	<property name="boost.archive"      value="boost_1_69_0.tar.gz"/>
+	<property name="websocket.version"  value="0.8.2"/>
+	<property name="boost.version"      value="1.73.0"/>
+	<property name="boost.archive"      value="boost_1_73_0.tar.gz"/>
 	<!-- use a local archive name with pattern name-X.Y.Z.tar.gz to make the split into name and version easier for the
 	scripts in production -->
 	<property name="boost.archive.local" value="boost-${boost.version}.tar.gz"/>
@@ -31,7 +31,7 @@
 	<property name="websocket.archive"  value="https://github.com/zaphoyd/websocketpp/archive"/>
 	<!-- since download is not possible from archive 1 : returns 403 forbidden 
 	try to download from second archive -->
-	<property name="boost.archive.src0" value="http://syss114.pok.stglabs.ibm.com:8081/nexus/content/repositories/Streams.external/external/noarch/noarch/boost-sources/1.69.0/boost-sources-1.69.0.tar.gz"/>
+	<property name="boost.archive.src0" value="http://syss114.pok.stglabs.ibm.com:8081/nexus/content/repositories/Streams.external/external/noarch/noarch/boost-sources/${boost.version}/boost-sources-${boost.version}.tar.gz"/>
 	<property name="boost.archive.loc1" value="https://dl.bintray.com/boostorg/release"/>
 	<property name="boost.archive.loc2" value="https://downloads.sourceforge.net/project/boost/boost"/>
 	
@@ -364,6 +364,7 @@
 			<arg value="--exclude=${toolkit.dir}/pom.xml"/>
 			<arg value="--exclude=${toolkit.dir}/.cproject"/>
 			<arg value="--exclude=${toolkit.dir}/impl/java/*"/>
+			<arg value="--exclude=${toolkit.dir}/lib/cmake"/>
 			<arg value="${toolkit.dir}/"/>
 			<arg value="${samples.dir}/"/>
 			<arg value="${doc.string}/"/>
