@@ -230,16 +230,18 @@ IAM access token from here:
 https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-websockets#WSopen
 
 3. On the IBM Streams application development machine (where the application code is 
-compiled to create the application bundle), it is necessary to download and install 
-the boost_1_69_0 as well as the websocketpp version 0.8.1. 
+compiled to create the application bundle), it is necessary to install the toolkit and the required libraries
+boost_1_73_0, websocketpp version 0.8.2 and rapidjson 1.1.0
+The toolkit release bundle contains all these required dependencies.
 Please note that this is not needed on the Streams application execution machines.
 For the essential steps to meet this requirement, please refer to the above-mentioned 
 documentation URL or a file named sttgateway-tech-brief.txt available at this 
 tooolkit's top-level directory.
 
-4. On the IBM Streams application machines, please ensure that you can run the 
-Linux curl command. This is required by this toolkit to generate and refresh the 
-IAM access token which is a must for the STT service on public cloud.
+4. On the IBM Streams application machines, please ensure that the licurl is installed. 
+This is required by the toolkit dependency to streamsx.inet toolkit. This is required 
+by this toolkit to generate and refresh  and refresh the IAM access token which is a must 
+for the STT service on public cloud.
 
 5. For the IBM Streams and the IBM Voice Gateway products to work together, 
 certain configuration steps must be done as explained here.
@@ -286,6 +288,104 @@ that is shipped with this toolkit to create your own self signed SSL certificate
 
 Major external dependency for this toolkit
 ------------------------------------------
+
+Note: The external dependencies are resolved during the toolkit build process and are 
+shipped with the toolkit archive.
+
+A must do in the Streams applications that will use this toolkit
+----------------------------------------------------------------
+a) You must add this toolkit as a dependency in your application.
+   --> In Streams Studio, you can add this toolkit location in the
+       Streams Explorer view and then add this toolkit as a
+       dependency inside your application project's Dependencies section.
+       
+   --> In a command line compile mode, simply add the -t option to
+       point to this toolkit's top-level or its parent directory.
+
+   --> This toolkit provides secure access to the STT service by
+       generating an IAM access token needed in the public cloud via a 
+       utility SPL composite that can be invoked within a Streams application. 
+       That composite IAMAccessTokenGenerator has a dependency on the 
+       streamsx.json toolkit and to the streamsx.inet toolkit. So, it is necessary 
+       to have the streamsx.json (v1.4.6 or higher) toolkit and the streamsx.inet (v2.3.6 or higher) 
+       on your development machine where you 
+       will build your application. In a command line compile mode, you 
+       have to add the -t option to point to your streamsx.json toolkit directory.
+       
+b) --> In Streams studio, you must double click on the BuildConfig of
+       your application's main composite and then select "Other" in the
+       dialog that is opened. In the "Additional SPL compiler options", you must add
+       the following.
+ 
+       --c++std=c++11
+       
+   --> If you are building your application from the command line, please refer to the
+       Makefile provided in the AudioFileWatsonSTT example shipped with
+       this toolkit. Before using that Makefile, you must set the 
+       STREAMS_STTGATEWAY_TOOLKIT environment variable to point to the full path of   
+       your streamsx.sttgateway/com.ibm.streamsx.sttgateway directory. Similarly,
+       you must set the STREAMS_JSON_TOOLKIT environment variable to point to
+       the full path of your streamsx.json (v1.4.6 or higher) toolkit directory.
+       And, you must set the STREAMS_INET_TOOLKIT environment variable to point to
+       the full path of your streamsx.inet toolkit directory.
+       To build your own applications, you can do the same as done in that Makefile.
+       
+   --> Please note that your IBM public cloud STT instance's API key will have to be
+       provided via a submission time parameter into your application so that 
+       your API key can be used to generate a new IAM access token within 
+       the utility composite IAMAccessTokenGenerator mentioned above. 
+       Since the IAM access tokens will expire after a certain time period, 
+       it is necessary to keep refreshing it periodically. That utility composite 
+       does that as well. This API Key is needed only when using the STT service on
+       public cloud. If the STT service on the IBM Cloud Pak for Data (CP4D) is used,
+       then the API key is not needed. Instead, a never expiring access token
+       obtained from the CP4D STT service instance's web console should be used.
+
+Common log messages generated by the Websocket library
+------------------------------------------------------
+There will be many log messages from the underlying C++ Websocket library
+routinely getting written in the Streams WatsonSTT operator log files.
+Such log messages are about making a connection to the Watson STT service,
+disconnecting from the Watson STT service, receiving Websocket control frames
+during the ongoing transcription etc. For example, in the absence of any 
+audio data available for transcription for a prolonged period (30 seconds or more),
+the Watson STT service will terminate the Websocket connection to better utilize 
+its back-end resources. In that case, a set of messages as shown below will be logged. 
+
+[2018-08-11 10:07:35] [control] Control frame received with opcode 8
+[2018-08-11 10:07:35] [application] Websocket connection closed with the Watson STT service.
+[2018-08-11 10:07:35] [disconnect] Disconnect close local:[1011,see the previous message for the error details.] remote:[1011,see the previous message for the error details.]
+
+These messages are normal and they don't reflect any error in the 
+Streams WatsonSTT operator. When the audio data becomes available later,
+the WatsonSTT operator will reestablish the Websocket connection and continue
+the transcription task. Only when you see any abnormal runtime exception
+errors, you should take actions to diagnose and fix the problem.
+
+Examples that showcase this toolkit's features
+----------------------------------------------
+This toolkit ships with the following examples that can be used as reference applications. 
+These examples showcase the full feature set of the IBMVoiceGatewaySource and the
+WatsonSTT operators that are available within this toolkit. More details about these
+examples can be obtained from the offical documentation for this toolkit.
+
+1) <YOUR_STTGATEWAY_TOOLKIT_HOME>/samples/AudioFileWatsonSTT
+2) <YOUR_STTGATEWAY_TOOLKIT_HOME>/samples/AudioFileWatsonSTTAllOutput
+3) <YOUR_STTGATEWAY_TOOLKIT_HOME>/samples/AudioRawWatsonSTT
+4)  <YOUR_STTGATEWAY_TOOLKIT_HOME>/samples/AudioRawWatsonSTTAllOutput
+5) <YOUR_STTGATEWAY_TOOLKIT_HOME>/samples/VoiceGatewayToStreamsToWatsonSTT
+6) <YOUR_STTGATEWAY_TOOLKIT_HOME>/samples/VoiceGatewayToStreamsToWatsonS2T
+7) <YOUR_STTGATEWAY_TOOLKIT_HOME>/samples/stt_restults_http_receiver
+
+Official documentation for this toolkit
+---------------------------------------
+https://ibmstreams.github.io/streamsx.sttgateway/
+============================================================
+
+
+Information for the installation of the external libraries (done by build script now)
+-------------------------------------------------------------------------------------
+
 Bulk of the Websocket logic in this toolkit's operator relies on the
 following open source C++ Websocket header only library.
 https://github.com/zaphoyd/websocketpp
@@ -382,97 +482,4 @@ a) Download websocketpp v0.8.1 from https://github.com/zaphoyd/websocketpp/relea
     In that way, it is very convenient.)
 
 b) At this time, you may delete the ~/websocket-0.8.1 directory.
-
-A must do in the Streams applications that will use this toolkit
-----------------------------------------------------------------
-a) You must add this toolkit as a dependency in your application.
-   --> In Streams Studio, you can add this toolkit location in the
-       Streams Explorer view and then add this toolkit as a
-       dependency inside your application project's Dependencies section.
-       
-   --> In a command line compile mode, simply add the -t option to
-       point to this toolkit's top-level or its parent directory.
-
-   --> This toolkit provides secure access to the STT service by
-       generating an IAM access token needed in the public cloud via a 
-       utility SPL composite that can be invoked within a Streams application. 
-       That composite IAMAccessTokenGenerator has a dependency on the 
-       streamsx.json toolkit. So, it is necessary to have the streamsx.json 
-       (v1.4.6 or higher) toolkit on your development machine where you 
-       will build your application. In a command line compile mode, you 
-       have to add the -t option to point to your streamsx.json toolkit directory.
-       
-b) --> In Streams studio, you must double click on the BuildConfig of
-       your application's main composite and then select "Other" in the
-       dialog that is opened. In the "C++ compiler options", you must add
-       the following.
-       
-       -I <Full path to your com.ibm.streamsx.sttgateway toolkit>/impl/include
-       
-       (e-g): -I /home/xyz/streamsx.sttgateway/com.ibm.streamsx.sttgateway/impl/include
-       
-   --> In Streams studio, you must double click on the BuildConfig of
-       your application's main composite and then select "Other" in the
-       dialog that is opened. In the "Additional SPL compiler options", you must add
-       the following.
  
-       --c++std=c++11
-       
-   --> If you are building your application from the command line, please refer to the
-       Makefile provided in the AudioFileWatsonSTT example shipped with
-       this toolkit. Before using that Makefile, you must set the 
-       STREAMS_STTGATEWAY_TOOLKIT environment variable to point to the full path of   
-       your streamsx.sttgateway/com.ibm.streamsx.sttgateway directory. Similarly,
-       you must set the STREAMS_JSON_TOOLKIT environment variable to point to
-       the full path of your streamsx.json (v1.4.6 or higher) toolkit directory.
-       To build your own applications, you can do the same as done in that Makefile.
-       
-   --> Please note that your IBM public cloud STT instance's API key will have to be
-       provided via a submission time parameter into your application so that 
-       your API key can be used to generate a new IAM access token within 
-       the utility composite IAMAccessTokenGenerator mentioned above. 
-       Since the IAM access tokens will expire after a certain time period, 
-       it is necessary to keep refreshing it periodically. That utility composite 
-       does that as well. This API Key is needed only when using the STT service on
-       public cloud. If the STT service on the IBM Cloud Pak for Data (CP4D) is used,
-       then the API key is not needed. Instead, a never expiring access token
-       obtained from the CP4D STT service instance's web console should be used.
-
-Common log messages generated by the Websocket library
-------------------------------------------------------
-There will be many log messages from the underlying C++ Websocket library
-routinely getting written in the Streams WatsonSTT operator log files.
-Such log messages are about making a connection to the Watson STT service,
-disconnecting from the Watson STT service, receiving Websocket control frames
-during the ongoing transcription etc. For example, in the absence of any 
-audio data available for transcription for a prolonged period (30 seconds or more),
-the Watson STT service will terminate the Websocket connection to better utilize 
-its back-end resources. In that case, a set of messages as shown below will be logged. 
-
-[2018-08-11 10:07:35] [control] Control frame received with opcode 8
-[2018-08-11 10:07:35] [application] Websocket connection closed with the Watson STT service.
-[2018-08-11 10:07:35] [disconnect] Disconnect close local:[1011,see the previous message for the error details.] remote:[1011,see the previous message for the error details.]
-
-These messages are normal and they don't reflect any error in the 
-Streams WatsonSTT operator. When the audio data becomes available later,
-the WatsonSTT operator will reestablish the Websocket connection and continue
-the transcription task. Only when you see any abnormal runtime exception
-errors, you should take actions to diagnose and fix the problem.
-
-Examples that showcase this toolkit's features
-----------------------------------------------
-This toolkit ships with the following examples that can be used as reference applications. 
-These examples showcase the full feature set of the IBMVoiceGatewaySource and the
-WatsonSTT operators that are available within this toolkit. More details about these
-examples can be obtained from the offical documentation for this toolkit.
-
-1) <YOUR_STTGATEWAY_TOOLKIT_HOME>/samples/AudioFileWatsonSTT
-2) <YOUR_STTGATEWAY_TOOLKIT_HOME>/samples/AudioRawWatsonSTT
-3) <YOUR_STTGATEWAY_TOOLKIT_HOME>/samples/VoiceGatewayToStreamsToWatsonSTT
-4) <YOUR_STTGATEWAY_TOOLKIT_HOME>/samples/VoiceGatewayToStreamsToWatsonS2T
-5) <YOUR_STTGATEWAY_TOOLKIT_HOME>/samples/stt_restults_http_receiver
-
-Official documentation for this toolkit
----------------------------------------
-https://ibmstreams.github.io/streamsx.sttgateway/
-============================================================

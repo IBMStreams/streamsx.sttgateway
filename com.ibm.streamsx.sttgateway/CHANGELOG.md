@@ -1,4 +1,7 @@
 # Changes
+## v2.2.2
+* Library update: boost 1.73.0; websocketpp 0.8.2
+
 ## v2.2.1
 * Include the operator *.pm files into the toolkit bundle
 

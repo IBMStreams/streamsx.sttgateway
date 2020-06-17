@@ -46,11 +46,16 @@ There are certain important requirements that need to be satisfied in order to u
 
 2. This toolkit uses Websocket to communicate with the IBM Voice Gateway and the Watson STT service. A valid IAM access token is needed to use the Watson STT service on the public cloud and a valid access token to use the Watson STT service on the CP4D. So, users of this toolkit must provide their public cloud STT service instance's API key or the CP4D STT service instance's access token when launching the Streams application(s) that will have a dependency on this toolkit. When using the API key from the public cloud, a utility SPL composite named IAMAccessTokenGenerator available in this toolkit will be able to generate the IAM access token and then subsequently refresh that token to keep it valid. A Streams application employing this toolkit can make use of that utility composite to generate the necessary IAM access token needed in the public cloud. Please do more reading about the IAM access token from [here](https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-websockets#WSopen).
 
-3. On the IBM Streams application development machine (where the application code is compiled to create the application bundle), it is necessary to download and install the boost_1_69_0 as well as the websocketpp version 0.8.1. Please note that this is not needed on the Streams application execution machines. For the essential steps to meet this requirement, please refer to the above-mentioned documentation URL or a file named sttgateway-tech-brief.txt available at this tooolkit's top-level directory.
+3. On the IBM Streams application development machine (where the application code is compiled to create the application bundle), it is necessary to download and install the toolkit release bundle. The toolkit release bundle contains the required external libraries: boost, websocketpp and rapidjson. Please note that this is not needed on the Streams application execution machines. For the essential steps to meet this requirement, please refer to the above-mentioned documentation URL or a file named sttgateway-tech-brief.txt available at this tooolkit's top-level directory.
 
-4. On the IBM Streams application machines, please ensure that you can run the Linux curl command. This is required by this toolkit to generate and refresh the IAM access token which is a must for the STT service on public cloud.
+4. On the IBM Streams application machines, please ensure that libcurl is installed. This is required by this toolkit to generate and refresh the IAM access token which is a must for the STT service on public cloud.
 
 5. For the IBM Streams and the IBM Voice Gateway products to work together, certain configuration steps must be done in both the products. For more details on that, please refer to this toolkit's documentation URL or the sttgateway-tech-brief.txt available at this tooolkit's top-level directory.
+
+## External libraries used
+* boost 1.73.0
+* websocketpp 0.8.2
+* rapidjson 1.1.0
 
 ## Example usage of this toolkit inside a Streams application
 Here is a code snippet that shows how to invoke the **WatsonSTT** operator available in this toolkit with a subset of supported features:
@@ -173,5 +178,5 @@ st submitjob -P tlsPort=9443 -P vgwSessionLoggingNeeded=false -P numberOfS2TEngi
 
 ## WHATS NEW
 
-see [CHANGELOG.md]
+see file com.ibm.streamsx.sttgateway/CHANGELOG.md
 
