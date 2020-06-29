@@ -1,5 +1,5 @@
 #enhance timeout due to log running compile jobs for samples
-setVar TTPR_timeout 300
+setVar TTPR_timeout 600
 
 #samples path
 setVar 'TTPR_SreamsxSttgatewaySamplesPath' "$TTRO_inputDir/../../../samples"
