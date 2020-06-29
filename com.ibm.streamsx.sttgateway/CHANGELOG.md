@@ -1,6 +1,11 @@
 # Changes
 ## v2.2.2
-* Library update: boost 1.73.0; websocketpp 0.8.2
+* [#50](https://github.com/IBMStreams/streamsx.sttgateway/issues/50) Library update: boost 1.73.0; websocketpp 0.8.2
+* [#51](https://github.com/IBMStreams/streamsx.sttgateway/issues/51) Remove Compiler Warning in WatsonSTT Operator
+* [#52](https://github.com/IBMStreams/streamsx.sttgateway/issues/52) Remove Compiler Warning in include/boost/bind.hpp
+* [#53](https://github.com/IBMStreams/streamsx.sttgateway/issues/53) Test updates
+* [#54](https://github.com/IBMStreams/streamsx.sttgateway/issues/54) Avoid boost cmake files in lib directory
+* Documentation updates
 
 ## v2.2.1
 * Include the operator *.pm files into the toolkit bundle

@@ -48,9 +48,13 @@ There are certain important requirements that need to be satisfied in order to u
 
 3. On the IBM Streams application development machine (where the application code is compiled to create the application bundle), it is necessary to download and install the toolkit release bundle. The toolkit release bundle contains the required external libraries: boost, websocketpp and rapidjson. Please note that this is not needed on the Streams application execution machines. For the essential steps to meet this requirement, please refer to the above-mentioned documentation URL or a file named sttgateway-tech-brief.txt available at this tooolkit's top-level directory.
 
-4. On the IBM Streams application machines, please ensure that libcurl is installed. This is required by this toolkit to generate and refresh the IAM access token which is a must for the STT service on public cloud.
+4. On the IBM Streams application development machine the following toolkits are required:
+* com.ibm.streamsx.inet version 2.3.6 or higher
+* com.ibm.streamsx.json version 1.4.6 or higher
 
-5. For the IBM Streams and the IBM Voice Gateway products to work together, certain configuration steps must be done in both the products. For more details on that, please refer to this toolkit's documentation URL or the sttgateway-tech-brief.txt available at this tooolkit's top-level directory.
+5. On the IBM Streams application machines, please ensure that libcurl is installed. This is required by this toolkit to generate and refresh the IAM access token which is a must for the STT service on public cloud.
+
+6. For the IBM Streams and the IBM Voice Gateway products to work together, certain configuration steps must be done in both the products. For more details on that, please refer to this toolkit's documentation URL or the sttgateway-tech-brief.txt available at this tooolkit's top-level directory.
 
 ## External libraries used
 * boost 1.73.0

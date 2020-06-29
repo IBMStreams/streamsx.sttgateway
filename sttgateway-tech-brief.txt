@@ -230,20 +230,20 @@ IAM access token from here:
 https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-websockets#WSopen
 
 3. On the IBM Streams application development machine (where the application code is 
-compiled to create the application bundle), it is necessary to install the toolkit and the required libraries
-boost_1_73_0, websocketpp version 0.8.2 and rapidjson 1.1.0
-The toolkit release bundle contains all these required dependencies.
+compiled to create the application bundle), it is necessary to install the toolkit. 
+The toolkit release bundle contains all the required dependencies.
 Please note that this is not needed on the Streams application execution machines.
-For the essential steps to meet this requirement, please refer to the above-mentioned 
-documentation URL or a file named sttgateway-tech-brief.txt available at this 
-tooolkit's top-level directory.
 
-4. On the IBM Streams application machines, please ensure that the licurl is installed. 
+4. On the IBM Streams application development machine the following toolkits are required:
+* com.ibm.streamsx.inet version 2.3.6 or higher
+* com.ibm.streamsx.json version 1.4.6 or higher
+
+5. On the IBM Streams application machines, please ensure that the licurl is installed. 
 This is required by the toolkit dependency to streamsx.inet toolkit. This is required 
 by this toolkit to generate and refresh  and refresh the IAM access token which is a must 
 for the STT service on public cloud.
 
-5. For the IBM Streams and the IBM Voice Gateway products to work together, 
+6. For the IBM Streams and the IBM Voice Gateway products to work together, 
 certain configuration steps must be done as explained here.
 
 a) In order to make the IBM Voice Gateway send the speech data from the 
