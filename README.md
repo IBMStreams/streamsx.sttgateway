@@ -182,5 +182,5 @@ st submitjob -P tlsPort=9443 -P vgwSessionLoggingNeeded=false -P numberOfS2TEngi
 
 ## WHATS NEW
 
-see file com.ibm.streamsx.sttgateway/CHANGELOG.md
+see: [CHANGELOG.md](com.ibm.streamsx.sttgateway/CHANGELOG.md)
 
