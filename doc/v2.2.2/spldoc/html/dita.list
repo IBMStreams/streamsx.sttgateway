@@ -1,4 +1,4 @@
-#Tue Jun 30 17:14:44 CEST 2020
+#Fri Apr 17 15:26:05 CEST 2020
 copytosourcelist=
 hreftargetslist=dita/tk$com.ibm.streamsx.sttgateway/spl$com.ibm.streamsx.sttgateway.watson$IAMAccessTokenGenerator.xml,dita/tk$com.ibm.streamsx.sttgateway/ns$com.ibm.streamsx.sttgateway.watson.xml,dita/tk$com.ibm.streamsx.sttgateway/op$com.ibm.streamsx.sttgateway.watson$WatsonSTT.xml,dita/tk$com.ibm.streamsx.sttgateway/ix$Type.xml,dita/tk$com.ibm.streamsx.sttgateway/spl$com.ibm.streamsx.sttgateway.watson$Utils.xml,dita/tk$com.ibm.streamsx.sttgateway/ix$Operator.xml,dita/references/FunctionModel.xml,dita/tk$com.ibm.streamsx.sttgateway/tk$com.ibm.streamsx.sttgateway.xml,dita/tk$com.ibm.streamsx.sttgateway/op$com.ibm.streamsx.sttgateway.watson$IBMVoiceGatewaySource.xml,dita/toolkits/ix$Function.xml,dita/toolkits/ix$Namespace.xml,dita/toolkits/ix$Operator.xml,dita/toolkits/ix$Type.xml,dita/tk$com.ibm.streamsx.sttgateway/ix$Namespace.xml,dita/toolkits/toolkits.xml,dita/tk$com.ibm.streamsx.sttgateway/fc$com.ibm.streamsx.sttgateway.watson.xml,dita/references/OperatorModel.xml,dita/tk$com.ibm.streamsx.sttgateway/ix$Function.xml
 fullditatopicfile=fullditatopic.list
