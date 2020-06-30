@@ -56,6 +56,11 @@ WebSocket connections it opened into this operator.
 
 // A nice read in this URL about using property_tree for JSON parsing:
 // http://zenol.fr/blog/boost-property-tree/en.html
+// Use define to avoid warning:
+// include/boost/bind.hpp:41:265: note: #pragma message: The practice of declaring the Bind placeholders (_1, _2, ...) in the global namespace is deprecated. Please use <boost/bind/bind.hpp> + using namespace boost::placeholders, or define BOOST_BIND_GLOBAL_PLACEHOLDERS to retain the current behavior.
+#define BOOST_BIND_GLOBAL_PLACEHOLDERS
+// The problem will be fixed in next boost version see:
+// https://github.com/boostorg/property_tree/issues/51
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/json_parser.hpp>
 

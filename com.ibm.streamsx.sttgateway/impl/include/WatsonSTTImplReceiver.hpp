@@ -444,13 +444,13 @@ void WatsonSTTImplReceiver<OP, OT>::ws_init() {
 			// Set this TLS handler.
 			// This technique to pass a class member method as a callback function is from here:
 			// https://stackoverflow.com/questions/34757245/websocketpp-callback-class-method-via-function-pointer
-			wsClient->set_tls_init_handler(bind(&WatsonSTTImplReceiver<OP, OT>::on_tls_init,this,wsClient,::_1));
+			wsClient->set_tls_init_handler(bind(&WatsonSTTImplReceiver<OP, OT>::on_tls_init,this,wsClient,std::placeholders::_1));
 
 			// Register our other event handlers.
-			wsClient->set_open_handler(bind(&WatsonSTTImplReceiver<OP, OT>::on_open,this,wsClient,::_1));
-			wsClient->set_fail_handler(bind(&WatsonSTTImplReceiver<OP, OT>::on_fail,this,wsClient,::_1));
-			wsClient->set_message_handler(bind(&WatsonSTTImplReceiver<OP, OT>::on_message,this,wsClient,::_1,::_2));
-			wsClient->set_close_handler(bind(&WatsonSTTImplReceiver<OP, OT>::on_close,this,wsClient,::_1));
+			wsClient->set_open_handler(bind(&WatsonSTTImplReceiver<OP, OT>::on_open,this,wsClient,std::placeholders::_1));
+			wsClient->set_fail_handler(bind(&WatsonSTTImplReceiver<OP, OT>::on_fail,this,wsClient,std::placeholders::_1));
+			wsClient->set_message_handler(bind(&WatsonSTTImplReceiver<OP, OT>::on_message,this,wsClient,std::placeholders::_1,std::placeholders::_2));
+			wsClient->set_close_handler(bind(&WatsonSTTImplReceiver<OP, OT>::on_close,this,wsClient,std::placeholders::_1));
 			//wsClient->set_ping_handler(bind(&WatsonSTTImplReceiver<OP, OT>::on_ping,this,wsClient,::_1,::_2));
 			//wsClient->set_pong_handler(bind(&WatsonSTTImplReceiver<OP, OT>::on_pong,this,wsClient,::_1,::_2));
 

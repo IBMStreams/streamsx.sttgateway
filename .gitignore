@@ -28,6 +28,7 @@ com.ibm.streamsx.sttgateway/lib/libboost_chrono*
 com.ibm.streamsx.sttgateway/lib/libboost_random*
 com.ibm.streamsx.sttgateway/lib/libboost_system*
 com.ibm.streamsx.sttgateway/lib/libboost_thread*
+com.ibm.streamsx.sttgateway/lib/cmake/
 
 # ignore downloads in ext dir but do not ignore rapidjson
 /ext/websocketpp*

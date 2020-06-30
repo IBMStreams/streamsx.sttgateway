@@ -78,6 +78,6 @@ myEvaluate() {
 		)
 	fi
 	if ! linewisePatternMatchArray "$TTRO_workDirCase/data/Tuples" 'true'; then
-		setError "Not enough pattern matches found"
+		setFailure "Not enough pattern matches found"
 	fi
 }

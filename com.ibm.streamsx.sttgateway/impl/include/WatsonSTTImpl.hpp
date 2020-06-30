@@ -14,6 +14,7 @@
 #include <string>
 #include <atomic>
 #include <cmath>
+#include <fstream>
 
 // This operator heavily relies on the Websocket++ header only library.
 // https://docs.websocketpp.org/index.html
@@ -29,8 +30,9 @@
 
 // A nice read in this URL about using property_tree for JSON parsing:
 // http://zenol.fr/blog/boost-property-tree/en.html
-#include <boost/property_tree/ptree.hpp>
-#include <boost/property_tree/json_parser.hpp>
+// we do not use boost json parser any longer
+//#include <boost/property_tree/ptree.hpp>
+//#include <boost/property_tree/json_parser.hpp>
 
 #include <boost/exception/to_string.hpp>
 
