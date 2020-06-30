@@ -5,6 +5,7 @@
 * [#52](https://github.com/IBMStreams/streamsx.sttgateway/issues/52) Remove Compiler Warning in include/boost/bind.hpp
 * [#53](https://github.com/IBMStreams/streamsx.sttgateway/issues/53) Test updates
 * [#54](https://github.com/IBMStreams/streamsx.sttgateway/issues/54) Avoid boost cmake files in lib directory
+* Resolved: [#56](https://github.com/IBMStreams/streamsx.sttgateway/issues/56) The Eclipse CDT compiler settings are sporadically removed
 * Documentation updates
 
 ## v2.2.1
