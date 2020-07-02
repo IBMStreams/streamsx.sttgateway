@@ -1,4 +1,7 @@
 # Changes
+# Develop Latest
+* build.xml: Include the OS and architecture in the file name of the release archive
+
 ## v2.2.2
 * [#50](https://github.com/IBMStreams/streamsx.sttgateway/issues/50) Library update: boost 1.73.0; websocketpp 0.8.2
 * [#51](https://github.com/IBMStreams/streamsx.sttgateway/issues/51) Remove Compiler Warning in WatsonSTT Operator
