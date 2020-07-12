@@ -179,7 +179,7 @@ public composite AudioFileWatsonSTTAllOutput {
 		// the output stream of the WatsonSTT operator.
 		stream<rstring speech, int32 sequence> AudioFileName as O = DirectoryScan() {
 			logic state:
-				mutable int32 counter = 0;
+				mutable int32 counter = 1;
 			param
 				directory : $audioDir;
 				pattern : "\\.wav$";

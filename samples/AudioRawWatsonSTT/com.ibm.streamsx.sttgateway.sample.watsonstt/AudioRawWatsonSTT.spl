@@ -156,7 +156,7 @@ public composite AudioRawWatsonSTT {
 		stream<int32 sequence, rstring conversationId, blob speech> AudioBlobData as O = FileSource(AudioFileName as I) {
 			logic
 				state: {
-					mutable int32 fileCounter = 0;
+					mutable int32 fileCounter = 1;
 					mutable rstring tmp = "";
 				}
 				onTuple I:

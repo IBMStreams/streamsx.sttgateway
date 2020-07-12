@@ -8,7 +8,7 @@
 /*
 ==============================================
 First created on: Oct/03/2019
-Last modified on: Oct/16/2019
+Last modified on: Jul/09/2020
 
 This C++ example below can be used to generate voice traffic to test the
 other streamsx.sttgateway toolkit example named VoiceGatewayToStreamsToWatsonSTT.
@@ -27,16 +27,21 @@ with the IBM Streams application mentioned above.
 This example code can be built and run from a Linux terminal window by 
 using the steps shown below.
 
-1) Ensure that you have installed boost_1_69_0 as explained in the streamsx.sttgateway documentation. (https://ibmstreams.github.io/streamsx.sttgateway/docs/user/overview/)
+1) Ensure that you have installed boost_1_73_0 or higher as explained in the streamsx.sttgateway documentation. (https://ibmstreams.github.io/streamsx.sttgateway/docs/user/overview/)
 
-2) Ensure that you have installed websocket++ v0.8.1 or higher as explained in the streamsx.sttgateway documentation.
+2) Ensure that you have installed websocket++ v0.8.2 or higher as explained in the streamsx.sttgateway documentation.
 
 3) Ensure that you have the OpenSSL installed on your Linux machine since we will need the OpenSSL libraries in the compiler command used below.
 
 4) Set LD_LIBRARY_PATH=<YOUR_BOOST_INSTALL_DIR>/boost_1_69_0/lib in order to link to the Boost ASIO.
+   (A quick way is to point this to your fully built streamsx.sttgateway/com.ibm.streamsx.sttgateway/lib directory.)
 
-5) Compile this test application as shown below:
-g++ IBMVoiceGatewayDataSimulator.cpp -o c.out -std=c++11 -I <YOUR_WEBSOCKETPP_INSTALL_DIR>/websocketpp-0.8.1 -lboost_system -lboost_thread -lboost_random -lboost_chrono -lpthread -lssl -lcrypto
+5a) Compile this test application as shown below:
+g++ IBMVoiceGatewayDataSimulator.cpp -o c.out -std=c++11 -I <YOUR_WEBSOCKETPP_INSTALL_DIR>/websocketpp-0.8.2 -lboost_system -lboost_random -lboost_chrono -lpthread -lssl -lcrypto
+
+5b) If you don't want to give the compiler command yourself, you can try to use the
+    Makefile provided in this directory. You have to edit the Makefile to point to the correct
+    Boost and websoketpp install directories and then simply run "make clean" and "make".
 
 6) Once it is compiled, you can run it to send speech messages read from specific WAV files to the VoiceGatewayToStreamsToWatsonSTT application running in IBM Streams. You can use the WAV files available from the audio-files directory in the samples directory of the streamsx.gateway toolkit. You can open multiple Linux terminal windows (e-g: 10 of them) and then run this application in quick succession from those terminal windows to send concurrent requests and test how the Streams application handles concurrent requests to perform Speech To Text. If it all works reliably, then the IBM Streams application can be connected to the real IBM Voice Gateway traffic to perform the STT operation. Other possibility is to write a bash shell script and invoke this application 10 times from there to run in the background mode.
 
@@ -76,19 +81,41 @@ using websocketpp::lib::bind;
 
 // We need this to enable SSL on the websocket client side i.e. this application.
 context_ptr on_tls_init() {
-       // establishes a SSL connection
-       context_ptr ctx = std::make_shared<boost::asio::ssl::context>(boost::asio::ssl::context::sslv23);
+	   // This method establishes the SSL negotiation and the connection.
+	   // TIP: If we want to know which TLS version gets negotiated between the
+	   // client and the server, we can run this command from a client machine:
+	   //
+	   // openssl s_client -connect TLSHost:port
+	   // openssl s_client -connect b0513:8443
+	   //
+	   // You can read more about that command in this URL:
+	   // https://security.stackexchange.com/questions/100029/how-do-we-determine-the-ssl-tls-version-of-an-http-request
+	   //
+	   // As a client, we can request the server to support only the tlsv12 protocol.
+	   // We can disable the other SSL, TLS protocol versions in order to
+	   // strengthen the security.
+	   // You can read more details about this from here.
+	   // https://stackoverflow.com/questions/47096415/how-to-make-boostasio-ssl-server-accept-both-tls-1-1-and-tls-1-2/47097088
+	   // https://www.boost.org/doc/libs/1_58_0/doc/html/boost_asio/reference/ssl__context.html
+	   // https://www.boost.org/doc/libs/1_58_0/doc/html/boost_asio/reference/ssl__context/method.html
+	   //
+	   // We can initialize the asio client context with sslv3. Then, we can apply the
+	   // no_tlsxxx flags to disable a particular tls version as needed.
+    context_ptr ctx = std::make_shared<boost::asio::ssl::context>(boost::asio::ssl::context::sslv23);
 
-       try {
-          ctx->set_options(boost::asio::ssl::context::default_workarounds |
-                         boost::asio::ssl::context::no_sslv2 |
-                         boost::asio::ssl::context::no_sslv3 |
-                         boost::asio::ssl::context::single_dh_use);
-       } catch (std::exception &e) {
-           std::cout << "Error in context pointer: " << e.what() << std::endl;
-       }
+	   // We will support only tlsv1.2. Let us disable all the other older
+	   // tls versions including the very old ssl v2 and v3 protocols.
+    try {
+       ctx->set_options(boost::asio::ssl::context::default_workarounds |
+                   boost::asio::ssl::context::no_sslv2 |
+                   boost::asio::ssl::context::no_sslv3 |
+					  boost::asio::ssl::context::no_tlsv1 |
+                   boost::asio::ssl::context::single_dh_use);
+    } catch (std::exception &e) {
+       std::cout << "Error in on_tls_init: " << e.what() << std::endl;
+    }
 
-       return ctx;
+    return ctx;
 }
 
 class connection_metadata {
@@ -455,7 +482,7 @@ int main(int argc, char *argv[]) {
        std::string("\"vgwSessionID\":\"") + vgwSessionId + std::string("\",") +
        std::string("\"vgwSIPCallID\":\"sipCallID123\",") +
        std::string("\"vgwSiprecSIPCallID\":\"siprecCallID123\",") +
-       std::string("\"vgwParticipantURI\":\"participantURI123\",") +
+       std::string("\"vgwParticipantURI\":\"sip:+19149453000@4.55.11.163:5060\",") +
        std::string("\"vgwIsCaller\":true,") +
        std::string("\"vgwTenantID\":\"vgwTenantID123\",") +
        std::string("\"vgwSIPToURI\":\"vgwSIPToURI123\"}}");
@@ -473,7 +500,7 @@ int main(int argc, char *argv[]) {
        std::string("\"vgwSessionID\":\"") + vgwSessionId + std::string("\",") +
        std::string("\"vgwSIPCallID\":\"sipCallID123\",") +
        std::string("\"vgwSiprecSIPCallID\":\"siprecCallID123\",") +
-       std::string("\"vgwParticipantURI\":\"participantURI123\",") +
+       std::string("\"vgwParticipantURI\":\"sip:+15712487798@169.61.56.229\",") +
        std::string("\"vgwIsCaller\":false,") +
        std::string("\"vgwTenantID\":\"vgwTenantID123\",") +
        std::string("\"vgwSIPToURI\":\"vgwSIPToURI123\"}}");

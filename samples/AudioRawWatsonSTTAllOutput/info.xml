@@ -3,13 +3,13 @@
   <info:identity>
     <info:name>AudioRawWatsonSTTAllOutput</info:name>
     <info:description></info:description>
-    <info:version>1.0.6</info:version>
+    <info:version>1.0.7</info:version>
     <info:requiredProductVersion>4.2.1.6</info:requiredProductVersion>
   </info:identity>
   <info:dependencies>
     <info:toolkit>
       <common:name>com.ibm.streamsx.sttgateway</common:name>
-      <common:version>[1.0.3,4.0.0)</common:version>
+      <common:version>[2.2.3,4.0.0)</common:version>
     </info:toolkit>
   </info:dependencies>
 </info:toolkitInfoModel>

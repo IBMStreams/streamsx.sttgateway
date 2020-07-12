@@ -112,7 +112,7 @@ public composite AudioFileWatsonSTT {
 		stream<rstring speech, uint64 myseq> FileNameStream as O = DirectoryScan() {
 			logic
 				state:
-					mutable uint64 sequence_ = 0;
+					mutable uint64 sequence_ = 1;
 			param
 				directory : $audioDir;
 				pattern : "\\.wav$";
@@ -190,7 +190,7 @@ public composite AudioFileWatsonSTT {
 		
 		() as Sink = FileSink(PrintStream) {
 			param
-				file: "Tuples";
+				file: "stt-result.txt";
 				append: true;
 				flush: 1u;
 				format: FileSink.line;

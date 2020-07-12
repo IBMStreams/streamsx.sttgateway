@@ -2,13 +2,18 @@
 # others. All Rights Reserved.                        
 .PHONY: build all distributed clean
 
+# You must ensure that the following line points to your 
+# correct STT Gateway toolkit directory that is of v2.2.3 or above.
 STREAMS_STTGATEWAY_TOOLKIT ?= $(PWD)/../../com.ibm.streamsx.sttgateway
 # You must ensure that the following line points to your
 # correct JSON toolkit directory that is of v1.4.6 or above.
 STREAMS_JSON_TOOLKIT ?= $(STREAMS_INSTALL)/toolkits/com.ibm.streamsx.json
-# You must ensure that the following line points to your 
-# correct inet toolkit directory that is of v3.0.0 or above.
+# You must ensure that the following line points to your
+# correct INET toolkit directory that is of v2.3.6 or above.
 STREAMS_INET_TOOLKIT ?= $(STREAMS_INSTALL)/toolkits/com.ibm.streamsx.inet
+# You must ensure that the following line points to your 
+# correct websocket toolkit directory that is of v1.0.6 or above.
+STREAMS_WEBSOCKET_TOOLKIT ?= $(HOME)/com.ibm.streamsx.websocket
 
 ifeq ($(STREAMS_STUDIO_BUILDING), 1)
     $(info Building from Streams Studio, use env vars set by studio)
@@ -24,11 +29,11 @@ else
     SPLC = $(STREAMS_INSTALL)/bin/sc
     DATA_DIR = data
     OUTPUT_DIR = output
-    TOOLKIT_PATH = $(STREAMS_STTGATEWAY_TOOLKIT):$(STREAMS_JSON_TOOLKIT):$(STREAMS_INET_TOOLKIT)
+    TOOLKIT_PATH = $(STREAMS_STTGATEWAY_TOOLKIT):$(STREAMS_JSON_TOOLKIT):$(STREAMS_INET_TOOLKIT):$(STREAMS_WEBSOCKET_TOOLKIT)
 endif
 
 SPL_MAIN_COMPOSITE = com.ibm.streamsx.sttgateway.sample.watsonstt::VoiceGatewayToStreamsToWatsonSTT
-SPLC_FLAGS = -a --c++std=c++11
+SPLC_FLAGS = -a --c++std=c++11 -x '-I $(STREAMS_STTGATEWAY_TOOLKIT)/impl/include'
 SPL_CMD_ARGS ?=
 
 build: distributed

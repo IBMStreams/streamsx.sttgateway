@@ -1,14 +1,14 @@
 /*
 ==============================================
 # Licensed Materials - Property of IBM
-# Copyright IBM Corp. 2019
+# Copyright IBM Corp. 2019, 2020
 ==============================================
 */
 
 /*
 ============================================================
 First created on: Sep/17/2019
-Last modified on: Nov/06/2019
+Last modified on: Jul/09/2020
 ============================================================
 */
 
@@ -61,16 +61,23 @@ public:
 	SPL::boolean tlsEndpointStarted;
 	SPL::boolean nonTlsEndpointStarted;
 	SPL::int64 timeOfPreviousStaleSessionRemoval;
+	// This map holds the phone numbers of the agent and 
+	// the customer for a given VGW session id.
+	//
+	// Key: vgeSessionId_vgwIsCaller
+	// Value: Phone Number
+	// e-g: 
+	// 3726389_0 : sip:+15712487798@169.61.56.229
+	// 3726389_1 : sip:+19149453000@4.55.11.163:5060
+	std::map<std::string, std::string> vgwSessionPhoneNumbersMap;
 	
 	SPL::uint64 nVoiceCallsProcessed;
 	SPL::uint64 nSpeechDataBytesReceived;
 	SPL::uint64 nOutputTuplesSent;
 	
-	typedef std::set<websocketpp::connection_hdl,
-		std::owner_less<websocketpp::connection_hdl>> tls_con_set;
-	tls_con_set tls_connections_set;
-	
 	struct connection_metadata {
+		bool isTlsConnection;
+		SPL::rstring callStartDateTime;
 		// VGW session status will carry the following values:
 		// 1 = VGW client opened a Websocket connection.
 		// 2 = VGW client started the STT transcription along with the call meta data.
@@ -135,6 +142,9 @@ public:
 	Metric *nVoiceCallsProcessedMetric;
 	Metric *nSpeechDataBytesReceivedMetric;
 	Metric *nOutputTuplesSentMetric;
+	Metric *nTlsPortMetric;
+	Metric *nNonTlsPortNeededMetric;
+	Metric *nNonTlsPortMetric;
 	
 	// Constructor
 	MY_OPERATOR();
@@ -160,8 +170,14 @@ public:
 	// Punctuation processing
 	void process(Punctuation const & punct, uint32_t port);
 
-	// Websocket client connection open handler.
-	void on_open(websocketpp::connection_hdl hdl);
+	// Websocket non_tls client connection open handler.
+	void on_open_non_tls(websocketpp::connection_hdl hdl);
+
+	// Websocket TLS client connection open handler.
+	void on_open_tls(websocketpp::connection_hdl hdl);
+		
+	// Websocket client connection common open handler.
+	void on_open(websocketpp::connection_hdl hdl, bool isTlsConnection);	
 		
 	// Websocket message reception event handler
 	template <typename EndpointType>
@@ -187,10 +203,8 @@ private:
 	int32_t getTupleCnt(int32_t const & emittedTupleCnt);
 	int32_t getTotalSpeechDataBytesReceived(int32_t const & totalSpeechDataBytesReceived);
 	int32_t getVoiceChannelNumber(int32_t const & voiceChannelNumber);
-	std::string getAgentPhoneNumber(std::string const & phoneNumber,
-		bool const & isCaller, int32_t const & voiceChannelNumber);
-	std::string getCallerPhoneNumber(std::string const & phoneNumber,
-		bool const & isCaller, int32_t const & voiceChannelNumber);
+	std::string getAgentOrCallerPhoneNumber(std::string const & vgwSessionId, bool const & vgwIsCaller);
+	SPL::rstring getCallStartDateTime(SPL::rstring const & callStartDateTime);
 }; 
 
 <%SPL::CodeGen::headerEpilogue($model);%>

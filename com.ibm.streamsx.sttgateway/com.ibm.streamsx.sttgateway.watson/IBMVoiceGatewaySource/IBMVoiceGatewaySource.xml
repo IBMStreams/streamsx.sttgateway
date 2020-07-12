@@ -7,12 +7,13 @@
   <cppOperatorModel>
     <context>
       <description>
-      The IBMVoiceGatewaySource operator is designed to ingest 
+      The IBMVoiceGatewaySource is a server-based operator. Inside of it, 
+      it hosts a C++ WebSocket server. It is designed to ingest 
       speech data from the IBM Voice Gateway product version 1.0.3.0 or above. 
       This speech data is ingested in binary format from the 
       IBM Voice Gateway into this operator via the Websocket interface. 
       Such speech data arrives here in multiple fragments directly from 
-      a live voice call. This operator is capable of receiving speech data 
+      an ongoing live voice call. This operator is capable of receiving speech data 
       from multiple calls that can all happen at the very same time 
       between different pairs of speakers. For every voice call it handles 
       in real-time, the IBM Voice Gateway product will open two 
@@ -29,11 +30,25 @@
       This operator can be configured with a Websocket server port number which is optional. If the user of this
       operator doesn't specify a Websocket server port number, then a default port number of 443 will be used.
       
-      Requirements: 
-      See the samples folder inside this toolkit for a working example that show how to use this operator.
+      See the samples folder inside this toolkit for two real-world working examples 
+      (VoiceGatewayToStreamsToWatsonS2T and VoiceGatewayToStreamsToWatsonSTT) that show 
+      how to use this operator. In those examples, you will see how to ingest the real-time
+      voice call speech data, feed it to an IBM Watson Speech To Text engine to transcribe into
+      text and then distribute the transcribed data in different ways for doing further analytics to
+      derive insights. In addtion, those examples also show how to do live voice call recording and 
+      call replay from the pre-recorded calls. Many other vendors provide proprietary black-box solutions 
+      for call recording at a hefty price tag with either a non-existent or a minimal call replay facility. 
+      But, this toolkit gives those two features for free in a completely open and a flexible manner 
+      for users to beneift from them. Such a benefit allows customers to control where the 
+      recorded data gets stored in a standard Mu-Law format as well as accessing and using that 
+      data for their other purposes. All of them combined, it is a compelling way in which the
+      IBM Voice Gateway, IBM Streams and IBM Watson Speech To Text offerings 
+      put the customer in the driver's seat to gather real-time intelligence from their
+      voice infrastructure.
       
-      For a detailed documentation about the operator design, usage patterns and in-depth technical
-      details, please refer to the official STT Gateway toolkit documentation available at this URL:
+      For a detailed documentation about the requirements, operator design, usage patterns and 
+      in-depth technical details, please refer to the official STT Gateway toolkit documentation 
+      available at this URL:
       
       [https://ibmstreams.github.io/streamsx.sttgateway]
       </description>
@@ -69,6 +84,24 @@
           
           *NOTE:* This metric is only updated if parameter `vgwLiveMetricsUpdateNeeded` is true.
           </description>
+          <kind>Gauge</kind>
+        </metric>
+        
+        <metric>
+          <name>nTlsPort</name>
+          <description>TLS port number configured for this operator.</description>
+          <kind>Gauge</kind>
+        </metric>
+
+        <metric>
+          <name>nNonTlsPortNeeded</name>
+          <description>Did the user configure to exchange data via a non-TLS port?</description>
+          <kind>Gauge</kind>
+        </metric>
+
+        <metric>
+          <name>nNonTlsPort</name>
+          <description>Non-TLS port number configured for this operator.</description>
           <kind>Gauge</kind>
         </metric>
       </metrics>
@@ -108,32 +141,29 @@
             <description>Returns an rstring value with details about the caller's phone number.</description>
             <prototype><![CDATA[rstring getCallerPhoneNumber()]]></prototype>
           </function>
+          <function>
+            <description>Returns an rstring value with the call start date time i.e. system clock time.</description>
+            <prototype><![CDATA[rstring getCallStartDateTime()]]></prototype>
+          </function>          
         </customOutputFunction>
       </customOutputFunctions>
       
       <libraryDependencies>
         <library>
-          <cmn:description>Boost Library common/Websocket include and Boost system</cmn:description>
+          <cmn:description>Boost Library</cmn:description>
           <cmn:managedLibrary>
             <cmn:lib>boost_system</cmn:lib>
+            <cmn:lib>boost_chrono</cmn:lib>
+            <cmn:lib>boost_random</cmn:lib>
             <cmn:libPath>../../lib</cmn:libPath>
             <cmn:includePath>../../include</cmn:includePath>
           </cmn:managedLibrary>
         </library>
-        
+         
         <library>
-          <cmn:description>Boost Library chrono</cmn:description>
+          <cmn:description>Websocketpp Library</cmn:description>
           <cmn:managedLibrary>
-            <cmn:lib>boost_chrono</cmn:lib>
-            <cmn:libPath>../../lib</cmn:libPath>
-          </cmn:managedLibrary>
-        </library>
-        
-        <library>
-          <cmn:description>Boost Library random</cmn:description>
-          <cmn:managedLibrary>
-            <cmn:lib>boost_random</cmn:lib>
-            <cmn:libPath>../../lib</cmn:libPath>
+            <cmn:includePath>../../include</cmn:includePath>
           </cmn:managedLibrary>
         </library>
       </libraryDependencies>
