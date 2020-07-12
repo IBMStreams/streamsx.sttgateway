@@ -2,7 +2,7 @@
 title: "Toolkit Usage Overview"
 permalink: /docs/user/overview/
 excerpt: "How to use this toolkit."
-last_modified_at: 2020-07-07T08:28:48+01:00
+last_modified_at: 2020-07-12T07:28:48+01:00
 redirect_from:
    - /theme-setup/
 sidebar:
@@ -178,15 +178,43 @@ st submitjob -P tlsPort=9443 -P vgwSessionLoggingNeeded=false -P numberOfS2TEngi
 ### Working examples shipped with this toolkit
 As explained in the previous section, there are six examples available within this toolkit directory that can be compiled and tested by using a valid IAM access token (generated via your STT service instance's API key) required to connect to the Watson STT service on the IBM public cloud or by using the regular access token to connect to the Watson STT service on your CP4D cluster. The streamsx.sttgateway toolkit provides a utility composite operator named IAMAccessTokenGenerator that can be used within any Streams application to generate and refresh an IAM access token that stays current and valid at all times. Without a valid IAM access token, this toolkit will not be able to function correctly. So, it is necessary to understand the importance of the IAM access token. The six examples provided in this toolkit will show you how to use the utility composite operator to generate/refresh the IAM access token and send it to the WatsonSTT operator. For using the Watson STT service on your CP4D cluster, you will not require the IAM access token and you will need the regular access token displayed in the CP4D web console. The first four examples show different variations of reading and processing the batch workload from a collection of prerecorded audio files. The fifth example shows how to get the real-time speech data of  the live voice calls from the IBM Voice Gateway product into IBM Streams and then invoke the Watson Speech To Text service either on the public cloud or on a private cloud running CP4D. The sixth example shows how to do real-time speech to text transcription using the embedded STT engine available inside a Streams operator named com.ibm.streams.speech2text.watson::WatsonS2T. Within the same streamsx.sttgateway/samples directory where these six examples are present, there is a directory named audio_files that contains a few test audio files useful for testing the batch speech to text examples. There is also a helper application named stt_results_http_receiver which can be used to see how the real-time STT results can be streamed to an external HTTP or WebSocket server.
 
-* [AudioFileWatsonSTT](https://github.com/IBMStreams/streamsx.sttgateway/tree/master/samples/AudioFileWatsonSTT)
-* [AudioFileWatsonSTTAllOutput](https://github.com/IBMStreams/streamsx.sttgateway/tree/master/samples/AudioFileWatsonSTTAllOutput)
-* [AudioRawWatsonSTT](https://github.com/IBMStreams/streamsx.sttgateway/tree/master/samples/AudioRawWatsonSTT)
-* [AudioRawWatsonSTTAllOutput](https://github.com/IBMStreams/streamsx.sttgateway/tree/master/samples/AudioRawWatsonSTTAllOutput)
-* [VoiceGatewayToStreamsToWatsonSTT](https://github.com/IBMStreams/streamsx.sttgateway/tree/master/samples/VoiceGatewayToStreamsToWatsonSTT)
-* [VoiceGatewayToStreamsToWatsonS2T](https://github.com/IBMStreams/streamsx.sttgateway/tree/master/samples/VoiceGatewayToStreamsToWatsonS2T)
-* [stt_results_http_receiver](https://github.com/IBMStreams/streamsx.sttgateway/tree/master/samples/stt_results_http_receiver)
-* [audio_files](https://github.com/IBMStreams/streamsx.sttgateway/tree/master/samples/audio-files)
-* [VoiceDataSimulator](https://github.com/IBMStreams/streamsx.sttgateway/tree/master/samples/VoiceDataSimulator)
+* [AccessTokenGenerator](https://github.com/IBMStreams/streamsx.sttgateway/tree/develop/samples/AccessTokenGenerator)
+* [AudioFileWatsonSTT](https://github.com/IBMStreams/streamsx.sttgateway/tree/develop/samples/AudioFileWatsonSTT)
+* [AudioFileWatsonSTTAllOutput](https://github.com/IBMStreams/streamsx.sttgateway/tree/develop/samples/AudioFileWatsonSTTAllOutput)
+* [AudioRawWatsonSTT](https://github.com/IBMStreams/streamsx.sttgateway/tree/develop/samples/AudioRawWatsonSTT)
+* [AudioRawWatsonSTTAllOutput](https://github.com/IBMStreams/streamsx.sttgateway/tree/develop/samples/AudioRawWatsonSTTAllOutput)
+* [VoiceGatewayToStreamsToWatsonSTT](https://github.com/IBMStreams/streamsx.sttgateway/tree/develop/samples/VoiceGatewayToStreamsToWatsonSTT)
+* [VoiceGatewayToStreamsToWatsonS2T](https://github.com/IBMStreams/streamsx.sttgateway/tree/develop/samples/VoiceGatewayToStreamsToWatsonS2T)
+* [stt_results_http_receiver](https://github.com/IBMStreams/streamsx.sttgateway/tree/develop/samples/stt_results_http_receiver)
+* [audio_files](https://github.com/IBMStreams/streamsx.sttgateway/tree/develop/samples/audio-files)
+* [VoiceDataSimulator](https://github.com/IBMStreams/streamsx.sttgateway/tree/develop/samples/VoiceDataSimulator)
+
+## Importing this toolkit and its built-in examples into IBM Streams Studio
+1. Build the `streamsx.sttgateway` toolkit using the three ant commands mentioned in a previous section.
+
+2. In Streams Studio, select `File->Import->IBM Streams Studio->SPL Project` and click `Next`.
+
+3. In the resulting dialog box, click `Browse` and then select the `streamsx.sttgateway` directory from where you ran those ant commands.
+
+4. Now, it should list the `com.ibm.streamsx.sttgateway` project which you must select and click `Finish`. It will take about 8 minutes to take a copy of that entire project into your Streams Studio workspace.
+
+5. At this time, the `com.ibm.streamsx.sttgateway` project in your Streams Studio workspace is ready to be added as a dependency in any of your own applications that want to use the `IBMVoiceGatewaySource` and/or the `WatsonSTT` operators.
+
+We will also show here the steps needed to import one of the built-in examples. You can use similar steps for other examples as well.
+
+1. In Streams Studio, select `File->Import->IBM Streams Studio->SPL Project` and click `Next`.
+
+2. In the resulting dialog box, click `Browse` and then select the `streamsx.sttgateway->samples` directory. (This is the location where you ran those ant commands earlier).
+
+3. Now, it should list all the available examples from which you can select an example project that you want and click `Finish`.
+
+4. You have to change the SPL build of the imported project from an External Builder to an Internal Builder. You can do that by right clicking on that imported project and then selecting `Configure SPL Build`. In the resulting dialog box, you can change the `Builder type` from an `External builder` to `Streams Studio internal builder`. Click `OK`.
+
+5. Now, expand your imported top-level project, expand the namespace below it and then right-click the main composite name below it and select `New->Build Configuration`. (You have to do it for every main composite present in a given example.)
+
+6. In the resulting dialog box, select Other and enter `--c++std=c++11` in the `Additional SPL compiler options` field. Click `OK`.
+
+7. Your imported example project should build correctly now provided you meet all the other toolkit dependencies.
 
 ## Common log messages generated by the Websocket library
 There will be many log messages from the underlying C++ Websocket library routinely getting written in the Streams WatsonSTT operator log files. Such log messages are about making a connection to the Watson STT service, disconnecting from the Watson STT service, receiving Websocket control frames during the ongoing transcription etc. For example, in the absence of any audio data available for transcription for a prolonged period (30 seconds or more), the Watson STT service will terminate the Websocket connection to better utilize its back-end resources. In that case, a set of messages as shown below will be logged. 
