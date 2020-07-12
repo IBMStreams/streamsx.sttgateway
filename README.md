@@ -26,6 +26,12 @@ It provides the following two operators to realize that purpose.
  
 - <span style="color:purple">Speech data files in a directory-->IBM Streams<-->Watson Speech To Text engine embedded inside an IBM Streams operator</span>
 
+## All-in-one Speech to text analytics, Call Recording and Call Replay
+As described above, Speech To Text is the core feature of this toolkit. In addition, this toolkit enables call recording and call replay. It includes two real-world tested examples that show how to do live voice call recording and call replay from the pre-recorded calls. Many other vendors provide proprietary, rigid black-box solutions for call recording at a hefty price tag with either a non-existent or a minimal call replay facility. But, this toolkit gives those two features for free in a completely open and a flexible manner for users to beneift from them. Such a benefit allows customers to control where the recorded data gets stored in a standard Mu-Law format as well as accessing and using that data for their other purposes. All of them combined, it is a compelling way in which the IBM Voice Gateway, IBM Streams and IBM Watson Speech To Text offerings put the customer in the driver's seat to gather real-time intelligence from their voice infrastructure.
+
+## A visual description of this toolkit's architecture
+![STT Gateway Architecture Diagram](https://github.com/IBMStreams/streamsx.sttgateway/blob/develop/samples/VoiceGatewayToStreamsToWatsonSTT/etc/stt-arch.png)
+
 ## Documentation
 1. The official toolkit documentation with extensive details is available at this URL: https://ibmstreams.github.io/streamsx.sttgateway/
 
@@ -46,13 +52,14 @@ There are certain important requirements that need to be satisfied in order to u
 
 2. This toolkit uses Websocket to communicate with the IBM Voice Gateway and the Watson STT service. A valid IAM access token is needed to use the Watson STT service on the public cloud and a valid access token to use the Watson STT service on the CP4D. So, users of this toolkit must provide their public cloud STT service instance's API key or the CP4D STT service instance's access token when launching the Streams application(s) that will have a dependency on this toolkit. When using the API key from the public cloud, a utility SPL composite named IAMAccessTokenGenerator available in this toolkit will be able to generate the IAM access token and then subsequently refresh that token to keep it valid. A Streams application employing this toolkit can make use of that utility composite to generate the necessary IAM access token needed in the public cloud. Please do more reading about the IAM access token from [here](https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-websockets#WSopen).
 
-3. On the IBM Streams application development machine (where the application code is compiled to create the application bundle), it is necessary to download and install the toolkit release bundle. The toolkit release bundle contains the required external libraries: boost, websocketpp and rapidjson. Please note that this is not needed on the Streams application execution machines. For the essential steps to meet this requirement, please refer to the above-mentioned documentation URL or a file named sttgateway-tech-brief.txt available at this tooolkit's top-level directory.
+3. On the IBM Streams application development machine(s) (where the application code is compiled to create the application bundle), it is necessary to download and install the toolkit release bundle. The toolkit release bundle contains the necessary ant build script to download the required external libraries: boost, websocketpp and rapidjson. For the essential steps to meet this requirement, please refer to the above-mentioned documentation URL or a file named sttgateway-tech-brief.txt available at this tooolkit's top-level directory.
 
-4. On the IBM Streams application development machine the following toolkits are required:
+4. On the IBM Streams application development machine(s) the following toolkits are required:
 * com.ibm.streamsx.inet version 2.3.6 or higher
 * com.ibm.streamsx.json version 1.4.6 or higher
+* com.ibm.streamsx.websocket version 1.0.6 or higher
 
-5. On the IBM Streams application machines, please ensure that libcurl is installed. This is required by this toolkit to generate and refresh the IAM access token which is a must for the STT service on public cloud.
+5. On the IBM Streams application machines, please ensure that the openssl and libcurl are installed including the openssl-devel and libcurl-devel. This is required by the toolkit dependency to streamsx.websocket and the streamsx.inet toolkits. This is required by this toolkit to generate and refresh and refresh the IAM access token which is a must for the STT service on public cloud as well as for the TLS support.
 
 6. For the IBM Streams and the IBM Voice Gateway products to work together, certain configuration steps must be done in both the products. For more details on that, please refer to this toolkit's documentation URL or the sttgateway-tech-brief.txt available at this tooolkit's top-level directory.
 
@@ -78,6 +85,10 @@ parallel region which may cause erroneous transcription results.
 NOTE: The WatsonSTT operator allows fusing multiple instances of
 this operator into a single PE. This will help in reducing the 
 total number of CPU cores used in running the application.
+It is better to fuse only when there are upto a maximum of 
+ten WatsonSTT operator instances. Anything more than that, it is 
+better not to fuse them in order for the application logic to
+work correctly.
 */
 @parallel(width = $numberOfSTTEngines, 
 partitionBy=[{port=ABC, attributes=[conversationId]}], broadcast=[AT])
@@ -94,14 +105,12 @@ partitionBy=[{port=ABC, attributes=[conversationId]}], broadcast=[AT])
                  utteranceEndTime = getUtteranceEndTime(),
                  finalizedUtterance = isFinalizedUtterance(),
                  transcriptionCompleted = isTranscriptionCompleted(),
-                 fullTranscriptionText = getFullTranscriptionText(),
                  sttErrorMessage = getSTTErrorMessage();
 }
 ```
 
-A built-in example inside this toolkit can be compiled and launched with the default STT options to use the STT service on public cloud as shown below.
-The sample AudioFileWatsonSTT required that the stt service connection details are provided as application configuration properties. To create the 
-application configuration enter:
+A built-in example inside this toolkit can be compiled and launched with the default STT options to use the STT service on public cloud as shown below. The sample AudioFileWatsonSTT required that the stt service connection details are provided as application configuration properties. To create the application configuration, you can use the following command.
+
 ```
 streamtool mkappconfig --description 'connection configuration for IBM Cloud Watson stt service' \
 	--property 'apiKey=<your api key>' \
@@ -121,7 +130,7 @@ Following IBM Streams job sumission command shows how to override the default va
 ```
 cd   streamsx.sttgateway/samples/AudioRawWatsonSTT
 make
-st submitjob  -d  <YOUR_STREAMS_DOMAIN>  -i  <YOUR_STREAMS_INSTANCE>  output/com.ibm.streamsx.sttgateway.sample.watsonstt.AudioRawWatsonSTT.sab -P  sttApiKey=<YOUR_WATSON_STT_SERVICE_API_KEY>  -P sttBaseLanguageModel=en-US_NarrowbandModel  -P contentType="audio/wav"    -P filterProfanity=true   -P keywordsSpottingThreshold=0.294   -P keywordsToBeSpotted="['country', 'learning', 'IBM', 'model']"   -P smartFormattingNeeded=true   -P wordAlternativesThreshold=0.251   -P maxUtteranceAlternatives=5   -P audioBlobFragmentSize=32768   -P sttLiveMetricsUpdateNeeded=true  -P audioDir=<YOUR_AUDIO_FILES_DIRECTORY>   -P numberOfSTTEngines=100
+st submitjob  -d  <YOUR_STREAMS_DOMAIN>  -i  <YOUR_STREAMS_INSTANCE>  output/com.ibm.streamsx.sttgateway.sample.watsonstt.AudioRawWatsonSTT.sab -P  sttApiKey=<YOUR_WATSON_STT_SERVICE_API_KEY>  -P sttBaseLanguageModel=en-US_NarrowbandModel  -P contentType="audio/wav"    -P filterProfanity=true   -P keywordsSpottingThreshold=0.294   -P keywordsToBeSpotted="['country', 'learning', 'IBM', 'model']"   -P smartFormattingNeeded=true   -P wordAlternativesThreshold=0.251   -P maxUtteranceAlternatives=5   -P audioBlobFragmentSize=32768   -P sttLiveMetricsUpdateNeeded=true  -P audioDir=<YOUR_AUDIO_FILES_DIRECTORY>   -P numberOfSTTEngines=50
 ```
 
 Following is another way to run the same application to access the STT service on the IBM Cloud Pak for Data (CP4D). STT URI shown below is for an illustrative purpose and you must use a valid STT URI obtained from your CP4D cluster.
@@ -153,6 +162,7 @@ If you are planning to ingest the speech data from live voice calls, then you ca
        // Get these values via custom output functions provided by this operator.
        output
           BSD: vgwSessionId = getIBMVoiceGatewaySessionId(),
+          callStartDateTime = getCallStartDateTime(), 
           isCustomerSpeechData = isCustomerSpeechData(),
           vgwVoiceChannelNumber = getVoiceChannelNumber(),
           callerPhoneNumber = getCallerPhoneNumber(),
@@ -177,10 +187,22 @@ For those customers who are using the speech to text engine embedded in the com.
 ```
 cd   streamsx.sttgateway/samples/VoiceGatewayToStreamsToWatsonS2T
 make
-st submitjob -P tlsPort=9443 -P vgwSessionLoggingNeeded=false -P numberOfS2TEngines=4 -P WatsonS2TConfigFile=/home/streamsadmin/toolkit.speech2text-v2.12.0/model/en_US.8kHz.general.diarization.low_latency.pset -P WatsonS2TModelFile=$HOME/toolkit.speech2text-v2.12.0/model/en_US.8kHz.general.pkg -P ipv6Available=false -P writeTranscriptionResultsToFiles=true -P sendTranscriptionResultsToHttpEndpoint=true -P httpEndpointForSendingTranscriptionResults=http://172.30.105.11:9080/sttresults/Receiver/ports/output/0/inject output/com.ibm.streamsx.sttgateway.sample.watsons2t.VoiceGatewayToStreamsToWatsonS2T.sab
+st submitjob -P tlsPort=9443 -P vgwSessionLoggingNeeded=false -P numberOfS2TEngines=80 -P WatsonS2TConfigFile=/home/streamsadmin/toolkit.speech2text-v2.12.0/model/en_US.8kHz.general.diarization.low_latency.pset -P WatsonS2TModelFile=$HOME/toolkit.speech2text-v2.12.0/model/en_US.8kHz.general.pkg -P ipv6Available=false -P writeTranscriptionResultsToFiles=true -P sendTranscriptionResultsToHttpEndpoint=true -P httpEndpointForSendingTranscriptionResults=http://172.30.105.11:9080 -P callRecordingWriteDirectory=/homes/hny5/sen/call-recording-write -P callRecordingReadDirectory=/homes/hny5/sen/call-recording-read -P numberOfCallReplayEngines=15 -C fusionScheme=legacy  output/com.ibm.streamsx.sttgateway.sample.watsons2t.VoiceGatewayToStreamsToWatsonS2T.sab
 ```
+## Working examples shipped with this toolkit
+There are many examples available in this toolkit that can be compiled and tested. Couple of them are generic real-word solutions running in production that can be customized and used when needed.
+
+* [AccessTokenGenerator](https://github.com/IBMStreams/streamsx.sttgateway/tree/develop/samples/AccessTokenGenerator)
+* [AudioFileWatsonSTT](https://github.com/IBMStreams/streamsx.sttgateway/tree/develop/samples/AudioFileWatsonSTT)
+* [AudioFileWatsonSTTAllOutput](https://github.com/IBMStreams/streamsx.sttgateway/tree/develop/samples/AudioFileWatsonSTTAllOutput)
+* [AudioRawWatsonSTT](https://github.com/IBMStreams/streamsx.sttgateway/tree/develop/samples/AudioRawWatsonSTT)
+* [AudioRawWatsonSTTAllOutput](https://github.com/IBMStreams/streamsx.sttgateway/tree/develop/samples/AudioRawWatsonSTTAllOutput)
+* [VoiceGatewayToStreamsToWatsonSTT](https://github.com/IBMStreams/streamsx.sttgateway/tree/develop/samples/VoiceGatewayToStreamsToWatsonSTT)
+* [VoiceGatewayToStreamsToWatsonS2T](https://github.com/IBMStreams/streamsx.sttgateway/tree/develop/samples/VoiceGatewayToStreamsToWatsonS2T)
+* [stt_results_http_receiver](https://github.com/IBMStreams/streamsx.sttgateway/tree/develop/samples/stt_results_http_receiver)
+* [audio_files](https://github.com/IBMStreams/streamsx.sttgateway/tree/develop/samples/audio-files)
+* [VoiceDataSimulator](https://github.com/IBMStreams/streamsx.sttgateway/tree/develop/samples/VoiceDataSimulator)
 
 ## WHATS NEW
 
 see: [CHANGELOG.md](com.ibm.streamsx.sttgateway/CHANGELOG.md)
-

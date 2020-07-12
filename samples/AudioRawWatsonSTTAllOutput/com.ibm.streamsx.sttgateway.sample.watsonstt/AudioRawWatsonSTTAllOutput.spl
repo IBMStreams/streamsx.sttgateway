@@ -288,7 +288,7 @@ public composite AudioRawWatsonSTTAllOutput {
 			Custom(AudioFileName as AFN) {
 			logic
 				// The counter for the sequece id of the results. Sequence should start with 0
-				state: mutable int32 counter = -1;
+				state: mutable int32 counter = 0;
 				onTuple AFN: {
 					mutable int64 audioBlobFragmentSize =  $audioBlobFragmentSize;
 					

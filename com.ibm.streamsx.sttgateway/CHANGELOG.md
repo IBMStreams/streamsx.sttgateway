@@ -1,4 +1,20 @@
 # Changes
+
+## v2.2.3
+* Jul/12/2020
+* Allow only TLS v1.2 in the IBMVoiceGatewaySource operator.
+* Added a feature to query the call start date time string via an output function in the IBMVoiceGatewaySource operator.
+* Added a feature so that both the agent and caller phone numbers can be queried anytime via output functions irrespective of who is talking during a voice call session.
+* Simplified the TLS connection clean-up logic in the IBMVoiceGatewaySource operator.
+* Added new operator metrics to display the TLS and non-TLS ports being used by the IBMVoiceGatewaySource operator.
+* Minor changes in the AudioFile and AudioRaw examples to change the sink file name and start the file sequence from 1 instead of 0.
+* Added the very important live call recording and call replay features to the Voice Gateway related examples.
+* Replaced the use of the HTTPPost operator from the inet tookkit with HttpPost from the websocket toolkit inside the Voice Gateway related examples. This is in preparaion to move to WebSocket based transcription result exchange in the future to handle large number of concurrent calls.
+* Changed the VoiceDataSimulator test client application to negotiate only TLS v1.2 connections with the remote server.
+* In the Voice Gateway related examples, added a call replay test data generator script which will help in the scale testing of transcribing many concurrent calls.
+* Added a colorful architecture diagram for this toolkit.
+* Changed the stt_results_http_receiver example to use the WebSocketSource operator to receive the transcription results via both HTTP and WebSocket.
+
 ## v2.2.2
 * [#50](https://github.com/IBMStreams/streamsx.sttgateway/issues/50) Library update: boost 1.73.0; websocketpp 0.8.2
 * [#51](https://github.com/IBMStreams/streamsx.sttgateway/issues/51) Remove Compiler Warning in WatsonSTT Operator

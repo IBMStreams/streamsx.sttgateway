@@ -76,6 +76,7 @@
 
 	<target name="init">
 		<echo message="Toolkit Version: ${tkinfo.identity.version} boost.version: ${boost.version} websocket.version: ${websocket.version}"/>
+		<echo message="OS version: ${os.version} Architecture: ${os.arch} OS Name: ${os.name}"/>
 		<mkdir dir="${lib.dir}"/>
 		<mkdir dir="${ext.dir}/boost-install-files"/>
 	</target>
@@ -163,9 +164,12 @@
 
 	<target name="download-clean"
 		description="Clean up downloaded library sources and the libraries build artifacts from ext directory">
-		<delete includeemptydirs="true">
+		<delete includeemptydirs="true" failonerror="false">
 			<!-- do not delete rapidjson because this lib is not downloaded -->
 			<fileset dir="${ext.dir}" excludes="${rapidjson.str}/*"/>
+			<fileset dir="${lib.dir}">
+			   <include name="*.a"/>
+			</fileset>
 		</delete>
 	</target>
 
@@ -335,6 +339,14 @@
 		<antcall target="spldoc-samples"/>
 		<antcall target="samples-clean"/>
 		<mkdir dir="${release.dir}"/>
+		<!-- get os type string -->
+		<property name="osVersion" value="${os.version}"/>
+		<condition property="osPlat" value="el7">
+			<contains string="${osVersion}" substring="el7" casesensitive="false"/>
+		</condition>
+		<condition property="osPlat" value="el6">
+			<contains string="${osVersion}" substring="el6" casesensitive="false"/>
+		</condition>
 		<!-- Extract the short git commit hash -->
 		<exec executable="git" outputproperty="commithash">
 			<arg value="rev-parse" />
@@ -342,7 +354,7 @@
 			<arg value="HEAD" />
 		</exec>
 		<echo message="Make releasefile Toolkit Version: ${tkinfo.identity.version} ${commithash}"/>
-		<property name="releasefilename" value="${release.dir}/${ant.project.name}-${tkinfo.identity.version}-${commithash}-${DSTAMP}-${TSTAMP}.tgz"/>
+		<property name="releasefilename" value="${release.dir}/${ant.project.name}-${tkinfo.identity.version}-${osPlat}-${os.arch}-${commithash}-${DSTAMP}-${TSTAMP}.tgz"/>
 		<!-- must use the tar command because the tar target handles symbolic links incorrect -->
 		<!-- <tar compression="gzip" longfile="gnu"
 			destfile="${releasefilename}"

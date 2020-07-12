@@ -1,14 +1,14 @@
 /*
 ==============================================
 # Licensed Materials - Property of IBM
-# Copyright IBM Corp. 2019
+# Copyright IBM Corp. 2019, 2020
 ==============================================
 */
 
 /*
 ============================================================
 First created on: Sep/20/2019
-Last modified on: Nov/06/2019
+Last modified on: Jul/09/2020
 
 Please refer to the sttgateway-tech-brief.txt file in the 
 top-level directory of this toolkit to read about 
@@ -244,6 +244,9 @@ MY_OPERATOR::MY_OPERATOR()
 	nVoiceCallsProcessedMetric = & opm.getCustomMetricByName("nVoiceCallsProcessed");
 	nSpeechDataBytesReceivedMetric = & opm.getCustomMetricByName("nSpeechDataBytesReceived");
 	nOutputTuplesSentMetric = & opm.getCustomMetricByName("nOutputTuplesSent");
+	nTlsPortMetric = & opm.getCustomMetricByName("nTlsPort");
+	nNonTlsPortNeededMetric = &opm.getCustomMetricByName("nNonTlsPortNeeded");
+	nNonTlsPortMetric = &opm.getCustomMetricByName("nNonTlsPort");
 
 	// Initialize the member variables as needed from the operator parameter values read above.	
 	tlsPort = <%=$tlsPort%>;
@@ -263,6 +266,30 @@ MY_OPERATOR::MY_OPERATOR()
 		certificateFileName = ProcessingElement::pe().getApplicationDirectory() + "/etc/ws-server.pem";
 	}
 	
+	operatorPhysicalName = getContext().getName();
+	//
+	// This operator is most likely not going to be in an 
+	// UDP parallel region due to the need by the IBM Voice Gateway's 
+	// need to connect to a single URL (machine name and port).
+	// So, this variable here may not carry much value.
+	udpChannelNumber = getContext().getChannel();
+	
+	SPLAPPTRC(L_ERROR, 
+		"Operator " <<
+		operatorPhysicalName <<
+		"-->Channel " << boost::to_string(udpChannelNumber) <<
+		". Following are the user configured operator parameters: "
+		"tlsPort=" << tlsPort <<
+		", certificateFileName=" << certificateFileName <<
+		", nonTlsEndpointNeeded=" << nonTlsEndpointNeeded <<
+		", nonTlsPort=" << nonTlsPort <<
+		", initDelay=" << initDelay <<
+		", vgwLiveMetricsUpdateNeeded=" << vgwLiveMetricsUpdateNeeded <<
+		", websocketLoggingNeeded=" << websocketLoggingNeeded <<
+		", vgwSessionLoggingNeeded=" << vgwSessionLoggingNeeded <<
+		", vgwStaleSessionPurgeInterval=" << vgwStaleSessionPurgeInterval <<
+		", ipv6Available="  << ipv6Available, "constructor");	
+	
 	tlsEndpointStarted = false;
 	nonTlsEndpointStarted = false;
 }
@@ -278,12 +305,14 @@ void MY_OPERATOR::allPortsReady()
 {
     // Notifies that all ports are ready. No tuples should be submitted before
     // this. Source operators can use this method to spawn threads.
-	operatorPhysicalName = getContext().getName();
-	// This operator is most likely not going to be in an 
-	// UDP parallel region due to the need by the IBM Voice Gateway's 
-	// need to connect to a single URL (machine name and port).
-	// So, this variable here may not carry much value.
-	udpChannelNumber = getContext().getChannel();
+	//
+	// Update the operator metric only if the user asked for a live update.
+	if (vgwLiveMetricsUpdateNeeded == true) {
+		// These are one time metrics that will not change during the life of an operator.
+		nTlsPortMetric->setValueNoLock(tlsPort);
+		nNonTlsPortNeededMetric->setValueNoLock(nonTlsEndpointNeeded);
+		nNonTlsPortMetric->setValueNoLock(nonTlsPort);
+	}	
 	
 	//
 	// This is a source operator. Let us create a thread.
@@ -302,7 +331,7 @@ void MY_OPERATOR::prepareToShutdown()
 	if (nonTlsEndpointStarted == true) {
 		endpoint_plain.stop_listening();
 	}
-	
+
 	// We must properly close the client connections that are currently active.
 	// That will allow them to be closed normally on their end. Otherwise, clients will end up
 	// with limbo (dangling) connections which will lead to unnecessary broken TCP or
@@ -314,39 +343,33 @@ void MY_OPERATOR::prepareToShutdown()
 	// This will initiate the WebSocket closing handshake for 
 	// these active client connections.
 	con_map::iterator it = client_connections_map.begin();
-	
-	while(it != client_connections_map.end()) {
+
+	while (it != client_connections_map.end()) {
 		websocketpp::connection_hdl hdl = it->first;
+		connection_metadata & con_metadata = it->second;
 		
 		// Properly close the client connection now.
-		std::string closeReason = 
+		std::string closeReason =
 			"Normal close by streamsx.sttgateway due to the shutdown of the IBMVoiceGatewaySource operator.";
 		websocketpp::lib::error_code ec;
-		
-		// Check if this connection handle is based on a TLS endpoint.
-		// During the websocket++ connection creation, we have cached the 
-		// TLS based connection handles in an std::set. We can look up in that set now.
-		bool is_tls_connection = 
-			tls_connections_set.find(hdl) != tls_connections_set.end();
-		
+
 		// This connection closing technique is discussed in these URLs:
 		// https://stackoverflow.com/questions/25260852/shut-down-websocket-connection
 		// https://github.com/zaphoyd/websocketpp/issues/803
 		// https://mayaposch.wordpress.com/2015/09/16/creating-a-websocket-server-with-websocket/
-		if (is_tls_connection == true) {
+		if(con_metadata.isTlsConnection == true) {
 			endpoint_tls.close(hdl, websocketpp::close::status::normal,
 				closeReason, ec);
 		} else { 
 			endpoint_plain.close(hdl, websocketpp::close::status::normal,
 				closeReason, ec);
 		}
-		
+
 		it++;
 	}
 
 	// This operator is being shutdown now.
 	// We can empty the following containers.
-	tls_connections_set.clear();
 	client_connections_map.clear();
 	vgw_session_id_map.clear();
 }
@@ -395,7 +418,7 @@ void MY_OPERATOR::process(uint32_t idx)
 			// Set up a plain endpoint without TLS.
 			// Initialize asio with our external io_service rather than an internal one.
 			endpoint_plain.init_asio(&ios);
-			endpoint_plain.set_open_handler(bind(&MY_OPERATOR::on_open,this,::_1));
+			endpoint_plain.set_open_handler(bind(&MY_OPERATOR::on_open_non_tls,this,::_1));
 			endpoint_plain.set_message_handler(
 				bind(&MY_OPERATOR::on_message<server_plain>,this,&endpoint_plain,::_1,::_2));
 			endpoint_plain.set_close_handler(bind(&MY_OPERATOR::on_close,this,::_1));
@@ -440,7 +463,7 @@ void MY_OPERATOR::process(uint32_t idx)
 		// Set up a TLS endpoint at all times since the 
 		// IBM Voice Gateway product will only use a secure endpoint.
 		endpoint_tls.init_asio(&ios);
-		endpoint_tls.set_open_handler(bind(&MY_OPERATOR::on_open,this,::_1));
+		endpoint_tls.set_open_handler(bind(&MY_OPERATOR::on_open_tls,this,::_1));
 		endpoint_tls.set_message_handler(
 			bind(&MY_OPERATOR::on_message<server_tls>,this,&endpoint_tls,::_1,::_2));
 		endpoint_tls.set_close_handler(bind(&MY_OPERATOR::on_close,this,::_1));
@@ -479,6 +502,12 @@ void MY_OPERATOR::process(uint32_t idx)
 }
 
 // This method sets up the TLS for a given client connection handle.
+// WebSocket++ library calls this handler ahead of time before a
+// new TLS client attempts to connect. It prepares a TLS context
+// ahead of time and keeps a spare one to be assigned to the next 
+// arriving new WebSocket or a regular https client (wss or https).
+// When such a new TLS client connects here, it will be using that
+// spare handle throughout its connected life.
 MY_OPERATOR::context_ptr MY_OPERATOR::on_tls_init(websocketpp::connection_hdl hdl) {
 	bool vgwSessionLoggingDone = false;
 	
@@ -491,32 +520,79 @@ MY_OPERATOR::context_ptr MY_OPERATOR::on_tls_init(websocketpp::connection_hdl hd
 		SPLAPPTRC(L_INFO, "on_tls_init called with hdl: " << hdl.lock().get(), "on_tls_init");
 	}
 	
-	context_ptr ctx(new boost::asio::ssl::context(boost::asio::ssl::context::tlsv1));
+	// TIP: If we want to know which TLS version gets negotiated between the
+	// client and the server, we can run this command from a client machine:
+	//
+	// openssl s_client -connect TLSHost:port
+	// openssl s_client -connect b0513:8443
+	//
+	// You can read more about that command in this URL:
+	// https://security.stackexchange.com/questions/100029/how-do-we-determine-the-ssl-tls-version-of-an-http-request
+	//
+	// We will configure the boost asio server to support only the tlsv12 protocol.
+	// We can disable the other SSL, TLS protocol versions in order to 
+	// strengthen the security.
+	// You can read more details about this from here.
+	// https://stackoverflow.com/questions/47096415/how-to-make-boostasio-ssl-server-accept-both-tls-1-1-and-tls-1-2/47097088
+	// https://www.boost.org/doc/libs/1_58_0/doc/html/boost_asio/reference/ssl__context.html
+	// https://www.boost.org/doc/libs/1_58_0/doc/html/boost_asio/reference/ssl__context/method.html
+	//
+	// As shown in the URL above, we can use one of several TLS context methods such as
+	// tlsv1, tlsv1_server, tlsv11, tlsv11_server, tlsv12, tlsv12_server. Using one of these
+	// options will start only a server supporting that TLS version. Alternatively, we can simply
+	// use tls_server which will allow all the versions i.e. v1, v11 and v12. Then, we can apply the 
+	// no_tlsxxx flags to disable a particular tls version as needed.
+	context_ptr ctx(
+		new boost::asio::ssl::context(boost::asio::ssl::context::tls_server));
 
 	try {
-		ctx->set_options(boost::asio::ssl::context::default_workarounds |
-			boost::asio::ssl::context::no_sslv2 |
-			boost::asio::ssl::context::no_sslv3 |
-			boost::asio::ssl::context::single_dh_use);
+		// We will support only tlsv1.2. Let us disable all the other older 
+		// tls versions including the very old ssl v2 and v3 protocols.
+		ctx->set_options(
+				boost::asio::ssl::context::default_workarounds
+						| boost::asio::ssl::context::no_sslv2
+						| boost::asio::ssl::context::no_sslv3
+						| boost::asio::ssl::context::no_tlsv1
+						| boost::asio::ssl::context::no_tlsv1_1
+						| boost::asio::ssl::context::single_dh_use);
 		ctx->set_password_callback(bind(&MY_OPERATOR::get_password, this));
+		// Let us now load the server's private key and 
+		// public certificate holding PEM file.
 		ctx->use_certificate_chain_file(certificateFileName.c_str());
 		ctx->use_private_key_file(certificateFileName.c_str(), boost::asio::ssl::context::pem);
-		// Let us keep track of all the connection handles that use TLS context.
-		// This will be useful in the prepareToShutdown method above to
-		// distinguish between TLS endpoint and non-TLS (plain) endpoint.
-		// Because, to close the active client connections at the time of the
-		// operator shutdown, we have to call the close method on an 
-		// appropriate endpoint.
-		tls_connections_set.insert(hdl);
 	} catch (std::exception& e) {
-		std::cout << e.what() << std::endl;
+    	std::cout << "Operator " << operatorPhysicalName <<
+			"-->Channel " << boost::to_string(udpChannelNumber) << 
+			"-->" << e.what() << std::endl;
+		
+		throw std::runtime_error(
+			std::string("IBMVoiceGatewaySource_cpp.cgt: Exception in on_tls_init: ") +
+			e.what() +
+			". Reason for this error could be an invalid wss, https URL or a " +
+			"missing server certificate file. Please check.");
 	}
     
 	return ctx;
 }
 
-// When a client establishes a new Websocket connection, this callback method is run.
-void MY_OPERATOR::on_open(websocketpp::connection_hdl hdl) {
+// When a client establishes a new non_tls Websocket connection, this callback method is run.
+void MY_OPERATOR::on_open_non_tls(websocketpp::connection_hdl hdl) {
+	// Let us redirect this to the common on_open handler by
+	// setting the second argument to false to indicate that
+	// it is a non_tls WebSocket connection from a client.
+	on_open(hdl, false);
+} // End of on_open_non_tls
+
+// When a client establishes a new TLS Websocket connection, this callback method is run.
+void MY_OPERATOR::on_open_tls(websocketpp::connection_hdl hdl) {
+	// Let us redirect this to the common on_open handler by
+	// setting the second argument to true to indicate that
+	// it is a TLS WebSocket connection from a client.
+	on_open(hdl, true);
+} // End of on_open_tls.
+
+// This is a common on_open handler for both the non_tls and TLS new client connections.
+void MY_OPERATOR::on_open(websocketpp::connection_hdl hdl, bool isTlsConnection) {
 	bool vgwSessionLoggingDone = false;
 	
 	if (vgwSessionLoggingNeeded == true) {
@@ -532,6 +608,7 @@ void MY_OPERATOR::on_open(websocketpp::connection_hdl hdl) {
 
 	// Add this newly opened client connection to the associative container.
 	connection_metadata con_metadata;
+	con_metadata.isTlsConnection = isTlsConnection;
 	con_metadata.vgwSessionStatus = VGW_OPENED_A_WS_CONNECTION;
 	con_metadata.vgwSessionStartTime = 
 		SPL::Functions::Time::getSeconds(SPL::Functions::Time::getTimestamp());
@@ -786,8 +863,25 @@ void MY_OPERATOR::on_message(EndpointType* s, websocketpp::connection_hdl hdl,
 				// started an STT session. So, we can transition this connection's 
 				// status to the next logical state.
 				con_metadata.vgwSessionStatus = VGW_STARTED_AN_STT_SESSION;
+				// Let us store the call start date time string represented as system/wall clock time.
+				con_metadata.callStartDateTime = 
+					SPL::Functions::Time::ctime(SPL::Functions::Time::getTimestamp());
 				// Update it in the client connections map.
 				client_connections_map[hdl] = con_metadata;
+				
+				// At this time, we can store the phone number 
+				// (agent or caller) belonging to this voice channel to be
+				// returned later when and if the application (i.e. user of this operator) 
+				// queries for it via this operator's custom output function.
+				//
+				// We have a map where the agent and caller phone numbers of a given
+				// call session id are stored. 
+				//
+				// Key: vgeSessionId_vgwIsCaller
+				// Value: Phone Number
+				std::string key = con_metadata.vgwSessionId + std::string("_") + 
+					boost::to_string(con_metadata.vgwIsCaller);
+				vgwSessionPhoneNumbersMap[key] = con_metadata.vgwParticipantURI;
 				
 				if (vgwSessionLoggingNeeded == true) {
 					SPLAPPTRC(L_ERROR, "Operator " << operatorPhysicalName <<
@@ -1127,16 +1221,18 @@ void MY_OPERATOR::on_message(EndpointType* s, websocketpp::connection_hdl hdl,
 		  	  	  <%} elsif ($operation eq "getAgentPhoneNumber") { 
 		    %> 
 			   	   oTuple.set_<%=$name%>( 
-			   	        <%=$operation%>(con_metadata.vgwParticipantURI,
-							con_metadata.vgwIsCaller, con_metadata.vgwVoiceChannelNumber));
+			   			getAgentOrCallerPhoneNumber(con_metadata.vgwSessionId, false));
 	  	  	  	  <%} elsif ($operation eq "getCallerPhoneNumber") { 
 	  	  	%> 
 		   	   	   oTuple.set_<%=$name%>( 
-		   	            <%=$operation%>(con_metadata.vgwParticipantURI,
-							con_metadata.vgwIsCaller, con_metadata.vgwVoiceChannelNumber));
-		  	  	  <%}	
+		   	   			getAgentOrCallerPhoneNumber(con_metadata.vgwSessionId, true));
+		  	  	  <%} elsif ($operation eq "getCallStartDateTime") { 
+		  	%> 
+		  		   oTuple.set_<%=$name%>( 
+		  		   	    <%=$operation%>(con_metadata.callStartDateTime));
+		  		  <%}
 			}%>
-			
+						
 			submit(oTuple, 0);
 
 			if (vgwSessionLoggingNeeded == true) {
@@ -1197,6 +1293,21 @@ void MY_OPERATOR::on_close(websocketpp::connection_hdl hdl) {
 			", vgwIsCaller: " << con_metadata.vgwIsCaller <<
 			", sessionDuration: " << sessionDuration << " seconds.", "on_close");
 	}
+
+	// We have a map where the agent and caller phone numbers of a given
+	// call session id are stored. Since this leg of that call is ending,
+	// let us remove the corespoding entry from that map.
+	//
+	// Key: vgeSessionId_vgwIsCaller
+	// Value: Phone Number
+	std::string key = con_metadata.vgwSessionId + std::string("_") + 
+		boost::to_string(con_metadata.vgwIsCaller);
+	auto it = vgwSessionPhoneNumbersMap.find(key);
+
+	if (it != vgwSessionPhoneNumbersMap.end()) {
+		// it->first has the key of the map and it->second has the value.
+		vgwSessionPhoneNumbersMap.erase(it->first);
+	}	
 	
 	// Delete this handle from our associative container.        
 	client_connections_map.erase(hdl);
@@ -1220,7 +1331,8 @@ MY_OPERATOR::connection_metadata& MY_OPERATOR::get_con_metadata_from_hdl(websock
 		// and probably means something else is wrong.
 		throw std::invalid_argument(error_string.c_str());
 	}
-        
+    
+	// it->first has the key of the map and it->second has the value.
 	return it->second;
 }
 
@@ -1276,30 +1388,31 @@ int32_t MY_OPERATOR::getVoiceChannelNumber(int32_t const & voiceChannelNumber) {
 	return(voiceChannelNumber);
 }
 
-std::string MY_OPERATOR::getAgentPhoneNumber(std::string const & phoneNumber,
-	bool const & isCaller, int32_t const & voiceChannelNumber) {
+std::string MY_OPERATOR::getAgentOrCallerPhoneNumber(std::string const & vgwSessionId, 
+	bool const & vgwIsCaller) {
 	// We will use the isCaller argument to determine whether it is an 
 	// agent number or a caller number.
 	// Read the commentary in the .h file for the connection_metadata structure to
 	// gain more background about what is going on with the vgwIsCaller and the
 	// vgwVoiceChannelNumber.
-	if (isCaller == false) {
-		return(phoneNumber);
+	//
+	// We have a map that holds the agent and caller phone numbers for a given voice call session.
+	// Key: vgeSessionId_vgwIsCaller
+	// Value: Phone Number
+	std::string key = vgwSessionId + std::string("_") + boost::to_string(vgwIsCaller);
+	auto it = vgwSessionPhoneNumbersMap.find(key);
+
+	if (it == vgwSessionPhoneNumbersMap.end()) {
+		// We couldn't find it in the map.
+		return(std::string(""));
 	} else {
-		// This is not an agent's voice channel.
-		return("");
+		// it->first has the key of the map and it->second has the value.
+		return it->second;
 	}
 }
 
-std::string MY_OPERATOR::getCallerPhoneNumber(std::string const & phoneNumber,
-	bool const & isCaller, int32_t const & voiceChannelNumber) {
-	// The same commenary given in the previous method applies here as well.
-	if (isCaller == true) {
-		return(phoneNumber);
-	} else {
-		// This is not a caller's voice channel.
-		return("");
-	}
+SPL::rstring MY_OPERATOR::getCallStartDateTime(SPL::rstring const & callStartDateTime) {
+	return(callStartDateTime);
 }
 
 <%SPL::CodeGen::implementationEpilogue($model);%>
