@@ -2,7 +2,7 @@
 title: "Operator Design"
 permalink: /docs/user/OperatorDesign/
 excerpt: "Describes the design of the Message Hub toolkit operators."
-last_modified_at: 2019-11-14T08:47:48+01:00
+last_modified_at: 2020-07-07T08:47:48+01:00
 redirect_from:
    - /theme-setup/
 sidebar:
@@ -22,7 +22,7 @@ In a Streams application, these two operators can either be used together or ind
 
 * **IBMVoiceGatewaySource** - this is a Websocket server based C++ source operator that can receive the speech data in binary format from many concurrent live voice calls happening between different pairs of speakers e-g: customers and call center agents.
 
-Main goal of this operator is to receive speech data from the iBM Voice Gateway. This operator internally runs a Websocket server that can accept persistent bidirectional client connections made by the IBM Voice Gateway and receive the speech data from the beginning to the end of any given voice call. It then emits chunks of the speech conversations received from the IBM Voice Gateway into output tuples to be consumed by the downstream operators for speech to text transcription. This operator is designed to work with the IBM Voice Gateway v1.0.3.0 and higher. In order to make this operator work well with the IBM Voice Gateway, there must be certain configuration that needs to be done in the IBM Voice Gateway. It includes enabling the voice call metadata transfer to the IBM Streams application, pointing to the Websocket URL endpoint of the IBM Streams application, creating a TLS/SSL certificate and pointing it in both the IBM Voice Gateway and the IBM Streams application etc. These steps must be performed before this source operator can be used in the context of an IBM Streams application. For clear instructions about this required configuration, please refer to a previous chapter titled "Toolkit Overview [Technical]" and focus on step 5 of one of its sections titled "Requirements for this toolkit".
+Main goal of this operator is to receive speech data from the iBM Voice Gateway. This operator internally runs a Websocket server that can accept persistent bidirectional client connections made by the IBM Voice Gateway and receive the speech data from the beginning to the end of any given voice call. It then emits chunks of the speech conversations received from the IBM Voice Gateway into output tuples to be consumed by the downstream operators for speech to text transcription. This operator is designed to work with the IBM Voice Gateway v1.0.3.0 and higher. In order to make this operator work well with the IBM Voice Gateway, there must be certain configuration that needs to be done in the IBM Voice Gateway. It includes enabling the voice call metadata transfer to the IBM Streams application, pointing to the Websocket URL endpoint of the IBM Streams application, creating a TLS/SSL certificate and pointing it in both the IBM Voice Gateway and the IBM Streams application etc. These steps must be performed before this source operator can be used in the context of an IBM Streams application. For clear instructions about this required configuration, please refer to a previous chapter titled "Toolkit Overview [Technical]" and focus on step 6 of one of its sections titled "Requirements for this toolkit".
 
 The IBMVoiceGatewaySource operator is designed to ingest speech data from the IBM Voice Gateway product. This speech data is ingested in binary format from the IBM Voice Gateway into this operator via the Websocket interface. Such speech data arrives here in multiple fragments directly from a live voice call. This operator is capable of receiving speech data from multiple calls that can all happen at the very same time between different pairs of speakers. For every voice call it handles in real-time, the IBM Voice Gateway product will open two Websocket connections into this operator and start sending the live speech data on both of those connections. One of those connections will carry the speech data of the agent and the other connection will carry the speech data of the customer. This operator will keep sending the audio chunks received on those two Websocket connections via its output stream for consumption by the downstream operators. At the end of the any given call, IBM Voice Gateway will close the two WebSocket connections it opened into this operator. This operator has a second output port that produces periodic output tuples to give an indication about the end of a specific speaker (i.e. channel) in a voice call that was in progress moments ago for the given IBM Voice Gateway session id. Downstream operators can make use of this "End Of Voice Call" signal as they see fit.
 
@@ -54,6 +54,7 @@ Following are the custom output functions supported by the IBMVoiceGatewaySource
 | `int32 getVoiceChannelNumber()` | Returns an int32 value indicating the voice channel number in which the speech data bytes were received for a IBM Voice Gateway session id. |
 | `rstring getCallerPhoneNumber()` | Returns an rstring value with details about the caller's phone number. |
 | `rstring getAgentPhoneNumber()` | Returns an rstring value with details about the agent's phone number. |
+| `rstring getCallStartDateTime()` | Returns an rstring value with the call start date time i.e. system clock time. |
 
 
 *******************************
@@ -72,7 +73,7 @@ Main goal of this operator is to make the task of the Speech To Text transcripti
 
  * To provide scalability, it lets the user to specify many WatsonSTT operator instances to work in parallel for transcribing concurrent audio conversations in real time (via network packets) or in batch (via stored files).
 
- * WatsonSTT operator instances running in parallel can be fused as needed to optimally use the available number of CPU cores.
+ * WatsonSTT operator instances running in parallel can be fused as needed to optimally use the available number of CPU cores. In general, fusion is fine as long as there is a total of 10 instances of this operator. Above that limit, it is better to avoid fusion for the correct functioning of the application logic.
 
  * In addition to letting the user choose the core STT capabilities, it also allows the user to take advantage of the other value added features such as profanity filtering, smart formatting, keywords spotting etc.
 
@@ -85,26 +86,23 @@ Following are the parameters accepted by the WatsonSTT operator. Some parameters
 | uri | `rstring` | `User must provide this value. No default.` | This parameter specifies the Watson STT web socket service URI. |
 | baseLanguageModel | `rstring` | `User must provide this value. No default.` | This parameter specifies the name of the Watson STT base language model that should be used. |
 | contentType | `rstring` | `audio/wav` | This parameter specifies the content type to be used for transcription. |
-| sttResultMode | `int32` | `3` | This parameter specifies what type of STT result is needed: 1 to get partial utterances, 2 to get completed utterance, 3 to get the full text after transcribing the entire audio. |
+| sttResultMode | `custom literal` | `partial or complete` | This parameter specifies what type of STT result is needed: partial utterances or a complete utterance to get the full text after transcribing the entire audio. |
+| nonFinalUtterancesNeeded | `boolean` | `false` | If `sttResultMode` equals `partial` this parameter controls the output of non final utterances. If `sttResultMode` equals `complete` this parameter is ignored. |
 | sttRequestLogging | `boolean` | `false` | This parameter specifies whether request logging should be done for every STT audio transcription request. |
 | baseModelVersion | `rstring` | `Empty string` | This parameter specifies a particular base model version to be used for transcription. |
 | customizationId | `rstring` | `Empty string` | This parameter specifies a custom language model to be used for transcription. |
 | customizationWeight | `float64` | `0.0` | This parameter specifies a relative weight for a custom language model as a float64 between 0.0 to 1.0 |
 | acousticCustomizationId | `rstring` | `Empty string` | This parameter specifies a custom acoustic model to be used for transcription. |
 | filterProfanity | `boolean` | `false` | This parameter indicates whether profanity should be filtered from a transcript. |
-| sttJsonResponseDebugging | `boolean` | `false` | This parameter is used for debugging the STT JSON response message. Mostly for IBM internal use. |
 | maxUtteranceAlternatives | `int32` | `1` | This parameter indicates the required number of n-best alternative hypotheses for the transcription results. |
 | wordAlternativesThreshold | `float64` | `0.0` | This parameter controls the density of the word alternatives results (a.k.a. Confusion Networks). A value of 0.0 disables this feature. Valid value must be less than 1.0 |
-| wordConfidenceNeeded | `boolean` | `false` | This parameter indicates whether the transcription result should include individual words and their confidences or not. |
-| wordTimestampNeeded | `boolean` | `false` | This parameter indicates whether the transcription result should include individual words and their timestamps or not. |
-| identifySpeakers | `boolean` | `false` | This parameter indicates whether the speakers of the individual words in an utterance result should be identified. |
 | smartFormattingNeeded | `boolean` | `false` | This parameter indicates whether to convert date, time, phone numbers, currency values, email and URLs into conventional representations. |
 | keywordsSpottingThreshold | `float64` | `0.0` | This parameter specifies the minimum confidence level that the STT service must have for an utterance word to match a given keyword. A value of 0.0 disables this feature. Valid value must be less than 1.0. |
 | keywordsToBeSpotted | `list<rstring>` | `Empty list` | This parameter specifies a list (array) of strings to be spotted. |
 | websocketLoggingNeeded | `boolean` | `false` | This parameter specifies whether logging is needed from the Websocket library. |
 | cpuYieldTimeInAudioSenderThread | `float64` | `0.001 i.e. 1 millisecond` | This parameter specifies the CPU yield time (in seconds) needed inside the audio sender thread's tight loop spinning to look for new audio data to be sent to the STT service. It should be >= 0.0 |
-| waitTimeBeforeSTTServiceConnectionRetry | `float64` | `3.0` | This parameter specifies the time (in seconds) to wait before retrying a connection attempt to the Watson STT service. It should be >= 1.0 |
 | maxAllowedConnectionAttempts | `int32` | `10` | This parameter specifies the maximum number of attempts to make a Websocket connection to the STT service. It should be >= 1 |
+| maxConnectionRetryDelay | `float64` | `60.0` | The maximum wait time in seconds before a connection retry is made. The retry delay of connection to the STT service increases exponentially starting from 2 seconds but not exceeding 'maxConnectionRetryDelay'. It must be greater 1.0 |
 | sttLiveMetricsUpdateNeeded | `boolean` | `true` | This parameter specifies whether live update for this operator's custom metrics is needed. |
 
 ### WatsonSTT operator's custom output functions
@@ -116,7 +114,6 @@ Following are the custom output functions supported by the WatsonSTT operator. T
 | `rstring getUtteranceText()` | Returns the transcription of audio in the form of a single utterance. |
 | `boolean isFinalizedUtterance()` | Returns a boolean value to indicate if this is an interim partial utterance or a finalized utterance. |
 | `float32 getConfidence()` | Returns a float32 confidence value for an interim partial utterance or for a finalized utterance or for the full text. |
-| `rstring getFullTranscriptionText()` | Returns the transcription of audio in the form of full text after completing the entire transcription. |
 | `rstring getSTTErrorMessage()` | Returns the Watson STT error message if any during transcription. |
 | `boolean isTranscriptionCompleted()` | Returns a boolean value to indicate whether the full transcription is completed. |
 | `list<rstring> getUtteranceAlternatives()` | Returns a list of n-best alternative hypotheses for an utterance result. List will have the very best guess first followed by the next best ones in that order. |

@@ -2,7 +2,7 @@
 title: "Toolkit Overview [Technical]"
 permalink: /docs/knowledge/overview/
 excerpt: "Basic knowledge of the toolkit's technical domain."
-last_modified_at: 2019-11-14T08:15:48+01:00
+last_modified_at: 2020-07-07T08:15:48+01:00
 redirect_from:
    - /theme-setup/
 sidebar:
@@ -36,6 +36,12 @@ This toolkit excels at ingesting speech data from an enterprise telephony infras
    - b) <span style="color:blue">Speech data files in a directory-->IBM Streams<-->Watson Speech To Text on IBM Cloud Pak for Data (CP4D)</span>
    - c) <span style="color:purple">Speech data files in a directory-->IBM Streams<-->Watson Speech To Text engine embedded inside an IBM Streams operator</span>
 
+## All-in-one Speech to text analytics, Call Recording and Call Replay
+As described above, Speech To Text is the core feature of this toolkit. In addition, this toolkit enables call recording and call replay. It includes two real-world tested examples that show how to do live voice call recording and call replay from the pre-recorded calls. Many other vendors provide proprietary, rigid black-box solutions for call recording at a hefty price tag with either a non-existent or a minimal call replay facility. But, this toolkit gives those two features for free in a completely open and a flexible manner for users to beneift from them. Such a benefit allows customers to control where the recorded data gets stored in a standard Mu-Law format as well as accessing and using that data for their other purposes. All of them combined, it is a compelling way in which the IBM Voice Gateway, IBM Streams and IBM Watson Speech To Text offerings put the customer in the driver's seat to gather real-time intelligence from their voice infrastructure.
+
+## A visual description of this toolkit's architecture
+![STT Gateway Architecture Diagram](https://github.com/IBMStreams/streamsx.sttgateway/blob/develop/samples/VoiceGatewayToStreamsToWatsonSTT/etc/stt-arch.png)
+
 ## Technical positioning of this toolkit
 At a very high level, this toolkit shares the same design goal as the other IBM Streams toolkit named com.ibm.streams.speech2text to convert speech data into text. But, they both work very differently to realize that design goal. IBM Streams users can select either of these two toolkits depending on their application and hardware infrastructure needs. So, it is important to know the following major differences between these two toolkits before choosing the suitable one for a given situation.
 
@@ -59,16 +65,24 @@ At a very high level, this toolkit shares the same design goal as the other IBM 
 ## Requirements for this toolkit
 There are certain important requirements that need to be satisfied in order to use the IBM Streams STT Gateway toolkit in Streams applications. Such requirements are explained below.
 
+**Note:** This toolkit is **not** supported on Red Hat Enterprise Linux Workstation release **6.x**
+    
+**Note:** This toolkit requires c++11 support.
+
 1. Network connectivity to the IBM Watson Speech To Text (STT) service running either on the public cloud or on the Cloud Pak for Data (CP4D) is needed from the IBM Streams Linux machines where this toolkit will be used. The same is true to integrate with the IBM Voice Gateway product for the use cases involving speech data ingestion for live voice calls.
 
-2. This toolkit uses Websocket to communicate with the IBM Voice Gateway and the Watson STT service. A valid IAM access token is needed to use the Watson STT service on the public cloud and a valid access token to use the Watson STT service on the CP4D. So, users of this toolkit must provide their public cloud STT service instance's API key or the CP4D STT service instance's access token when launching the Streams application(s) that will have a dependency on this toolkit. When using the API key from the public cloud, a utility SPL composite named IAMAccessTokenGenerator available in this toolkit will be able to generate the IAM access token and then subsequently refresh that token to keep it valid. A Streams application employing this toolkit can make use of that utility composite to generate the necessary IAM access token needed in the public cloud. Please do more reading about the 
-IAM access token from [here](https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-websockets#WSopen).
+2. This toolkit uses Websocket to communicate with the IBM Voice Gateway and the Watson STT service. A valid IAM access token is needed to use the Watson STT service on the public cloud and a valid access token to use the Watson STT service on the CP4D. So, users of this toolkit must provide their public cloud STT service instance's API key or the CP4D STT service instance's access token when launching the Streams application(s) that will have a dependency on this toolkit. When using the API key from the public cloud, a utility SPL composite named IAMAccessTokenGenerator available in this toolkit will be able to generate the IAM access token and then subsequently refresh that token to keep it valid. A Streams application employing this toolkit can make use of that utility composite to generate the necessary IAM access token needed in the public cloud. Please do more reading about the IAM access token from [here](https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-websockets#WSopen).
 
-3. On the IBM Streams application development machine (where the application code is compiled to create the application bundle), it is necessary to download and install the boost_1_69_0 as well as the websocketpp version 0.8.1. Please note that this is not needed on the Streams application execution machines. For the necessary steps to meet this requirement, please refer to the section titled "Toolkit Usage Overview".
+3. On the IBM Streams application development machine(s) (where the application code is compiled to create the application bundle), it is necessary to download and install the toolkit release bundle. The toolkit release bundle contains the necessary ant build script to download the required external libraries: boost, websocketpp and rapidjson. For the essential steps to meet this requirement, please refer to the above-mentioned documentation URL or a file named sttgateway-tech-brief.txt available at this tooolkit's top-level directory.
 
-4. On the IBM Streams application machines, please ensure that you can run the Linux curl command. The utility composite mentioned in a previous paragraph will use the Linux curl command to generate and refresh the IAM access token for using the STT service on public cloud. So, curl command should work on all the Streams application machines.
+4. On the IBM Streams application development machine(s) the following toolkits are required:
+* com.ibm.streamsx.inet version 2.3.6 or higher
+* com.ibm.streamsx.json version 1.4.6 or higher
+* com.ibm.streamsx.websocket version 1.0.6 or higher
 
-5. For the IBM Streams and the IBM Voice Gateway products to work together, certain configuration steps must be done as explained here.
+5. On the IBM Streams application machines, please ensure that the openssl and libcurl are installed including the openssl-devel and libcurl-devel. This is required by the toolkit dependency to streamsx.websocket and the streamsx.inet toolkits. This is required by this toolkit to generate and refresh and refresh the IAM access token which is a must for the STT service on public cloud as well as for the TLS support.
+
+6. For the IBM Streams and the IBM Voice Gateway products to work together, certain configuration steps must be done in both the products as explained here.
 
 - a) In order to make the IBM Voice Gateway send the speech data from the live voice calls, it is necessary to set the following environment variable in the deployment configuration of the IBM Voice Gateway's SIP Orchestrator at the time of deploying it.
 ```

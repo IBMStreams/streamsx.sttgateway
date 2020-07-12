@@ -22,7 +22,7 @@
 <div class="body refbody">
 <div class="section">
 <p class="p">
-<a class="xref" href="../toolkits/toolkits.html">Gateway to the IBM Speech To Text (STT) cloud service</a> &gt; <a class="xref" href="tk$com.ibm.streamsx.sttgateway.html">com.ibm.streamsx.sttgateway 2.2.3</a> &gt; <a class="xref" href="ns$com.ibm.streamsx.sttgateway.watson.html">com.ibm.streamsx.sttgateway.watson</a> &gt; IBMVoiceGatewaySource</p>
+<a class="xref" href="../toolkits/toolkits.html">Gateway to the IBM Speech To Text (STT) cloud service</a> &gt; <a class="xref" href="tk$com.ibm.streamsx.sttgateway.html">com.ibm.streamsx.sttgateway 2.2.2</a> &gt; <a class="xref" href="ns$com.ibm.streamsx.sttgateway.watson.html">com.ibm.streamsx.sttgateway.watson</a> &gt; IBMVoiceGatewaySource</p>
 
 </div>
 
@@ -32,16 +32,16 @@
 
 <div class="section">
 
-<p class="p">      The IBMVoiceGatewaySource is a server-based operator. Inside of it,        it hosts a C++ WebSocket server. It is designed to ingest        speech data from the IBM Voice Gateway product version 1.0.3.0 or above.        This speech data is ingested in binary format from the        IBM Voice Gateway into this operator via the Websocket interface.        Such speech data arrives here in multiple fragments directly from        an ongoing live voice call. This operator is capable of receiving speech data        from multiple calls that can all happen at the very same time        between different pairs of speakers. For every voice call it handles        in real-time, the IBM Voice Gateway product will open two        Websocket connections into this operator and start sending the        live speech data on both of those connections. One of those connections        will carry the speech data of the agent and the other connection        will carry the speech data of the customer. This operator will        keep sending the audio chunks received on those two Websocket        connections via its output stream for consumption by the        downstream operators. At the end of the any given call,        IBM Voice Gateway will close the two WebSocket connections it        opened into this operator.
+<p class="p">      The IBMVoiceGatewaySource operator is designed to ingest        speech data from the IBM Voice Gateway product version 1.0.3.0 or above.        This speech data is ingested in binary format from the        IBM Voice Gateway into this operator via the Websocket interface.        Such speech data arrives here in multiple fragments directly from        a live voice call. This operator is capable of receiving speech data        from multiple calls that can all happen at the very same time        between different pairs of speakers. For every voice call it handles        in real-time, the IBM Voice Gateway product will open two        Websocket connections into this operator and start sending the        live speech data on both of those connections. One of those connections        will carry the speech data of the agent and the other connection        will carry the speech data of the customer. This operator will        keep sending the audio chunks received on those two Websocket        connections via its output stream for consumption by the        downstream operators. At the end of the any given call,        IBM Voice Gateway will close the two WebSocket connections it        opened into this operator.
 </p>
 
 <p class="p">      This operator can be configured with a Websocket server port number which is optional. If the user of this       operator doesn't specify a Websocket server port number, then a default port number of 443 will be used.
 </p>
 
-<p class="p">      See the samples folder inside this toolkit for two real-world working examples        (VoiceGatewayToStreamsToWatsonS2T and VoiceGatewayToStreamsToWatsonSTT) that show        how to use this operator. In those examples, you will see how to ingest the real-time       voice call speech data, feed it to an IBM Watson Speech To Text engine to transcribe into       text and then distribute the transcribed data in different ways for doing further analytics to       derive insights. In addtion, those examples also show how to do live voice call recording and        call replay from the pre-recorded calls. Many other vendors provide proprietary black-box solutions        for call recording at a hefty price tag with either a non-existent or a minimal call replay facility.        But, this toolkit gives those two features for free in a completely open and a flexible manner        for users to beneift from them. Such a benefit allows customers to control where the        recorded data gets stored in a standard Mu-Law format as well as accessing and using that        data for their other purposes. All of them combined, it is a compelling way in which the       IBM Voice Gateway, IBM Streams and IBM Watson Speech To Text offerings        put the customer in the driver's seat to gather real-time intelligence from their       voice infrastructure.
+<p class="p">      Requirements:        See the samples folder inside this toolkit for a working example that show how to use this operator.
 </p>
 
-<p class="p">      For a detailed documentation about the requirements, operator design, usage patterns and        in-depth technical details, please refer to the official STT Gateway toolkit documentation        available at this URL:
+<p class="p">      For a detailed documentation about the operator design, usage patterns and in-depth technical       details, please refer to the official STT Gateway toolkit documentation available at this URL:
 </p>
 
 <p class="p">      <a class="xref" href="https://ibmstreams.github.io/streamsx.sttgateway">https://ibmstreams.github.io/streamsx.sttgateway</a>
@@ -78,7 +78,7 @@
  
   <dt class="dt dlterm">Metrics</dt>
 
-  <dd class="dd">This operator reports 6 metrics.</dd>
+  <dd class="dd">This operator reports 3 metrics.</dd>
 
  
 </dl>
@@ -218,18 +218,6 @@
             <dd class="dd">
 
 <p class="p">Returns an rstring value with details about the caller's phone number.
-</p>
-              <p class="p"/>
-
-            </dd>
-
-                        
-              <dt class="dt dlterm">
-                <tt class="ph tt">   rstring getCallStartDateTime()</tt>              </dt>
-
-            <dd class="dd">
-
-<p class="p">Returns an rstring value with the call start date time i.e. system clock time.
 </p>
               <p class="p"/>
 
@@ -695,32 +683,6 @@ This operator supports 10 parameters.
 <p class="p splhead-1"><strong class="ph b"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__context__metrics">Metrics</a></strong></p>
 <dl class="dl">
   
-    <dt class="dt dlterm"><tt class="ph tt">nNonTlsPort</tt> - <a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__context__metrics_kind_gauge">Gauge</a></dt>
-
-    <dd class="dd">
-
-<p class="p">Non-TLS port number configured for this operator.
-</p>
-
-     <p class="p"/>
-
-     </dd>
-
-  
-  
-    <dt class="dt dlterm"><tt class="ph tt">nNonTlsPortNeeded</tt> - <a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__context__metrics_kind_gauge">Gauge</a></dt>
-
-    <dd class="dd">
-
-<p class="p">Did the user configure to exchange data via a non-TLS port?
-</p>
-
-     <p class="p"/>
-
-     </dd>
-
-  
-  
     <dt class="dt dlterm"><tt class="ph tt">nOutputTuplesSent</tt> - <a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__context__metrics_kind_gauge">Gauge</a></dt>
 
     <dd class="dd">
@@ -753,19 +715,6 @@ This operator supports 10 parameters.
 
   
   
-    <dt class="dt dlterm"><tt class="ph tt">nTlsPort</tt> - <a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__context__metrics_kind_gauge">Gauge</a></dt>
-
-    <dd class="dd">
-
-<p class="p">TLS port number configured for this operator.
-</p>
-
-     <p class="p"/>
-
-     </dd>
-
-  
-  
     <dt class="dt dlterm"><tt class="ph tt">nVoiceCallsProcessed</tt> - <a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__context__metrics_kind_counter">Counter</a></dt>
 
     <dd class="dd">
@@ -789,10 +738,10 @@ This operator supports 10 parameters.
 <p class="p splhead-1"><strong class="ph b"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__context__dependencies">Libraries</a></strong></p>
 <dl class="dl">
  
-  <dt class="dt dlterm"><tt class="ph tt">Boost Library</tt>  </dt>
+  <dt class="dt dlterm"><tt class="ph tt">Boost Library common/Websocket include and Boost system</tt>  </dt>
 
 <dd class="dd"/>
-  <dd class="dd"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__context__dependencies__managedlibrary__lib">Library Name</a>: <tt class="ph tt">boost_system, boost_chrono, boost_random</tt></dd>
+  <dd class="dd"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__context__dependencies__managedlibrary__lib">Library Name</a>: <tt class="ph tt">boost_system</tt></dd>
 
   <dd class="dd"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__context__dependencies__managedlibrary__libpath">Library Path</a>: <tt class="ph tt">../../lib</tt></dd>
 
@@ -800,10 +749,21 @@ This operator supports 10 parameters.
 
  
  
-  <dt class="dt dlterm"><tt class="ph tt">Websocketpp Library</tt>  </dt>
+  <dt class="dt dlterm"><tt class="ph tt">Boost Library chrono</tt>  </dt>
 
 <dd class="dd"/>
-  <dd class="dd"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__context__dependencies__managedlibrary__includepath">Include Path</a>: <tt class="ph tt">../../include</tt></dd>
+  <dd class="dd"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__context__dependencies__managedlibrary__lib">Library Name</a>: <tt class="ph tt">boost_chrono</tt></dd>
+
+  <dd class="dd"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__context__dependencies__managedlibrary__libpath">Library Path</a>: <tt class="ph tt">../../lib</tt></dd>
+
+ 
+ 
+  <dt class="dt dlterm"><tt class="ph tt">Boost Library random</tt>  </dt>
+
+<dd class="dd"/>
+  <dd class="dd"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__context__dependencies__managedlibrary__lib">Library Name</a>: <tt class="ph tt">boost_random</tt></dd>
+
+  <dd class="dd"><a class="xref" href="../references/OperatorModel.html#spldoc_reference_operator_model__context__dependencies__managedlibrary__libpath">Library Path</a>: <tt class="ph tt">../../lib</tt></dd>
 
  
 </dl>
