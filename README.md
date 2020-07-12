@@ -189,6 +189,19 @@ cd   streamsx.sttgateway/samples/VoiceGatewayToStreamsToWatsonS2T
 make
 st submitjob -P tlsPort=9443 -P vgwSessionLoggingNeeded=false -P numberOfS2TEngines=80 -P WatsonS2TConfigFile=/home/streamsadmin/toolkit.speech2text-v2.12.0/model/en_US.8kHz.general.diarization.low_latency.pset -P WatsonS2TModelFile=$HOME/toolkit.speech2text-v2.12.0/model/en_US.8kHz.general.pkg -P ipv6Available=false -P writeTranscriptionResultsToFiles=true -P sendTranscriptionResultsToHttpEndpoint=true -P httpEndpointForSendingTranscriptionResults=http://172.30.105.11:9080 -P callRecordingWriteDirectory=/homes/hny5/sen/call-recording-write -P callRecordingReadDirectory=/homes/hny5/sen/call-recording-read -P numberOfCallReplayEngines=15 -C fusionScheme=legacy  output/com.ibm.streamsx.sttgateway.sample.watsons2t.VoiceGatewayToStreamsToWatsonS2T.sab
 ```
+## Working examples shipped with this toolkit
+There are many examples available in this toolkit that can be compiled and tested. Couple of them are generic real-word solutions running in production that can be customized and used when needed.
+
+* [AccessTokenGenerator](https://github.com/IBMStreams/streamsx.sttgateway/tree/develop/samples/AccessTokenGenerator)
+* [AudioFileWatsonSTT](https://github.com/IBMStreams/streamsx.sttgateway/tree/develop/samples/AudioFileWatsonSTT)
+* [AudioFileWatsonSTTAllOutput](https://github.com/IBMStreams/streamsx.sttgateway/tree/develop/samples/AudioFileWatsonSTTAllOutput)
+* [AudioRawWatsonSTT](https://github.com/IBMStreams/streamsx.sttgateway/tree/develop/samples/AudioRawWatsonSTT)
+* [AudioRawWatsonSTTAllOutput](https://github.com/IBMStreams/streamsx.sttgateway/tree/develop/samples/AudioRawWatsonSTTAllOutput)
+* [VoiceGatewayToStreamsToWatsonSTT](https://github.com/IBMStreams/streamsx.sttgateway/tree/develop/samples/VoiceGatewayToStreamsToWatsonSTT)
+* [VoiceGatewayToStreamsToWatsonS2T](https://github.com/IBMStreams/streamsx.sttgateway/tree/develop/samples/VoiceGatewayToStreamsToWatsonS2T)
+* [stt_results_http_receiver](https://github.com/IBMStreams/streamsx.sttgateway/tree/develop/samples/stt_results_http_receiver)
+* [audio_files](https://github.com/IBMStreams/streamsx.sttgateway/tree/develop/samples/audio-files)
+* [VoiceDataSimulator](https://github.com/IBMStreams/streamsx.sttgateway/tree/develop/samples/VoiceDataSimulator)
 
 ## WHATS NEW
 
