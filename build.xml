@@ -167,9 +167,6 @@
 		<delete includeemptydirs="true" failonerror="false">
 			<!-- do not delete rapidjson because this lib is not downloaded -->
 			<fileset dir="${ext.dir}" excludes="${rapidjson.str}/*"/>
-			<fileset dir="${lib.dir}">
-			   <include name="*.a"/>
-			</fileset>
 		</delete>
 	</target>
 
@@ -185,11 +182,12 @@
 			<arg value="cat /proc/cpuinfo | grep processor | wc -l"/>
 		</exec>
 		<exec executable="./b2" dir="${ext.dir}/boost-install-files/boost_${boost.version.name}" failonerror="true">
-			<arg value="--no-cmake-config"/>
+			<arg value="--no-cmake-config"/> <!-- do not create a cmake directory in the lib dir -->
 			<arg value="--with-chrono"/>
 			<arg value="--with-random"/>
 			<arg value="--with-system"/>
 			<arg value="-j${no.cpus}"/>
+			<arg value="link=shared"/> <!-- do not output static libraries -->
 			<arg value="install"/>
 		</exec>
 		<echo>Copying ${rapidjson.str} ${rapidjson.version}</echo>
