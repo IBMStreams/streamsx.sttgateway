@@ -18,3 +18,7 @@ setVar 'TTPR_SpeechToTextUrl' "wss://api.us-south.speech-to-text.watson.cloud.ib
 setVar 'TTPR_SpeechToTextApikeyFile' "${TTRO_inputDir}/apikey.enc"
 # or you provide the environment SPEECH_TO_TEXT_APIKEY
 # or you provide the command line parameter -D TTPR_SpeechToTextApikey=<apikey>
+
+# Set the new introduced dependency to websocket toolkit
+# you may overwrite this in a myProperties.sh file
+setVar 'TTPR_StreamsxWebsocketToolkit' "$HOME/workspace/com.ibm.streamsx.websocket"

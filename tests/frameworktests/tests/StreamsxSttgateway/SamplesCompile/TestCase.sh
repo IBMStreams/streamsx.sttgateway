@@ -29,11 +29,11 @@ if [[ $TTRO_variantCase == 'VoiceGatewayToStreamsToWatsonS2T' ]]; then
 		setSkip "sample requires TTPR_StreamsxSpeech2TextToolkit and TTPR_StreamsxNetworkToolkit"
 	fi
 fi
-if [[ $TTRO_variantCase == 'stt_results_http_receiver' ]]; then
-	if ! isExistingAndTrue TTPR_streamsxInetserverToolkit; then
-		setSkip "sample requires TTPR_streamsxInetserverToolkit"
+if [[ $TTRO_variantCase == 'VoiceGatewayToStreamsToWatsonSTT' || $TTRO_variantCase == 'stt_results_http_receiver' || $TTRO_variantCase == 'VoiceGatewayToStreamsToWatsonS2T' ]]; then
+	if isExistingAndTrue TTPR_StreamsxWebsocketToolkit; then
+		export STREAMS_WEBSOCKET_TOOLKIT="$TTPR_StreamsxWebsocketToolkit"
 	else
-		export STREAMS_INET_SERVER_TOOLKIT="$TTPR_streamsxInetserverToolkit"
+		setSkip "sample requires TTPR_StreamsxWebsocketToolkit"
 	fi
 fi
 
