@@ -4,7 +4,7 @@
 
 # You must ensure that the following line points to your 
 # correct streamsx.websocket toolkit directory that is of v1.0.6 or above.
-STREAMS_WEBSOCKET_SERVER_TOOLKIT ?= $(HOME)/com.ibm.streamsx.websocket
+STREAMS_WEBSOCKET_TOOLKIT ?= $(HOME)/com.ibm.streamsx.websocket
 
 ifeq ($(STREAMS_STUDIO_BUILDING), 1)
     $(info Building from Streams Studio, use env vars set by studio)
@@ -20,7 +20,7 @@ else
     SPLC = $(STREAMS_INSTALL)/bin/sc
     DATA_DIR = data
     OUTPUT_DIR = output
-    TOOLKIT_PATH = $(STREAMS_WEBSOCKET_SERVER_TOOLKIT)
+    TOOLKIT_PATH = $(STREAMS_WEBSOCKET_TOOLKIT)
 endif
 
 SPL_MAIN_COMPOSITE = com.ibm.streamsx.sttgateway.sample.httpreceiver::STTResultsHTTPReceiver
