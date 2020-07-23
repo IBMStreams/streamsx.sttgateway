@@ -21,4 +21,4 @@ setVar 'TTPR_SpeechToTextApikeyFile' "${TTRO_inputDir}/apikey.enc"
 
 # Set the new introduced dependency to websocket toolkit
 # you may overwrite this in a myProperties.sh file
-setVar 'TTPR_StreamsxWebsocketToolkit' "$HOME/workspace/streamsx.websocket/com.ibm.streamsx.websocket"
+# setVar 'TTPR_StreamsxWebsocketToolkit' "$HOME/workspace/streamsx.websocket/com.ibm.streamsx.websocket"
