@@ -1,8 +1,8 @@
 ---
 title: "Operator Design"
 permalink: /docs/user/OperatorDesign/
-excerpt: "Describes the design of the Message Hub toolkit operators."
-last_modified_at: 2020-07-07T08:47:48+01:00
+excerpt: "Describes the design of the streamsx.sttgateway toolkit operators."
+last_modified_at: 2020-09-04T15:23:48+01:00
 redirect_from:
    - /theme-setup/
 sidebar:
@@ -33,6 +33,7 @@ Following are the parameters accepted by the IBMVoiceGatewaySource operator. Som
 | --- | --- | --- | --- |
 | tlsPort | `uint32` | `443` | This parameter specifies the WebSocket TLS port number. |
 | certificateFileName | `rstring` | `etc/ws-server.pem present inside the Streams application` | This parameter specifies the full path of the WebSocket server PEM certificate file name. |
+| certificatePassword | `rstring` | `Empty string` | This parameter specifies a password needed for decrypting the WebSocket server’s private key in the PEM file. |
 | nonTlsEndpointNeeded | `boolean` | `false` | This parameter specifies whether a WebSocket (plain) non-TLS endpoint is needed. |
 | nonTlsPort | `uint32` | `80` | This parameter specifies the WebSocket (plain) non-TLS port number. |
 | initDelay | `float64` | `0.0` | This parameter specifies a one time delay in seconds for which this source operator should wait before start generating its first tuple. |

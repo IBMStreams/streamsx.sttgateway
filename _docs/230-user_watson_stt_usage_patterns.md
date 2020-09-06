@@ -1,8 +1,8 @@
 ---
 title: "Operator Usage Patterns"
 permalink: /docs/user/WatsonSTTUsagePatterns/
-excerpt: "Describes the WatsonSTT operator usage patterns."
-last_modified_at: 2020-07-07T08:53:48+01:00
+excerpt: "Describes the streamsx.sttgateway toolkit usage patterns."
+last_modified_at: 2020-09-04T15:20:48+01:00
 redirect_from:
    - /theme-setup/
 sidebar:
