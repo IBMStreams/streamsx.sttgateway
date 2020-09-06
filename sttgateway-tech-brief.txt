@@ -1,6 +1,6 @@
 ============================================================
 First created on: July/01/2018
-Last modified on: July/12/2020
+Last modified on: September/05/2020
 
 Purpose of this toolkit
 -----------------------
@@ -386,6 +386,12 @@ ant download-clean        [Approximately 2 minutes]
 
 If all those commands ran successfully, this toolkit is ready for use.
 
+If there is no direct Internet access from the IBM Streams machine and 
+if there is a need to go through a proxy server, then the ant all command 
+may not work. In that case, you can try this command instead. 
+
+`ant all -Dwebsocket.archive=file://localhost$(pwd)/ext -Dwebsocket.version=0.8.2 -Dboost.archive.src0=file://localhost$(pwd)/ext/boost-install-files/boost_1_73_0.tar.gz`
+
 A must do in the Streams applications that will use this toolkit
 ----------------------------------------------------------------
 a) You must add this toolkit as a dependency in your application.
@@ -500,7 +506,7 @@ We will also show here the steps needed to import one of the built-in examples. 
 
 6) In the resulting dialog box, select Other and enter `--c++std=c++11` in the `Additional SPL compiler options` field. Click `OK`.
 
-7) Your imported example project should build correctly now.
+7) Your imported example project should build correctly now provided you meet all the other toolkit dependencies.
 
 Official documentation for this toolkit
 ---------------------------------------

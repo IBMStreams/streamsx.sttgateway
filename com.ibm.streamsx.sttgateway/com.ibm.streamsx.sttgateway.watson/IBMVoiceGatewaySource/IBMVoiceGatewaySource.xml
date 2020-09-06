@@ -195,6 +195,16 @@
       </parameter>
 
       <parameter>
+        <name>certificatePassword</name>
+        <description>This parameter specifies a password needed for decrypting the WebSocket server's private key in the PEM file. Default is an empty string.</description>
+        <optional>true</optional>
+        <rewriteAllowed>true</rewriteAllowed>
+        <expressionMode>AttributeFree</expressionMode>
+        <type>rstring</type>
+        <cardinality>1</cardinality>
+      </parameter>
+
+      <parameter>
         <name>nonTlsEndpointNeeded</name>
         <description>This parameter specifies whether a WebSocket (plain) non-TLS endpoint is needed. (Default is false)</description>
         <optional>true</optional>

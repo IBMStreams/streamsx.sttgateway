@@ -8,7 +8,7 @@
 /*
 ============================================================
 First created on: Sep/20/2019
-Last modified on: Jul/09/2020
+Last modified on: Sep/04/2020
 
 Please refer to the sttgateway-tech-brief.txt file in the 
 top-level directory of this toolkit to read about 
@@ -196,7 +196,11 @@ using websocketpp::lib::bind;
     my $certificateFileName = $model->getParameterByName("certificateFileName");
 	# Default: Default is to read ws-server.pem from the etc sub-directory of the application.
     $certificateFileName = $certificateFileName ? $certificateFileName->getValueAt(0)->getCppExpression() : "";
-        
+
+    my $certificatePassword = $model->getParameterByName("certificatePassword");
+    # Default: Empty string.
+    $certificatePassword = $certificatePassword ? $certificatePassword->getValueAt(0)->getCppExpression() : "";
+    
     my $nonTlsEndpointNeeded = $model->getParameterByName("nonTlsEndpointNeeded");
 	# Default: 0
     $nonTlsEndpointNeeded = $nonTlsEndpointNeeded ? $nonTlsEndpointNeeded->getValueAt(0)->getCppExpression() : 0;    
@@ -258,13 +262,31 @@ MY_OPERATOR::MY_OPERATOR()
 	vgwSessionLoggingNeeded = <%=$vgwSessionLoggingNeeded%>;
 	vgwStaleSessionPurgeInterval = <%=$vgwStaleSessionPurgeInterval%>;
 	ipv6Available = <%=$ipv6Available%>;
+	
+	// For string based assignment using a perl variable, it can't be
+	// assigned directly to the value of that perl variable. If we do that,
+	// such an assignement will result in an empty assignment due to $lit3 and
+	// will lead to a compiler error. So, only for the string based copy from a
+	// perl variable, the following check must be done for an empty string and
+	// then it should be done as shown below.
+	<% if ($certificateFileName eq "") { %>	
+	certificateFileName = "";
+	<% } else { %>
 	certificateFileName = <%=$certificateFileName%>;
+	<%}%>
 	
 	if (certificateFileName == "") {
 		// User didn't provide a PEM file. We are going to read 
 		// ws-server.pem from the etc directory of the application.
-		certificateFileName = ProcessingElement::pe().getApplicationDirectory() + "/etc/ws-server.pem";
+		certificateFileName = ProcessingElement::pe().getApplicationDirectory()
+			+ "/etc/ws-server.pem";
 	}
+
+	<% if ($certificatePassword eq "") { %>	
+	certificatePassword = "";
+	<% } else { %>
+	certificatePassword = <%=$certificatePassword%>;
+	<%}%>	
 	
 	operatorPhysicalName = getContext().getName();
 	//
@@ -281,6 +303,7 @@ MY_OPERATOR::MY_OPERATOR()
 		". Following are the user configured operator parameters: "
 		"tlsPort=" << tlsPort <<
 		", certificateFileName=" << certificateFileName <<
+		", certificatePassword length=" << certificatePassword.length() <<
 		", nonTlsEndpointNeeded=" << nonTlsEndpointNeeded <<
 		", nonTlsPort=" << nonTlsPort <<
 		", initDelay=" << initDelay <<
@@ -555,7 +578,7 @@ MY_OPERATOR::context_ptr MY_OPERATOR::on_tls_init(websocketpp::connection_hdl hd
 						| boost::asio::ssl::context::no_tlsv1
 						| boost::asio::ssl::context::no_tlsv1_1
 						| boost::asio::ssl::context::single_dh_use);
-		ctx->set_password_callback(bind(&MY_OPERATOR::get_password, this));
+		ctx->set_password_callback(bind(&MY_OPERATOR::get_private_key_password, this));
 		// Let us now load the server's private key and 
 		// public certificate holding PEM file.
 		ctx->use_certificate_chain_file(certificateFileName.c_str());
@@ -1046,14 +1069,66 @@ void MY_OPERATOR::on_message(EndpointType* s, websocketpp::connection_hdl hdl,
 									"-->X4 Removed a stale VGW session id. " <<
 									*it, "on_message");
 							}
-						}
+							
+							// Added this logic on Sep/04/2020.
+							// Since we know the VGW session id that has gone stale,
+							// we can attempt to clean up a few more things on a 
+							// best effort basis as shown below.
+							//
+							// Since this connection has gone stale, we can send an 
+							// abnormal, delayed EndOfCall Signal via the output port.
+							// That can help the underlying application logic to
+							// do its own clean-up and release of the STT engines.
+							// Send the "End of Voice Call" signal now for this
+							// vgwSessionId_vgwVoiceChannelNumber combo.
+							// Send it for voice channel 1 which is an 
+							// agent channel most of the time.
+							OPort1Type oTuple;
+							oTuple.set_vgwSessionId(*it);
+							oTuple.set_isCustomerSpeechData(false);
+							oTuple.set_vgwVoiceChannelNumber(1);
+							submit(oTuple, 1);
+							// Do the same for voice channel 2 which is a
+							// customer channel most of the time.
+							oTuple.set_vgwSessionId(*it);
+							oTuple.set_isCustomerSpeechData(true);
+							oTuple.set_vgwVoiceChannelNumber(2);
+							submit(oTuple, 1);
+							
+							// We have a map where the agent and caller phone numbers of a given
+							// call session id are stored. Since this call has gone stale,
+							// let us remove the corespoding entry from that map.
+							//
+							// Key: vgeSessionId_vgwIsCaller
+							// Value: Phone Number
+							// Let us remove the agent's phome first.
+							bool vgwIsCaller = false;
+							std::string key = *it + std::string("_") + 
+								boost::to_string(vgwIsCaller);
+							auto it2 = vgwSessionPhoneNumbersMap.find(key);
+
+							if (it2 != vgwSessionPhoneNumbersMap.end()) {
+								// it2->first has the key of the map and it->second has the value.
+								vgwSessionPhoneNumbersMap.erase(it2->first);
+							}	
+
+							// Let us also try to remove the caller's phone.
+							vgwIsCaller = true;
+							key = *it + std::string("_") + boost::to_string(vgwIsCaller);
+							auto it3 = vgwSessionPhoneNumbersMap.find(key);
+
+							if (it3 != vgwSessionPhoneNumbersMap.end()) {
+								// it3->first has the key of the map and it->second has the value.
+								vgwSessionPhoneNumbersMap.erase(it3->first);
+							}	
+						} // End of for loop.
 						
 						std::list<websocketpp::connection_hdl> staleList2;
 						staleList2.clear();
 						
 						// Let us now check the client connections map.
 						// Stale entries happening in this map is a rarity just because
-						// on_close handler is almost always gets invoked during the
+						// on_close handler almost always gets invoked during the
 						// normal as well as abnormal client connection closures.
 						for(con_map::iterator it = client_connections_map.begin();
 							it != client_connections_map.end(); it++) {
@@ -1063,8 +1138,44 @@ void MY_OPERATOR::on_message(EndpointType* s, websocketpp::connection_hdl hdl,
 								vgwStaleSessionPurgeInterval) {
 								// This is a stale entry. Store the connection handle.
 								staleList2.push_back(it->first);
-							}
-						}
+								
+								// Added this logic on Sep/04/2020.
+								// NOTE: We already made an attempt to do this same logic
+								// inside the previous for loop. We are doing the same 
+								// here again using the connection data. This should not 
+								// cause any harm. If a duplicate EOCS is sent from here,
+								// the underlying app;ication logic should do the right
+								// thing to ignore if that EOCS is redundant.
+								//
+								// Since this connection has gone stale, we can send an 
+								// abnormal, delayed EndOfCall Signal via the output port.
+								// That can help the underlying application logic to
+								// do its own clean-up and release of the STT engines.
+								// Send the "End of Voice Call" signal now for this
+								// vgwSessionId_vgwVoiceChannelNumber combo.
+								OPort1Type oTuple;
+								oTuple.set_vgwSessionId(cmd.vgwSessionId);
+								oTuple.set_isCustomerSpeechData(cmd.vgwIsCaller);
+								oTuple.set_vgwVoiceChannelNumber(cmd.vgwVoiceChannelNumber);
+								submit(oTuple, 1);
+								
+								// Added this logic on Sep/04/2020.
+								// We have a map where the agent and caller phone numbers of a given
+								// call session id are stored. Since this leg of that call has gone stale,
+								// let us remove the corespoding entry from that map.
+								//
+								// Key: vgeSessionId_vgwIsCaller
+								// Value: Phone Number
+								std::string key = cmd.vgwSessionId + std::string("_") + 
+									boost::to_string(cmd.vgwIsCaller);
+								auto it = vgwSessionPhoneNumbersMap.find(key);
+
+								if (it != vgwSessionPhoneNumbersMap.end()) {
+									// it->first has the key of the map and it->second has the value.
+									vgwSessionPhoneNumbersMap.erase(it->first);
+								}	
+							} // End of if(currentTimeInSeconds - cmd.vgwSessionStartTime > 
+						} // End of  for loop.
 	
 						int32_t stale2RemovedCnt = 0;
 						// Now, we can remove the stale entries if any.
@@ -1313,9 +1424,11 @@ void MY_OPERATOR::on_close(websocketpp::connection_hdl hdl) {
 	client_connections_map.erase(hdl);
 }
 
-// No change to TLS init methods from echo_server_tls
-std::string MY_OPERATOR::get_password() {
-	return "test";
+// This is a callback that can return a password if the 
+// server-side key file is configured with a key password to be
+// provided at the time of loading it in the on_tls_init method.
+std::string MY_OPERATOR::get_private_key_password() {
+	return (certificatePassword);
 }
 
 // This is an utility method to get the client connection meta data for a given connection handle.

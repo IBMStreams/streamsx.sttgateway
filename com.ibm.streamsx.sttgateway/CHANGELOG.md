@@ -1,5 +1,17 @@
 # Changes
 
+## v2.2.4
+* Sep/05/2020
+* Fixed the dummy voice call record getting written in the trancription result files.
+* Much like the "End Of Call Signal" file, a new "Start Of Call Signal" file is written now.
+* STT engines are now released for new speech assignments only after both the voice channels have sent their EOCS for a given voice call.
+* Added a new `certificatePassword` parameter to the IBMVoiceGatewaySource operator to specify a password needed for decrypting the private key in the PEM file.
+* Added a new `createPersistentHttpConnection` submission time parameter for the two VoiceGateway related examples in order to be used inside the HttpPost operator invocation.
+* Enhanced the stale VGW connection purging logic with additional internal data structure clean-up.
+* New cleanup logic added to erase the phone number entries map when purging the stale connections.
+* Added the spldoc annotations back in the two Voice Gateway related examples.
+* Minor updates done in the toolkit documentation.
+
 ## v2.2.3
 * Jul/12/2020
 * Allow only TLS v1.2 in the IBMVoiceGatewaySource operator.

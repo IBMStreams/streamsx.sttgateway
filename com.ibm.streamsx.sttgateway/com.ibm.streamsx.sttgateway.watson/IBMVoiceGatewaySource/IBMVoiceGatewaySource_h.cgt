@@ -8,7 +8,7 @@
 /*
 ============================================================
 First created on: Sep/17/2019
-Last modified on: Jul/09/2020
+Last modified on: Sep/03/2020
 ============================================================
 */
 
@@ -48,6 +48,7 @@ public:
 	SPL::int32 udpChannelNumber;
 	SPL::uint32 tlsPort;
 	std::string certificateFileName;
+	std::string certificatePassword;
 	SPL::boolean nonTlsEndpointNeeded;
 	SPL::uint32 nonTlsPort;
 	SPL::float64 initDelay;
@@ -191,7 +192,7 @@ public:
 	context_ptr on_tls_init(websocketpp::connection_hdl hdl);
 	
 	// Callback method needed within the TLS event handler.
-	std::string get_password();
+	std::string get_private_key_password();
 	
 	// Method that looks up connection metadata for a connection handle in our associate container.
 	MY_OPERATOR::connection_metadata& get_con_metadata_from_hdl(websocketpp::connection_hdl hdl);
