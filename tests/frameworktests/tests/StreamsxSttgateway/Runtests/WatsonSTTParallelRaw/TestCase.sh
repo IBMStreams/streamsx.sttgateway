@@ -58,7 +58,7 @@ TTTT_patternList=(
 '*09-ibm-watson-law-4min.wav*finalizedUtterance=true*utteranceText="you know I*'
 '*09-ibm-watson-law-4min.wav*transcriptionCompleted=true*'
 '*10-invalid-audio.wav*sttErrorMessage="unable to transcode*'
-'*11-ibm-culture-2min.wav*finalizedUtterance=true*utteranceText="we had standing together*'
+'*11-ibm-culture-2min.wav*finalizedUtterance=true*utteranceText=*standing together*'
 '*11-ibm-culture-2min.wav*transcriptionCompleted=true*'
 '*12-jfk-speech-12sec.wav*finalizedUtterance=true*utteranceText="and so my fellow Americans*'
 '*12-jfk-speech-12sec.wav*transcriptionCompleted=true*'
