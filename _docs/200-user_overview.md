@@ -2,7 +2,7 @@
 title: "Toolkit Usage Overview"
 permalink: /docs/user/overview/
 excerpt: "How to use this toolkit."
-last_modified_at: 2020-09-04T14:16:48+01:00
+last_modified_at: 2020-11-28T23:16:48+01:00
 redirect_from:
    - /theme-setup/
 sidebar:
@@ -189,6 +189,10 @@ As explained in the previous section, there are many examples available within t
 * [AudioRawWatsonSTTAllOutput](https://github.com/IBMStreams/streamsx.sttgateway/tree/develop/samples/AudioRawWatsonSTTAllOutput)
 * [VoiceGatewayToStreamsToWatsonSTT](https://github.com/IBMStreams/streamsx.sttgateway/tree/develop/samples/VoiceGatewayToStreamsToWatsonSTT)
 * [VoiceGatewayToStreamsToWatsonS2T](https://github.com/IBMStreams/streamsx.sttgateway/tree/develop/samples/VoiceGatewayToStreamsToWatsonS2T)
+* [VoiceGatewayToStreamsToWatsonS2T](https://github.com/IBMStreams/streamsx.sttgateway/tree/develop/samples/STTGatewayUtils)
+* [VoiceGatewayToStreamsToWatsonS2T](https://github.com/IBMStreams/streamsx.sttgateway/tree/develop/samples/VgwDataRouter)
+* [VoiceGatewayToStreamsToWatsonS2T](https://github.com/IBMStreams/streamsx.sttgateway/tree/develop/samples/VgwDataRouterToWatsonS2T)
+* [VoiceGatewayToStreamsToWatsonS2T](https://github.com/IBMStreams/streamsx.sttgateway/tree/develop/samples/VgwDataRouterToWatsonSTT)
 * [stt_results_http_receiver](https://github.com/IBMStreams/streamsx.sttgateway/tree/develop/samples/stt_results_http_receiver)
 * [audio_files](https://github.com/IBMStreams/streamsx.sttgateway/tree/develop/samples/audio-files)
 * [VoiceDataSimulator](https://github.com/IBMStreams/streamsx.sttgateway/tree/develop/samples/VoiceDataSimulator)
