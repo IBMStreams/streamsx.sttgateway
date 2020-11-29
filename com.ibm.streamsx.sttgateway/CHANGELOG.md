@@ -1,5 +1,10 @@
 # Changes
 
+## v2.2.5
+* Nov/28/2020
+* Fixed a problem of deploying a heavy duty speech processing solution with hundreds of speech engines on a pure container based (non-bare-metal) runtime infrastructure.
+* Added a new example to showcase a solution pattern to have a real-time speech data router application that can distribute hundreds of concurrent voice calls to a collection of smaller footprint speech processor jobs that can do the speech analysis.
+
 ## v2.2.4
 * Sep/05/2020
 * Fixed the dummy voice call record getting written in the trancription result files.

@@ -14,17 +14,17 @@
     
     **Note:** This toolkit requires c++11 support.
     </description>
-    <version>2.2.4</version>
+    <version>2.2.5</version>
     <requiredProductVersion>4.2.1.6</requiredProductVersion>
   </identity>
   <dependencies>
     <toolkit>
       <common:name>com.ibm.streamsx.json</common:name>
-      <common:version>1.4.6</common:version>
+      <common:version>[1.4.6,7.0.0]</common:version>
     </toolkit>
     <toolkit>
       <common:name>com.ibm.streamsx.inet</common:name>
-      <common:version>2.3.6</common:version>
+      <common:version>[2.3.6,7.0.0]</common:version>
     </toolkit>
   </dependencies>
   <resources>

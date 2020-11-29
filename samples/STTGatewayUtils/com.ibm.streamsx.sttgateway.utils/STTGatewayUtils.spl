@@ -1,0 +1,121 @@
+/*
+==============================================
+# Licensed Materials - Property of IBM
+# Copyright IBM Corp. 2018, 2020
+==============================================
+*/
+
+/*
+==============================================
+First created on: Nov/24/2020
+Last modified on: Nov/26/2020
+
+This is a utility composite that will get used in the following applications.
+
+1) VgwDataRouter
+2) VgwDataRouterToWatsonS2T
+3) VgwDataRouterToWatsonSTT
+==============================================
+*/
+
+namespace com.ibm.streamsx.sttgateway.utils;
+
+// It is a dummpy Main composite.
+// Major goal of this project is to have reusable SPL, C++ and Java functions snd types.
+// Code for the C++ native functions can be found in the impl/include directory of this project.
+//
+// The following is the schema of the first output stream for the
+// IBMVoiceGatewaySource operator. The first four attributes are
+// very important and the other ones are purely optional if some
+// scenarios really require them.
+// blob speech --> Speech fragments of a live conversation as captured and sent by the IBM Voice Gateway.
+// rstring vgwSessionId --> Unique identifier of a voice call. 
+// boolean isCustomerSpeechData --> Every voice call will have a customer channel and an agent channel.
+//                                  This attribute tells whether this output stream carries customer speech data or not.
+// int32 vgwVoiceChannelNumber --> This indicates the voice channel number i.e. 1 or 2.
+//                                 Whoever (caller or agent) sends the first round of 
+//                                 speech data bytes will get assigned a voice channel of 1. 
+//                                 The next one to follow will get assigned a voice channel of 2.
+// rstring id --> This attribute is needed by the WatsonS2T operator. 
+//                It is set to vgwSessionId_vgwVoiceChannelNumber
+// rstring callStartDateTime --> Call start date time i.e. system clock time.
+// rstring callerPhoneNumber --> Details about the caller's phone number.
+// rstring agentPhoneNumber --> Details about the agent's phone number.
+// int32 speechDataFragmentCnt --> Number of fragments (tuples) emitted so far on a given channel (customer or agent) for a given vgwSessionId.
+// int32 totalSpeechDataBytesReceived --> Number of speech bytes received so far on a given channel (customer or agent) for a given vgwSessionId.
+// int32 int32 speechProcessorId --> Id of the speech processor job that is analyzing the speech data.
+// int32 speechEngineId --> This attribute will be set in the speech processor job. (Please, read the comments there.)
+// int32 speechResultProcessorId --> This attribute will be set in the speech processor job. (Please, read the comments there.)
+type BinarySpeech_t = blob speech, rstring vgwSessionId, boolean isCustomerSpeechData, 
+	int32 vgwVoiceChannelNumber, rstring id, rstring callStartDateTime, 
+	rstring callerPhoneNumber, rstring agentPhoneNumber, 
+	int32 speechDataFragmentCnt, int32 totalSpeechDataBytesReceived, 
+	int32 speechProcessorId, int32 speechEngineId, int32 speechResultProcessorId;
+// The following schema is for the second output stream of the
+// IBMVoiceGatewaySource operator. It has three attributes indicating
+// the speaker channel (vgwVoiceChannelNumber) of a given voice call (vgwSessionId) who
+// got completed with the call as well as an indicator (isCustomerSpeechData) to 
+// denote whether the speech data we received on this channel belonged
+// to a caller or an agent.
+type EndOfCallSignal_t = rstring vgwSessionId, 
+	boolean isCustomerSpeechData, int32 vgwVoiceChannelNumber;
+
+// The following schema will be for the data being sent here by the
+// VgwDataRouter application. It sends us raw binary data which 
+// will result in this format when it gets deserialized.
+// After deserializing it, the resulting binary payload can be
+// deserialized again based on the msgType to an appropriate tuple format.
+type DataFromVgwRouter_t = int32 msgType, blob payload;
+	
+// The following schema is for the call recording feature where we will
+// store the call metadata details for a specific voice channel of a given
+// voice call.
+type CallMetaData_t = rstring vgwSessionId, boolean isCustomerSpeechData, 
+	int32 vgwVoiceChannelNumber, rstring callerPhoneNumber, 
+	rstring agentPhoneNumber;
+	
+// The following schema is for the call recording feature where we will
+// store the call speech data for a specific voice channel of a given
+// voice call.
+type CallSpeechData_t = blob speech, rstring vgwSessionId; 
+
+// The following is the schema of the first output stream for the
+// WebSocketSendReceive operator. The first two attributes are
+// very important and the other ones are purely optional if some
+// scenarios really require them.
+// rstring strData --> String based data (plain text, JSON and XML) received from the remote server.
+// blob blobData --> Binary based data (audio, video, image etc.) received from the remote server.
+// uint64 totalDataItemsReceived -- Total data items received so far from the remote server.
+// uint64 totalDataBytesReceived --> Number of data bytes received so far from the remote server.
+// uint64 totalDataItemsSent -- Total data items sent so far to the remote server.
+// uint64 totalDataBytesSent --> Number of data bytes sent so far to the remote server.
+type ReceivedData_t = rstring strData, blob blobData,  
+	uint64 totalDataItemsReceived, uint64 totalDataBytesReceived,
+	uint64 totalDataItemsSent, uint64 totalDataBytesSent;
+	
+// The following schema is for the second output stream of the
+// WebSocketSendReceive operator. It has two attributes.
+// int32 sendResultCode, rstring sendResultMessage.
+// sendResultCode will carry a value of  0 on a successful send to the remote server and a
+// non-zero result in case of an error in sending the data. sendResultMessage will
+// carry a descriptive message about the send result. Application logic can check these 
+// output tuple attributes and have additional logic to retransmit a given 
+// input tuple if it was not sent to the remote server due to an error (e-g: broken connection).
+type SendDataResult_t = int32 sendResultCode, rstring sendResultMessage;
+
+// The following schema defines the required attributes for the input stream of
+// the WebSocketSendReceive operator. You can have either one or both of
+// these attributes depending on your needs.
+type SendData_t = rstring strData, blob blobData;
+
+// The following schema defines the required attributes for the input stream of
+// the WebSocketSink operator.
+type WebSocketSinkSendData_t = rstring strData, blob blobData, list<rstring> sendToUrlContextPaths; 
+
+public composite STTGatewayUtils {
+	graph
+		(stream<boolean x> X) = Beacon() {
+			param
+				iterations: 1;
+		}
+}

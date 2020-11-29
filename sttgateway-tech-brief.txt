@@ -1,6 +1,6 @@
 ============================================================
 First created on: July/01/2018
-Last modified on: September/05/2020
+Last modified on: November/28/2020
 
 Purpose of this toolkit
 -----------------------
@@ -470,15 +470,19 @@ These examples showcase the full feature set of the IBMVoiceGatewaySource and th
 WatsonSTT operators that are available within this toolkit. More details about these
 examples can be obtained from the offical documentation for this toolkit.
 
-1) <YOUR_STTGATEWAY_TOOLKIT_HOME>/samples/AccessTokenGenerator
-2) <YOUR_STTGATEWAY_TOOLKIT_HOME>/samples/AudioFileWatsonSTT
-3) <YOUR_STTGATEWAY_TOOLKIT_HOME>/samples/AudioFileWatsonSTTAllOutput
-4) <YOUR_STTGATEWAY_TOOLKIT_HOME>/samples/AudioRawWatsonSTT
-5) <YOUR_STTGATEWAY_TOOLKIT_HOME>/samples/AudioRawWatsonSTTAllOutput
-6) <YOUR_STTGATEWAY_TOOLKIT_HOME>/samples/VoiceGatewayToStreamsToWatsonSTT
-7) <YOUR_STTGATEWAY_TOOLKIT_HOME>/samples/VoiceGatewayToStreamsToWatsonS2T
-8) <YOUR_STTGATEWAY_TOOLKIT_HOME>/samples/stt_restults_http_receiver
-9) <YOUR_STTGATEWAY_TOOLKIT_HOME>/samples/VoiceDataSimulator
+1)  <YOUR_STTGATEWAY_TOOLKIT_HOME>/samples/AccessTokenGenerator
+2)  <YOUR_STTGATEWAY_TOOLKIT_HOME>/samples/AudioFileWatsonSTT
+3)  <YOUR_STTGATEWAY_TOOLKIT_HOME>/samples/AudioFileWatsonSTTAllOutput
+4)  <YOUR_STTGATEWAY_TOOLKIT_HOME>/samples/AudioRawWatsonSTT
+5)  <YOUR_STTGATEWAY_TOOLKIT_HOME>/samples/AudioRawWatsonSTTAllOutput
+6)  <YOUR_STTGATEWAY_TOOLKIT_HOME>/samples/VoiceGatewayToStreamsToWatsonSTT
+7)  <YOUR_STTGATEWAY_TOOLKIT_HOME>/samples/VoiceGatewayToStreamsToWatsonS2T
+8)  <YOUR_STTGATEWAY_TOOLKIT_HOME>/samples/STTGatewayUtils
+9)  <YOUR_STTGATEWAY_TOOLKIT_HOME>/samples/VgwDataRouter
+10) <YOUR_STTGATEWAY_TOOLKIT_HOME>/samples/VgwDataRouterToWatsonS2T
+11) <YOUR_STTGATEWAY_TOOLKIT_HOME>/samples/VgwDataRouterToWatsonSTT
+12) <YOUR_STTGATEWAY_TOOLKIT_HOME>/samples/stt_restults_http_receiver
+13) <YOUR_STTGATEWAY_TOOLKIT_HOME>/samples/VoiceDataSimulator
 
 Importing this toolkit and its built-in examples into IBM Streams Studio
 ------------------------------------------------------------------------
