@@ -21,6 +21,10 @@
 setCategory 'quick'
 
 #skip the special samples unless some environments are set
+if [[ $TTRO_variantCase == 'STTGatewayUtils' ]]; then
+	setSkip 'Dependency toolkit is compiled in TestSuite.sh since (since v.2.2.5)'
+fi
+
 if [[ $TTRO_variantCase == 'VoiceGatewayToStreamsToWatsonS2T' ]]; then
 	if isExistingAndTrue TTPR_StreamsxSpeech2TextToolkit && isExistingAndTrue TTPR_StreamsxNetworkToolkit; then
 		export STREAMS_S2T_TOOLKIT="$TTPR_StreamsxSpeech2TextToolkit"
@@ -29,7 +33,7 @@ if [[ $TTRO_variantCase == 'VoiceGatewayToStreamsToWatsonS2T' ]]; then
 		setSkip "sample requires TTPR_StreamsxSpeech2TextToolkit and TTPR_StreamsxNetworkToolkit"
 	fi
 fi
-if [[ $TTRO_variantCase == 'VoiceGatewayToStreamsToWatsonSTT' || $TTRO_variantCase == 'stt_results_http_receiver' || $TTRO_variantCase == 'VoiceGatewayToStreamsToWatsonS2T' ]]; then
+if [[ $TTRO_variantCase == 'VoiceGatewayToStreamsToWatsonSTT' || $TTRO_variantCase == 'stt_results_http_receiver' || $TTRO_variantCase == 'VoiceGatewayToStreamsToWatsonS2T' || $TTRO_variantCase == 'VgwDataRouter' || $TTRO_variantCase == 'VgwDataRouterToWatsonSTT' ]]; then
 	if isExistingAndTrue TTPR_StreamsxWebsocketToolkit; then
 		export STREAMS_WEBSOCKET_TOOLKIT="$TTPR_StreamsxWebsocketToolkit"
 	else
@@ -37,19 +41,30 @@ if [[ $TTRO_variantCase == 'VoiceGatewayToStreamsToWatsonSTT' || $TTRO_variantCa
 	fi
 fi
 
+if [[ $TTRO_variantCase == 'VgwDataRouterToWatsonS2T' ]]; then
+	if isExistingAndTrue TTPR_StreamsxSpeech2TextToolkit && isExistingAndTrue TTPR_StreamsxNetworkToolkit && isExistingAndTrue TTPR_StreamsxWebsocketToolkit; then
+		export STREAMS_S2T_TOOLKIT="$TTPR_StreamsxSpeech2TextToolkit"
+		export STREAMS_NETWORK_TOOLKIT="$TTPR_StreamsxNetworkToolkit"
+		export STREAMS_WEBSOCKET_TOOLKIT="$TTPR_StreamsxWebsocketToolkit"
+	else
+		setSkip "to many dependencies required"
+	fi
+fi
+
 if [[ $TTRO_variantCase == 'VoiceDataSimulator' ]]; then
 	setSkip "sample is not an spl sample"
 fi
 
-function testStep {
-	local save="$PWD"
-	cd "$TTPR_SreamsxSttgatewaySamplesPath/$TTRO_variantCase"
-	pwd
+testStep() {
 	export SPL_CMD_ARGS="-j $TTRO_treads"
 	export STREAMS_STTGATEWAY_TOOLKIT="$TTPR_streamsxSttgatewayToolkit"
 	export STREAMS_JSON_TOOLKIT="$TTPR_streamsxJsonToolkit"
 	export STREAMS_INET_TOOLKIT="$TTPR_streamsxInetToolkit"
+	local save="$PWD"
+	cd "$TTPR_SreamsxSttgatewaySamplesPath/$TTRO_variantCase"
+	pwd
 	echoExecuteInterceptAndSuccess 'make' 'all'
 	cd "$save"
 	return 0
 }
+

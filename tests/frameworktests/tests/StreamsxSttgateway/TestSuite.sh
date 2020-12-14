@@ -16,3 +16,17 @@ if isExistingAndTrue TTPR_StreamsxNetworkToolkit; then
 fi
 
 setVar 'TT_toolkitPath' "${TTTT_myToolkitPath}"
+
+testPreparation() {
+	export SPL_CMD_ARGS="-j $TTRO_treads"
+	export STREAMS_STTGATEWAY_TOOLKIT="$TTPR_streamsxSttgatewayToolkit"
+	export STREAMS_JSON_TOOLKIT="$TTPR_streamsxJsonToolkit"
+	export STREAMS_INET_TOOLKIT="$TTPR_streamsxInetToolkit"
+	echo "Compile dependency toolkit"
+	local save="$PWD"
+	cd "$TTPR_SreamsxSttgatewaySamplesPath/STTGatewayUtils"
+	pwd
+	echoAndExecute 'make' 'all'
+	cd "$save"
+}
+
