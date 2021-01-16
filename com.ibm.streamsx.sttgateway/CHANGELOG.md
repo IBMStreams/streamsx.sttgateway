@@ -1,5 +1,9 @@
 # Changes
 
+## v2.2.6
+* Jan/16/2021
+* Made the End Of Call Signal (EOCS) sending by the IBMVoiceGatewaySource operator to be more reliable and consistent.
+
 ## v2.2.5
 * Nov/28/2020
 * Fixed a problem of deploying a heavy duty speech processing solution with hundreds of speech engines on a pure container based (non-bare-metal) runtime infrastructure.

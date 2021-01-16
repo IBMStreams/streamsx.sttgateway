@@ -8,7 +8,7 @@
 /*
 ============================================================
 First created on: Sep/20/2019
-Last modified on: Sep/04/2020
+Last modified on: Jan/15/2021
 
 Please refer to the sttgateway-tech-brief.txt file in the 
 top-level directory of this toolkit to read about 
@@ -949,203 +949,140 @@ void MY_OPERATOR::on_message(EndpointType* s, websocketpp::connection_hdl hdl,
 			}
 			// ===========================================================
 			*/
+			// **** IMPORTANT CHANGE ****
+			// Jan/15/2021: Senthil completely deactivated the entire logic in this
+			// if block. He moved the exact same logic to the on_close method to address
+			// problems in not being to send the EOCS signals consistently and reliably.
+			// Please read the commentary in the on_close method to understand the
+			// main reason behind this change.
+			boolean processStopActionMessage = false;
+			
 			if (action == "stop") {
-				// Update this metric.
-				nSpeechDataBytesReceived += (uint64_t)con_metadata.speechDataBytesReceived;
-				nOutputTuplesSent += (uint64_t)con_metadata.speechPacketsReceivedCnt;
-
-				// It is a stop session message sent by the IBM Voice Gateway.
-				// We can delete this connection's meta data cached in our
-				// client connection map.
-				if (vgwSessionLoggingNeeded == true) {
-					SPLAPPTRC(L_ERROR, "Operator " << operatorPhysicalName <<
-						"-->Channel " << boost::to_string(udpChannelNumber) <<
-						"-->X3 Received and processed a stop session message for the vgwSessionId " << 
-						con_metadata.vgwSessionId << 
-						", vgwIsCaller=" << con_metadata.vgwIsCaller << 
-						", vgwVoiceChannelNumber=" << con_metadata.vgwVoiceChannelNumber <<
-						".", "on_message");
-				}					
-
-				// There may be more than one channel in the voice call for this
-				// vgwSessionId. All we know is that this particular channel (i.e. connection)
-				// that we have here is ending its STT session. We will go ahead and send an
-				// "End of Voice Call" signal to the downstream operator in order for it to 
-				// free up the necessary things handling this speaker of a given 
-				// voice call i.e. vgwSessionId_vgwVoiceChannelNumber combo. 
-				// If this happens to be the very last channel doing the "End session" in a 
-				// multi-channel voice call, we will also do the following cleanup.
-				// [Most of the voice calls will have two different channels: 
-				//  one for the customer speech and the other for the agent speech.]
-				bool vgwSessionIdFoundInMap = 
-					vgw_session_id_map.find(con_metadata.vgwSessionId) != vgw_session_id_map.end();
-				
-				if (vgwSessionIdFoundInMap == true) {
-					// Send the "End of Voice Call" signal now for this
-					// vgwSessionId_vgwVoiceChannelNumber combo.
-					OPort1Type oTuple;
-					oTuple.set_vgwSessionId(con_metadata.vgwSessionId);
-					oTuple.set_isCustomerSpeechData(con_metadata.vgwIsCaller);
-					oTuple.set_vgwVoiceChannelNumber(con_metadata.vgwVoiceChannelNumber);
-					submit(oTuple, 1);
-					
+				if(processStopActionMessage == true) {
+					// Update this metric.
+					nSpeechDataBytesReceived += (uint64_t)con_metadata.speechDataBytesReceived;
+					nOutputTuplesSent += (uint64_t)con_metadata.speechPacketsReceivedCnt;
+	
+					// It is a stop session message sent by the IBM Voice Gateway.
+					// We can delete this connection's meta data cached in our
+					// client connection map.
 					if (vgwSessionLoggingNeeded == true) {
 						SPLAPPTRC(L_ERROR, "Operator " << operatorPhysicalName <<
 							"-->Channel " << boost::to_string(udpChannelNumber) <<
-							"-->X3 Sent an 'End of Voice Call' signal for vgwSessionId=" << 
+							"-->X3 Received and processed a stop session message for the vgwSessionId " << 
 							con_metadata.vgwSessionId << 
-							", vgwVoiceChannelNumber=" <<
-							con_metadata.vgwVoiceChannelNumber << ".", "on_message");
+							", vgwIsCaller=" << con_metadata.vgwIsCaller << 
+							", vgwVoiceChannelNumber=" << con_metadata.vgwVoiceChannelNumber <<
+							".", "on_message");
 					}					
-
-					// Make the adjustment by removing the 
-					// last entry in the list being held inside this map. 
-					vgw_session_id_map[con_metadata.vgwSessionId].pop_back();
+	
+					// There may be more than one channel in the voice call for this
+					// vgwSessionId. All we know is that this particular channel (i.e. connection)
+					// that we have here is ending its STT session. We will go ahead and send an
+					// "End of Voice Call" signal to the downstream operator in order for it to 
+					// free up the necessary things handling this speaker of a given 
+					// voice call i.e. vgwSessionId_vgwVoiceChannelNumber combo. 
+					// If this happens to be the very last channel doing the "End session" in a 
+					// multi-channel voice call, we will also do the following cleanup.
+					// [Most of the voice calls will have two different channels: 
+					//  one for the customer speech and the other for the agent speech.]
+					bool vgwSessionIdFoundInMap = 
+						vgw_session_id_map.find(con_metadata.vgwSessionId) != vgw_session_id_map.end();
 					
-					if (vgw_session_id_map[con_metadata.vgwSessionId].size() <= 0) {
-						// There are no more active channels for this vgwSessionId.
-						// This channel is the very last one in this voice call to end the session.
-						// So, let us remove it from the map.
-						vgw_session_id_map.erase(con_metadata.vgwSessionId);
-
-						// A voice call is fully completed now. Update this metric.
-						nVoiceCallsProcessed++;
-						// Update the operator metric only if the user asked for a live update.
-						if (vgwLiveMetricsUpdateNeeded == true) {
-							nVoiceCallsProcessedMetric->setValueNoLock(nVoiceCallsProcessed);
-							nSpeechDataBytesReceivedMetric->setValueNoLock(nSpeechDataBytesReceived);
-							nOutputTuplesSentMetric->setValueNoLock(nOutputTuplesSent);
-						}						
-					} // End of if (vgw_session_id_map[con_metadata.vgwSessionId] <= 0)
-				} // End of if (vgwSessionIdFoundInMap == true)
-
-				if (vgwStaleSessionPurgeInterval > 0) {
-					// PERIODIC STALE SESSION AND STALE CONNECTION REMOVAL.
-					// Do this only if the user provided a non-zero purge interval.
-					// We should be prepared for a condition where the
-					// "Stop STT session" message never arrives for some reason.
-					// One reason this can happen is due to an abnormal crash or
-					// an abnormal exit/closure on the VGW side of things.
-					// In that case, it will leave us with left over map entries.
-					// So, we will have to purge those left over map entries.
-					// Similarly, any unclosed client connection (which is 
-					// extremely rare) will also leave stale entries in the map.
-					// We will remove all such things here periodically.
-					int64_t currentTimeInSeconds = 
-						SPL::Functions::Time::getSeconds(SPL::Functions::Time::getTimestamp());
-					
-					if (currentTimeInSeconds - timeOfPreviousStaleSessionRemoval >=
-						vgwStaleSessionPurgeInterval) {
-						// Time elapsed. Time to check for stale entries.
-						std::list<std::string> staleList;
-						staleList.clear();
+					if (vgwSessionIdFoundInMap == true) {
+						// Send the "End of Voice Call" signal now for this
+						// vgwSessionId_vgwVoiceChannelNumber combo.
+						OPort1Type oTuple;
+						oTuple.set_vgwSessionId(con_metadata.vgwSessionId);
+						oTuple.set_isCustomerSpeechData(con_metadata.vgwIsCaller);
+						oTuple.set_vgwVoiceChannelNumber(con_metadata.vgwVoiceChannelNumber);
+						submit(oTuple, 1);
+						
+						if (vgwSessionLoggingNeeded == true) {
+							SPLAPPTRC(L_ERROR, "Operator " << operatorPhysicalName <<
+								"-->Channel " << boost::to_string(udpChannelNumber) <<
+								"-->X3 Sent an 'End of Voice Call' signal for vgwSessionId=" << 
+								con_metadata.vgwSessionId << 
+								", vgwVoiceChannelNumber=" <<
+								con_metadata.vgwVoiceChannelNumber << ".", "on_message");
+						}					
+	
+						// Make the adjustment by removing the 
+						// last entry in the list being held inside this map. 
+						vgw_session_id_map[con_metadata.vgwSessionId].pop_back();
+						
+						if (vgw_session_id_map[con_metadata.vgwSessionId].size() <= 0) {
+							// There are no more active channels for this vgwSessionId.
+							// This channel is the very last one in this voice call to end the session.
+							// So, let us remove it from the map.
+							vgw_session_id_map.erase(con_metadata.vgwSessionId);
+	
+							// A voice call is fully completed now. Update this metric.
+							nVoiceCallsProcessed++;
+							// Update the operator metric only if the user asked for a live update.
+							if (vgwLiveMetricsUpdateNeeded == true) {
+								nVoiceCallsProcessedMetric->setValueNoLock(nVoiceCallsProcessed);
+								nSpeechDataBytesReceivedMetric->setValueNoLock(nSpeechDataBytesReceived);
+								nOutputTuplesSentMetric->setValueNoLock(nOutputTuplesSent);
+							}						
+						} // End of if (vgw_session_id_map[con_metadata.vgwSessionId] <= 0)
+					} // End of if (vgwSessionIdFoundInMap == true)
+	
+					if (vgwStaleSessionPurgeInterval > 0) {
+						// PERIODIC STALE SESSION AND STALE CONNECTION REMOVAL.
+						// Do this only if the user provided a non-zero purge interval.
+						// We should be prepared for a condition where the
+						// "Stop STT session" message never arrives for some reason.
+						// One reason this can happen is due to an abnormal crash or
+						// an abnormal exit/closure on the VGW side of things.
+						// In that case, it will leave us with left over map entries.
+						// So, we will have to purge those left over map entries.
+						// Similarly, any unclosed client connection (which is 
+						// extremely rare) will also leave stale entries in the map.
+						// We will remove all such things here periodically.
+						int64_t currentTimeInSeconds = 
+							SPL::Functions::Time::getSeconds(SPL::Functions::Time::getTimestamp());
+						
+						if (currentTimeInSeconds - timeOfPreviousStaleSessionRemoval >=
+							vgwStaleSessionPurgeInterval) {
+							// Time elapsed. Time to check for stale entries.
+							std::list<std::string> staleList;
+							staleList.clear();
+									
+							// Let us first check inside the VGW session id map.
+							for(std::map<std::string, SPL::list<int64_t>>::iterator it = vgw_session_id_map.begin();
+								it != vgw_session_id_map.end(); it++) {
+								// SPL::list is nothing but an std::vector behind the scenes.
+								SPL::list<int64_t> myList = it->second;
 								
-						// Let us first check inside the VGW session id map.
-						for(std::map<std::string, SPL::list<int64_t>>::iterator it = vgw_session_id_map.begin();
-							it != vgw_session_id_map.end(); it++) {
-							// SPL::list is nothing but an std::vector behind the scenes.
-							SPL::list<int64_t> myList = it->second;
-							
-							// Loop through this list and check every voice channel's start time.
-							for(SPL::list<int64_t>::iterator it2 = myList.begin();
-								it2 != myList.end(); it2++) {
-								if (currentTimeInSeconds - *it2 >=
-									vgwStaleSessionPurgeInterval) {
-									// This is a stale entry. Store the VGW session id.
-									staleList.push_back(it->first);
-									break;
+								// Loop through this list and check every voice channel's start time.
+								for(SPL::list<int64_t>::iterator it2 = myList.begin();
+									it2 != myList.end(); it2++) {
+									if (currentTimeInSeconds - *it2 >=
+										vgwStaleSessionPurgeInterval) {
+										// This is a stale entry. Store the VGW session id.
+										staleList.push_back(it->first);
+										break;
+									}
 								}
 							}
-						}
-						
-						// Now, we can remove the stale entries if any.
-						for(std::list<std::string>::iterator it = staleList.begin();
-							it != staleList.end(); it++) {
-							vgw_session_id_map.erase(*it);
 							
-							if (vgwSessionLoggingNeeded == true) {
-								SPLAPPTRC(L_ERROR, "Operator " << operatorPhysicalName <<
-									"-->Channel " << boost::to_string(udpChannelNumber) <<
-									"-->X4 Removed a stale VGW session id. " <<
-									*it, "on_message");
-							}
-							
-							// Added this logic on Sep/04/2020.
-							// Since we know the VGW session id that has gone stale,
-							// we can attempt to clean up a few more things on a 
-							// best effort basis as shown below.
-							//
-							// Since this connection has gone stale, we can send an 
-							// abnormal, delayed EndOfCall Signal via the output port.
-							// That can help the underlying application logic to
-							// do its own clean-up and release of the STT engines.
-							// Send the "End of Voice Call" signal now for this
-							// vgwSessionId_vgwVoiceChannelNumber combo.
-							// Send it for voice channel 1 which is an 
-							// agent channel most of the time.
-							OPort1Type oTuple;
-							oTuple.set_vgwSessionId(*it);
-							oTuple.set_isCustomerSpeechData(false);
-							oTuple.set_vgwVoiceChannelNumber(1);
-							submit(oTuple, 1);
-							// Do the same for voice channel 2 which is a
-							// customer channel most of the time.
-							oTuple.set_vgwSessionId(*it);
-							oTuple.set_isCustomerSpeechData(true);
-							oTuple.set_vgwVoiceChannelNumber(2);
-							submit(oTuple, 1);
-							
-							// We have a map where the agent and caller phone numbers of a given
-							// call session id are stored. Since this call has gone stale,
-							// let us remove the corespoding entry from that map.
-							//
-							// Key: vgeSessionId_vgwIsCaller
-							// Value: Phone Number
-							// Let us remove the agent's phome first.
-							bool vgwIsCaller = false;
-							std::string key = *it + std::string("_") + 
-								boost::to_string(vgwIsCaller);
-							auto it2 = vgwSessionPhoneNumbersMap.find(key);
-
-							if (it2 != vgwSessionPhoneNumbersMap.end()) {
-								// it2->first has the key of the map and it->second has the value.
-								vgwSessionPhoneNumbersMap.erase(it2->first);
-							}	
-
-							// Let us also try to remove the caller's phone.
-							vgwIsCaller = true;
-							key = *it + std::string("_") + boost::to_string(vgwIsCaller);
-							auto it3 = vgwSessionPhoneNumbersMap.find(key);
-
-							if (it3 != vgwSessionPhoneNumbersMap.end()) {
-								// it3->first has the key of the map and it->second has the value.
-								vgwSessionPhoneNumbersMap.erase(it3->first);
-							}	
-						} // End of for loop.
-						
-						std::list<websocketpp::connection_hdl> staleList2;
-						staleList2.clear();
-						
-						// Let us now check the client connections map.
-						// Stale entries happening in this map is a rarity just because
-						// on_close handler almost always gets invoked during the
-						// normal as well as abnormal client connection closures.
-						for(con_map::iterator it = client_connections_map.begin();
-							it != client_connections_map.end(); it++) {
-							connection_metadata cmd = it->second;
-							
-							if(currentTimeInSeconds - cmd.vgwSessionStartTime > 
-								vgwStaleSessionPurgeInterval) {
-								// This is a stale entry. Store the connection handle.
-								staleList2.push_back(it->first);
+							// Now, we can remove the stale entries if any.
+							for(std::list<std::string>::iterator it = staleList.begin();
+								it != staleList.end(); it++) {
+								vgw_session_id_map.erase(*it);
+								
+								if (vgwSessionLoggingNeeded == true) {
+									SPLAPPTRC(L_ERROR, "Operator " << operatorPhysicalName <<
+										"-->Channel " << boost::to_string(udpChannelNumber) <<
+										"-->X4 Removed a stale VGW session id. " <<
+										*it, "on_message");
+								}
 								
 								// Added this logic on Sep/04/2020.
-								// NOTE: We already made an attempt to do this same logic
-								// inside the previous for loop. We are doing the same 
-								// here again using the connection data. This should not 
-								// cause any harm. If a duplicate EOCS is sent from here,
-								// the underlying app;ication logic should do the right
-								// thing to ignore if that EOCS is redundant.
+								// Since we know the VGW session id that has gone stale,
+								// we can attempt to clean up a few more things on a 
+								// best effort basis as shown below.
 								//
 								// Since this connection has gone stale, we can send an 
 								// abnormal, delayed EndOfCall Signal via the output port.
@@ -1153,50 +1090,131 @@ void MY_OPERATOR::on_message(EndpointType* s, websocketpp::connection_hdl hdl,
 								// do its own clean-up and release of the STT engines.
 								// Send the "End of Voice Call" signal now for this
 								// vgwSessionId_vgwVoiceChannelNumber combo.
+								// Send it for voice channel 1 which is an 
+								// agent channel most of the time.
 								OPort1Type oTuple;
-								oTuple.set_vgwSessionId(cmd.vgwSessionId);
-								oTuple.set_isCustomerSpeechData(cmd.vgwIsCaller);
-								oTuple.set_vgwVoiceChannelNumber(cmd.vgwVoiceChannelNumber);
+								oTuple.set_vgwSessionId(*it);
+								oTuple.set_isCustomerSpeechData(false);
+								oTuple.set_vgwVoiceChannelNumber(1);
+								submit(oTuple, 1);
+								// Do the same for voice channel 2 which is a
+								// customer channel most of the time.
+								oTuple.set_vgwSessionId(*it);
+								oTuple.set_isCustomerSpeechData(true);
+								oTuple.set_vgwVoiceChannelNumber(2);
 								submit(oTuple, 1);
 								
-								// Added this logic on Sep/04/2020.
 								// We have a map where the agent and caller phone numbers of a given
-								// call session id are stored. Since this leg of that call has gone stale,
+								// call session id are stored. Since this call has gone stale,
 								// let us remove the corespoding entry from that map.
 								//
 								// Key: vgeSessionId_vgwIsCaller
 								// Value: Phone Number
-								std::string key = cmd.vgwSessionId + std::string("_") + 
-									boost::to_string(cmd.vgwIsCaller);
-								auto it = vgwSessionPhoneNumbersMap.find(key);
-
-								if (it != vgwSessionPhoneNumbersMap.end()) {
-									// it->first has the key of the map and it->second has the value.
-									vgwSessionPhoneNumbersMap.erase(it->first);
+								// Let us remove the agent's phome first.
+								bool vgwIsCaller = false;
+								std::string key = *it + std::string("_") + 
+									boost::to_string(vgwIsCaller);
+								auto it2 = vgwSessionPhoneNumbersMap.find(key);
+	
+								if (it2 != vgwSessionPhoneNumbersMap.end()) {
+									// it2->first has the key of the map and it->second has the value.
+									vgwSessionPhoneNumbersMap.erase(it2->first);
 								}	
-							} // End of if(currentTimeInSeconds - cmd.vgwSessionStartTime > 
-						} // End of  for loop.
 	
-						int32_t stale2RemovedCnt = 0;
-						// Now, we can remove the stale entries if any.
-						for(std::list<websocketpp::connection_hdl>::iterator it = staleList2.begin();
-							it != staleList2.end(); it++) {
-							client_connections_map.erase(*it);
-							stale2RemovedCnt++;
-						}
+								// Let us also try to remove the caller's phone.
+								vgwIsCaller = true;
+								key = *it + std::string("_") + boost::to_string(vgwIsCaller);
+								auto it3 = vgwSessionPhoneNumbersMap.find(key);
 	
-						if (vgwSessionLoggingNeeded == true && stale2RemovedCnt > 0) {
-							SPLAPPTRC(L_ERROR, "Operator " << operatorPhysicalName <<
-								"-->Channel " << boost::to_string(udpChannelNumber) <<
-								"-->X4 Removed a few stale client connection handles. Removed count=" <<
-								stale2RemovedCnt, "on_message");
+								if (it3 != vgwSessionPhoneNumbersMap.end()) {
+									// it3->first has the key of the map and it->second has the value.
+									vgwSessionPhoneNumbersMap.erase(it3->first);
+								}	
+							} // End of for loop.
+							
+							std::list<websocketpp::connection_hdl> staleList2;
+							staleList2.clear();
+							
+							// Let us now check the client connections map.
+							// Stale entries happening in this map is a rarity just because
+							// on_close handler almost always gets invoked during the
+							// normal as well as abnormal client connection closures.
+							for(con_map::iterator it = client_connections_map.begin();
+								it != client_connections_map.end(); it++) {
+								connection_metadata cmd = it->second;
+								
+								if(currentTimeInSeconds - cmd.vgwSessionStartTime > 
+									vgwStaleSessionPurgeInterval) {
+									// This is a stale entry. Store the connection handle.
+									staleList2.push_back(it->first);
+									
+									// Added this logic on Sep/04/2020.
+									// NOTE: We already made an attempt to do this same logic
+									// inside the previous for loop. We are doing the same 
+									// here again using the connection data. This should not 
+									// cause any harm. If a duplicate EOCS is sent from here,
+									// the underlying app;ication logic should do the right
+									// thing to ignore if that EOCS is redundant.
+									//
+									// Since this connection has gone stale, we can send an 
+									// abnormal, delayed EndOfCall Signal via the output port.
+									// That can help the underlying application logic to
+									// do its own clean-up and release of the STT engines.
+									// Send the "End of Voice Call" signal now for this
+									// vgwSessionId_vgwVoiceChannelNumber combo.
+									OPort1Type oTuple;
+									oTuple.set_vgwSessionId(cmd.vgwSessionId);
+									oTuple.set_isCustomerSpeechData(cmd.vgwIsCaller);
+									oTuple.set_vgwVoiceChannelNumber(cmd.vgwVoiceChannelNumber);
+									submit(oTuple, 1);
+									
+									// Added this logic on Sep/04/2020.
+									// We have a map where the agent and caller phone numbers of a given
+									// call session id are stored. Since this leg of that call has gone stale,
+									// let us remove the corespoding entry from that map.
+									//
+									// Key: vgeSessionId_vgwIsCaller
+									// Value: Phone Number
+									std::string key = cmd.vgwSessionId + std::string("_") + 
+										boost::to_string(cmd.vgwIsCaller);
+									auto it = vgwSessionPhoneNumbersMap.find(key);
+	
+									if (it != vgwSessionPhoneNumbersMap.end()) {
+										// it->first has the key of the map and it->second has the value.
+										vgwSessionPhoneNumbersMap.erase(it->first);
+									}	
+								} // End of if(currentTimeInSeconds - cmd.vgwSessionStartTime > 
+							} // End of  for loop.
+		
+							int32_t stale2RemovedCnt = 0;
+							// Now, we can remove the stale entries if any.
+							for(std::list<websocketpp::connection_hdl>::iterator it = staleList2.begin();
+								it != staleList2.end(); it++) {
+								client_connections_map.erase(*it);
+								stale2RemovedCnt++;
+							}
+		
+							if (vgwSessionLoggingNeeded == true && stale2RemovedCnt > 0) {
+								SPLAPPTRC(L_ERROR, "Operator " << operatorPhysicalName <<
+									"-->Channel " << boost::to_string(udpChannelNumber) <<
+									"-->X4 Removed a few stale client connection handles. Removed count=" <<
+									stale2RemovedCnt, "on_message");
+							}
+							
+							// Set it to the current time so that we can do our next 
+							// stale sesion data removal at the required time interval.
+							timeOfPreviousStaleSessionRemoval = currentTimeInSeconds;
 						}
-						
-						// Set it to the current time so that we can do our next 
-						// stale sesion data removal at the required time interval.
-						timeOfPreviousStaleSessionRemoval = currentTimeInSeconds;
+					} // End of if (vgwStaleSessionPurgeInterval > 0)
+				} else {
+					if (vgwSessionLoggingNeeded == true) {
+						SPLAPPTRC(L_INFO, "Operator " << operatorPhysicalName <<
+							"-->Channel " << boost::to_string(udpChannelNumber) <<
+							"-->X501 Received an 'action':'stop' message and ignored it " << 
+							"due to the deactivated code block. This is just an INFO and not an error.",
+							"on_message");						
 					}
-				} // End of if (vgwStaleSessionPurgeInterval > 0)
+				} // End of if(processStopActionMessage == true)
 
 				return;
 			} else {
@@ -1419,10 +1437,278 @@ void MY_OPERATOR::on_close(websocketpp::connection_hdl hdl) {
 		// it->first has the key of the map and it->second has the value.
 		vgwSessionPhoneNumbersMap.erase(it->first);
 	}	
+
+	// **** IMPORTANT CHANGE ****
+	// Jan/15/2021. Senthil deactivated the {action == "stop"} logic in the on_message method above and
+	// moved that entire logic here. The reason for that is "stop" message coming from VGW is
+	// not always guaranteed or in other words not fully consistent. If there is a network overload or 
+	// VGW media relay issues in the middle of a call, VGW will not be able to send the "stop" message.
+	// If we don't receive the "stop" message for a voice channel in an ongoing call, then this operator
+	// will not send the "EOCS" signal to the underlying SPL application for it to do the necessary
+	// post-call clean-up and release of the allocated STT engines. If this happens for a prolonged
+	// period for many calls, then that may result in all the STT engines to be in unreleased state which 
+	// in turn will not transcribe any future calls citing that "No available STT engines".
+	// So, we will not depend on the "stop" message anymore. I made the "stop" logic in the on_message 
+	// method to be inactive. Whenever a voice channel's WebSocket client connection gets closed, we will
+	// perform the exact logic that was earlier done in the on_message method. Unlike the "stop" message,
+	// a WebSocket client connection closure will always happen. So, logic below to send the EOCS signal 
+	// should be a lot more robust and reliable.
+	//
+	// Update this metric.
+	nSpeechDataBytesReceived += (uint64_t)con_metadata.speechDataBytesReceived;
+	nOutputTuplesSent += (uint64_t)con_metadata.speechPacketsReceivedCnt;
+
+	// It is a stop session message sent by the IBM Voice Gateway.
+	// We can delete this connection's meta data cached in our
+	// client connection map.
+	if (vgwSessionLoggingNeeded == true) {
+		SPLAPPTRC(L_ERROR, "Operator " << operatorPhysicalName <<
+			"-->Channel " << boost::to_string(udpChannelNumber) <<
+			"-->X3 Preparing to send End Of Call Signal (EOCS) for the vgwSessionId " << 
+			con_metadata.vgwSessionId << 
+			", vgwIsCaller=" << con_metadata.vgwIsCaller << 
+			", vgwVoiceChannelNumber=" << con_metadata.vgwVoiceChannelNumber <<
+			".", "on_close");
+	}					
+
+	// There may be more than one channel in the voice call for this
+	// vgwSessionId. All we know is that this particular channel (i.e. connection)
+	// that we have here is ending its STT session. We will go ahead and send an
+	// "End of Voice Call" signal to the downstream operator in order for it to 
+	// free up the necessary things handling this speaker of a given 
+	// voice call i.e. vgwSessionId_vgwVoiceChannelNumber combo. 
+	// If this happens to be the very last channel doing the "End session" in a 
+	// multi-channel voice call, we will also do the following cleanup.
+	// [Most of the voice calls will have two different channels: 
+	//  one for the customer speech and the other for the agent speech.]
+	bool vgwSessionIdFoundInMap = 
+		vgw_session_id_map.find(con_metadata.vgwSessionId) != vgw_session_id_map.end();
 	
+	if (vgwSessionIdFoundInMap == true) {
+		// Send the "End of Voice Call" signal now for this
+		// vgwSessionId_vgwVoiceChannelNumber combo.
+		OPort1Type oTuple;
+		oTuple.set_vgwSessionId(con_metadata.vgwSessionId);
+		oTuple.set_isCustomerSpeechData(con_metadata.vgwIsCaller);
+		oTuple.set_vgwVoiceChannelNumber(con_metadata.vgwVoiceChannelNumber);
+		submit(oTuple, 1);
+		
+		if (vgwSessionLoggingNeeded == true) {
+			SPLAPPTRC(L_ERROR, "Operator " << operatorPhysicalName <<
+				"-->Channel " << boost::to_string(udpChannelNumber) <<
+				"-->X3 Sent an 'End of Voice Call' signal for vgwSessionId=" << 
+				con_metadata.vgwSessionId << 
+				", vgwVoiceChannelNumber=" <<
+				con_metadata.vgwVoiceChannelNumber << ".", "on_close");
+		}					
+
+		// Make the adjustment by removing the 
+		// last entry in the list being held inside this map. 
+		vgw_session_id_map[con_metadata.vgwSessionId].pop_back();
+		
+		if (vgw_session_id_map[con_metadata.vgwSessionId].size() <= 0) {
+			// There are no more active channels for this vgwSessionId.
+			// This channel is the very last one in this voice call to end the session.
+			// So, let us remove it from the map.
+			vgw_session_id_map.erase(con_metadata.vgwSessionId);
+
+			// A voice call is fully completed now. Update this metric.
+			nVoiceCallsProcessed++;
+			// Update the operator metric only if the user asked for a live update.
+			if (vgwLiveMetricsUpdateNeeded == true) {
+				nVoiceCallsProcessedMetric->setValueNoLock(nVoiceCallsProcessed);
+				nSpeechDataBytesReceivedMetric->setValueNoLock(nSpeechDataBytesReceived);
+				nOutputTuplesSentMetric->setValueNoLock(nOutputTuplesSent);
+			}						
+		} // End of if (vgw_session_id_map[con_metadata.vgwSessionId] <= 0)
+	} // End of if (vgwSessionIdFoundInMap == true)
+
+	// This entire if block is a carry-over from the "stop" message processing section in the
+	// on_message method. I'm simply retaining that code block here. With the EOCS signal being
+	// now sent in this on_close method, we should not experience any stale sessions.
+	// Hence, this stale session purging logic will hardly ever get executed.
+	if (vgwStaleSessionPurgeInterval > 0) {
+		// PERIODIC STALE SESSION AND STALE CONNECTION REMOVAL.
+		// Do this only if the user provided a non-zero purge interval.
+		// We should be prepared for a condition where the
+		// "Stop STT session" message never arrives for some reason.
+		// One reason this can happen is due to an abnormal crash or
+		// an abnormal exit/closure on the VGW side of things.
+		// In that case, it will leave us with left over map entries.
+		// So, we will have to purge those left over map entries.
+		// Similarly, any unclosed client connection (which is 
+		// extremely rare) will also leave stale entries in the map.
+		// We will remove all such things here periodically.
+		int64_t currentTimeInSeconds = 
+			SPL::Functions::Time::getSeconds(SPL::Functions::Time::getTimestamp());
+		
+		if (currentTimeInSeconds - timeOfPreviousStaleSessionRemoval >=
+			vgwStaleSessionPurgeInterval) {
+			// Time elapsed. Time to check for stale entries.
+			std::list<std::string> staleList;
+			staleList.clear();
+					
+			// Let us first check inside the VGW session id map.
+			for(std::map<std::string, SPL::list<int64_t>>::iterator it = vgw_session_id_map.begin();
+				it != vgw_session_id_map.end(); it++) {
+				// SPL::list is nothing but an std::vector behind the scenes.
+				SPL::list<int64_t> myList = it->second;
+				
+				// Loop through this list and check every voice channel's start time.
+				for(SPL::list<int64_t>::iterator it2 = myList.begin();
+					it2 != myList.end(); it2++) {
+					if (currentTimeInSeconds - *it2 >=
+						vgwStaleSessionPurgeInterval) {
+						// This is a stale entry. Store the VGW session id.
+						staleList.push_back(it->first);
+						break;
+					}
+				}
+			}
+			
+			// Now, we can remove the stale entries if any.
+			for(std::list<std::string>::iterator it = staleList.begin();
+				it != staleList.end(); it++) {
+				vgw_session_id_map.erase(*it);
+				
+				if (vgwSessionLoggingNeeded == true) {
+					SPLAPPTRC(L_ERROR, "Operator " << operatorPhysicalName <<
+						"-->Channel " << boost::to_string(udpChannelNumber) <<
+						"-->X4 Removed a stale VGW session id. " <<
+						*it, "on_close");
+				}
+				
+				// Added this logic on Sep/04/2020.
+				// Since we know the VGW session id that has gone stale,
+				// we can attempt to clean up a few more things on a 
+				// best effort basis as shown below.
+				//
+				// Since this connection has gone stale, we can send an 
+				// abnormal, delayed EndOfCall Signal via the output port.
+				// That can help the underlying application logic to
+				// do its own clean-up and release of the STT engines.
+				// Send the "End of Voice Call" signal now for this
+				// vgwSessionId_vgwVoiceChannelNumber combo.
+				// Send it for voice channel 1 which is an 
+				// agent channel most of the time.
+				OPort1Type oTuple;
+				oTuple.set_vgwSessionId(*it);
+				oTuple.set_isCustomerSpeechData(false);
+				oTuple.set_vgwVoiceChannelNumber(1);
+				submit(oTuple, 1);
+				// Do the same for voice channel 2 which is a
+				// customer channel most of the time.
+				oTuple.set_vgwSessionId(*it);
+				oTuple.set_isCustomerSpeechData(true);
+				oTuple.set_vgwVoiceChannelNumber(2);
+				submit(oTuple, 1);
+				
+				// We have a map where the agent and caller phone numbers of a given
+				// call session id are stored. Since this call has gone stale,
+				// let us remove the corespoding entry from that map.
+				//
+				// Key: vgeSessionId_vgwIsCaller
+				// Value: Phone Number
+				// Let us remove the agent's phome first.
+				bool vgwIsCaller = false;
+				std::string key = *it + std::string("_") + 
+					boost::to_string(vgwIsCaller);
+				auto it2 = vgwSessionPhoneNumbersMap.find(key);
+
+				if (it2 != vgwSessionPhoneNumbersMap.end()) {
+					// it2->first has the key of the map and it->second has the value.
+					vgwSessionPhoneNumbersMap.erase(it2->first);
+				}	
+
+				// Let us also try to remove the caller's phone.
+				vgwIsCaller = true;
+				key = *it + std::string("_") + boost::to_string(vgwIsCaller);
+				auto it3 = vgwSessionPhoneNumbersMap.find(key);
+
+				if (it3 != vgwSessionPhoneNumbersMap.end()) {
+					// it3->first has the key of the map and it->second has the value.
+					vgwSessionPhoneNumbersMap.erase(it3->first);
+				}	
+			} // End of for loop.
+			
+			std::list<websocketpp::connection_hdl> staleList2;
+			staleList2.clear();
+			
+			// Let us now check the client connections map.
+			// Stale entries happening in this map is a rarity just because
+			// on_close handler almost always gets invoked during the
+			// normal as well as abnormal client connection closures.
+			for(con_map::iterator it = client_connections_map.begin();
+				it != client_connections_map.end(); it++) {
+				connection_metadata cmd = it->second;
+				
+				if(currentTimeInSeconds - cmd.vgwSessionStartTime > 
+					vgwStaleSessionPurgeInterval) {
+					// This is a stale entry. Store the connection handle.
+					staleList2.push_back(it->first);
+					
+					// Added this logic on Sep/04/2020.
+					// NOTE: We already made an attempt to do this same logic
+					// inside the previous for loop. We are doing the same 
+					// here again using the connection data. This should not 
+					// cause any harm. If a duplicate EOCS is sent from here,
+					// the underlying app;ication logic should do the right
+					// thing to ignore if that EOCS is redundant.
+					//
+					// Since this connection has gone stale, we can send an 
+					// abnormal, delayed EndOfCall Signal via the output port.
+					// That can help the underlying application logic to
+					// do its own clean-up and release of the STT engines.
+					// Send the "End of Voice Call" signal now for this
+					// vgwSessionId_vgwVoiceChannelNumber combo.
+					OPort1Type oTuple;
+					oTuple.set_vgwSessionId(cmd.vgwSessionId);
+					oTuple.set_isCustomerSpeechData(cmd.vgwIsCaller);
+					oTuple.set_vgwVoiceChannelNumber(cmd.vgwVoiceChannelNumber);
+					submit(oTuple, 1);
+					
+					// Added this logic on Sep/04/2020.
+					// We have a map where the agent and caller phone numbers of a given
+					// call session id are stored. Since this leg of that call has gone stale,
+					// let us remove the corespoding entry from that map.
+					//
+					// Key: vgeSessionId_vgwIsCaller
+					// Value: Phone Number
+					std::string key = cmd.vgwSessionId + std::string("_") + 
+						boost::to_string(cmd.vgwIsCaller);
+					auto it = vgwSessionPhoneNumbersMap.find(key);
+
+					if (it != vgwSessionPhoneNumbersMap.end()) {
+						// it->first has the key of the map and it->second has the value.
+						vgwSessionPhoneNumbersMap.erase(it->first);
+					}	
+				} // End of if(currentTimeInSeconds - cmd.vgwSessionStartTime > 
+			} // End of  for loop.
+
+			int32_t stale2RemovedCnt = 0;
+			// Now, we can remove the stale entries if any.
+			for(std::list<websocketpp::connection_hdl>::iterator it = staleList2.begin();
+				it != staleList2.end(); it++) {
+				client_connections_map.erase(*it);
+				stale2RemovedCnt++;
+			}
+
+			if (vgwSessionLoggingNeeded == true && stale2RemovedCnt > 0) {
+				SPLAPPTRC(L_ERROR, "Operator " << operatorPhysicalName <<
+					"-->Channel " << boost::to_string(udpChannelNumber) <<
+					"-->X4 Removed a few stale client connection handles. Removed count=" <<
+					stale2RemovedCnt, "on_close");
+			}
+			
+			// Set it to the current time so that we can do our next 
+			// stale sesion data removal at the required time interval.
+			timeOfPreviousStaleSessionRemoval = currentTimeInSeconds;
+		}
+	} // End of if (vgwStaleSessionPurgeInterval > 0)
+
 	// Delete this handle from our associative container.        
 	client_connections_map.erase(hdl);
-}
+} // End of on_close method.
 
 // This is a callback that can return a password if the 
 // server-side key file is configured with a key password to be
