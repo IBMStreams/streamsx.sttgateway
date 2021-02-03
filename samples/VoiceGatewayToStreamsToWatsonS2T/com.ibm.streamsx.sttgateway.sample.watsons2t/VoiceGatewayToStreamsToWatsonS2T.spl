@@ -1,14 +1,14 @@
 /*
 ==============================================
 # Licensed Materials - Property of IBM
-# Copyright IBM Corp. 2018, 2020
+# Copyright IBM Corp. 2018, 2021
 ==============================================
 */
 
 /*
 ==============================================
 First created on: Oct/28/2019
-Last modified on: Sep/04/2020
+Last modified on: Feb/02/2021
 
 A) What does this example application do?
    --------------------------------------
@@ -335,6 +335,20 @@ public composite VoiceGatewayToStreamsToWatsonS2T {
 		// Is IBM Voice Gateway message exchange logging needed for debugging?
 		expression<boolean> $vgwSessionLoggingNeeded : 
 			(boolean)getSubmissionTimeValue("vgwSessionLoggingNeeded", "false");
+		// Under some cicumstances, if the IBMVoiceGatewaySource operator sends 
+		// only one EOCS (End Of Call Sigmal) tuple instead of two as required for
+		// the two voice channels, that may eventually cause the application logic
+		// below not be able to release the speech engines properly at the end of
+		// a voice call for a given VGW session id. We have seen it in certain
+		// customer environments. To avoid that condition, such customers can
+		// configure this application to treat the very first EOCS tuple as 
+		// sufficient to treat a voice call as a "completed call". In that case,
+		// it will simply ignore if and when a second EOCS tuple arrives.
+		// This feature can be activated to compensate for the situation described
+		// above if it happens in some customer environments.
+		// (Senthil added this on Feb/01/2021).
+		expression<int32> $numberOfEocsNeededForVoiceCallCompletion : 
+			(int32)getSubmissionTimeValue("numberOfEocsNeededForVoiceCallCompletion", "2");	
 		//
 		// IBM Watson S2T related submission time values are defined below.
 		expression<int32> $numberOfS2TEngines :(int32)
@@ -700,6 +714,8 @@ public composite VoiceGatewayToStreamsToWatsonS2T {
 										" started at " + ctime(getTimestamp()) + ".", fileHandle, err);
 									fclose(fileHandle, err);
 								}
+								
+								appTrc(Trace.error, "A new voice call has started. vgwSessionId=" + BSD.vgwSessionId);
 							}
 							
 							// Insert into the state map for future reference.
@@ -776,6 +792,53 @@ public composite VoiceGatewayToStreamsToWatsonS2T {
 						// following if block only after receiving EOCS for both the voice channels of this call.
 						insertM(_vgwSessionToCompletedUdpChannelMap, _key, _oTuple.s2tEngineId);
 					}
+
+					// Senthil added this if block on Feb/01/2020.
+					if($numberOfEocsNeededForVoiceCallCompletion == 1) {
+						// If the user configured this application to handle
+						// only one EOCS to treat a voice call as completed, then we
+						// will try to clean-up the other voice channel if it exists.
+						mutable int32 otherVgwVoiceChannelNumber = 1;
+						
+						if(EOCS.vgwVoiceChannelNumber == 1) {
+							otherVgwVoiceChannelNumber = 2;
+						}
+						
+						// Get the sessionId + channelNumber combo string.
+						_key = EOCS.vgwSessionId + "_" + (rstring)otherVgwVoiceChannelNumber;
+						
+						if (has(_vgwSessionIdToUdpChannelMap, _key) == true) {
+							// Let us send an empty blob to the WatsonS2T operator to indicate that
+							// this speaker of a given voice call is done.
+							_oTuple = (BinarySpeech_t){};
+							// Copy the three input tuple attributes that must
+							// match with that of the outgoing tuple.
+							assignFrom(_oTuple, EOCS);
+							// Override the following two attributes to reflect the other voice channel.
+							// Flip this attribute value.
+							if(_oTuple.isCustomerSpeechData == true) {
+								_oTuple.isCustomerSpeechData = false;
+							} else {
+								_oTuple.isCustomerSpeechData = true;
+							}
+							
+							_oTuple.vgwVoiceChannelNumber = otherVgwVoiceChannelNumber;
+							
+							// Assign the S2T engine id where this voice channel was
+							// getting processed until now.
+							_oTuple.s2tEngineId = _vgwSessionIdToUdpChannelMap[_key];
+							// We have to send this tuple to the result processor as well for 
+							// the call recording logic to work correctly.
+							_oTuple.s2tResultProcessorId = 
+								_vgwSessionToResultProcessorChannelMap[EOCS.vgwSessionId];
+							submit(_oTuple, BSDF);
+							// We are now done with this vgwSessionId_vgwVoiceChannelNumber combo.
+							removeM(_vgwSessionIdToUdpChannelMap, _key);
+							// Add the S2T engine id to this call completed map to be released later in the
+							// following if block only after receiving EOCS for both the voice channels of this call.
+							insertM(_vgwSessionToCompletedUdpChannelMap, _key, _oTuple.s2tEngineId);
+						}
+					}
 					
 					// Since this voice call is ending, let us release the S2T result processor 
 					// instance that was allocated above for this voice call.
@@ -793,8 +856,22 @@ public composite VoiceGatewayToStreamsToWatsonS2T {
 						// Remove the result processor id only if the EOCS signal
 						// was sent for both of the voice channels. That must first 
 						// happen before we can release the result processor id.
-						if (has(_vgwSessionIdToUdpChannelMap, key1) == false &&
-							has(_vgwSessionIdToUdpChannelMap, key2) == false) {
+						//
+						// This if condition was changed by Senthil on 
+						// Feb/01/2021 for the following reason.
+						// If the user configured this application to handle
+						// a single EOCS as sufficient to consider a voice call
+						// completed for a given VGW session id, we will use the 
+						// second || i.e. OR condition. Please refer to the 
+						// constant i.e. expression declaration section above to 
+						// read the commentary about this idea.
+						//
+						if (($numberOfEocsNeededForVoiceCallCompletion == 2 &&
+							(has(_vgwSessionIdToUdpChannelMap, key1) == false &&
+							has(_vgwSessionIdToUdpChannelMap, key2) == false)) || 
+							($numberOfEocsNeededForVoiceCallCompletion == 1 &&
+							(has(_vgwSessionIdToUdpChannelMap, key1) == false ||
+							has(_vgwSessionIdToUdpChannelMap, key2) == false))) {
 							removeM(_vgwSessionToResultProcessorChannelMap, EOCS.vgwSessionId);
 							
 							// Since the voice call for this VGW session id has ended completely,
@@ -827,6 +904,8 @@ public composite VoiceGatewayToStreamsToWatsonS2T {
 									" ended at " + ctime(getTimestamp()) + ".", fileHandle, err);
 								fclose(fileHandle, err);
 							}
+							
+							appTrc(Trace.error, "An ongoing voice call has completed. vgwSessionId=" + EOCS.vgwSessionId);
 						}
 					}
 				}

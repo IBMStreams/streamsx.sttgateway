@@ -1,5 +1,11 @@
 # Changes
 
+## v2.2.7
+* Feb/02/2021
+* Modified the IBMVoiceGatewaySource operator to handle the missing VGW start session message and/or missing speech data packet.
+* Added an optional job submission time parameter numberOfEocsNeededForVoiceCallCompletion for users to address the condition mentioned in the previous bullet. 
+* Added log messages to notify when the condition mentioned in the previous bullet occurs.
+
 ## v2.2.6
 * Jan/16/2021
 * Made the End Of Call Signal (EOCS) sending by the IBMVoiceGatewaySource operator to be more reliable and consistent.

@@ -4,7 +4,7 @@
  <info:identity>
    <info:name>VgwDataRouter</info:name>
    <info:description>Example that shows how to route VGW speech data to different Speech processor jobs</info:description>
-   <info:version>1.0.0</info:version>
+   <info:version>1.0.1</info:version>
    <info:requiredProductVersion>4.2.1.6</info:requiredProductVersion>
  </info:identity>
  <info:dependencies>

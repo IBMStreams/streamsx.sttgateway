@@ -1,14 +1,14 @@
 /*
 ==============================================
 # Licensed Materials - Property of IBM
-# Copyright IBM Corp. 2018, 2020
+# Copyright IBM Corp. 2018, 2021
 ==============================================
 */
 
 /*
 ==============================================
 First created on: Nov/24/2020
-Last modified on: Nov/27/2020
+Last modified on: Feb/02/2021
 
 A) What does this example application do?
    --------------------------------------
@@ -331,6 +331,20 @@ public composite VgwDataRouter {
 		// Is IBM Voice Gateway message exchange logging needed for debugging?
 		expression<boolean> $vgwSessionLoggingNeeded : 
 			(boolean)getSubmissionTimeValue("vgwSessionLoggingNeeded", "false");
+		// Under some cicumstances, if the IBMVoiceGatewaySource operator sends 
+		// only one EOCS (End Of Call Sigmal) tuple instead of two as required for
+		// the two voice channels, that may eventually cause the application logic
+		// below not be able to release the speech processor jobs properly at the end of
+		// a voice call for a given VGW session id. We have seen it in certain
+		// customer environments. To avoid that condition, such customers can
+		// configure this application to treat the very first EOCS tuple as 
+		// sufficient to treat a voice call as a "completed call". In that case,
+		// it will simply ignore if and when a second EOCS tuple arrives.
+		// This feature can be activated to compensate for the situation described
+		// above if it happens in some customer environments.
+		// (Senthil added this on Feb/01/2021).
+		expression<int32> $numberOfEocsNeededForVoiceCallCompletion : 
+			(int32)getSubmissionTimeValue("numberOfEocsNeededForVoiceCallCompletion", "2");
 		//
 		// IBM Watson STT related submission time values are defined below.
 		expression<int32> $totalNumberOfSpeechProcessorJobs :(int32)
@@ -674,7 +688,8 @@ public composite VgwDataRouter {
 						boolean key1Exists = has(_vgwSessionVgwVoiceChannelNumberCompletedMap, key1);
 						boolean key2Exists = has(_vgwSessionVgwVoiceChannelNumberCompletedMap, key2);
 						
-						if (key1Exists == true && key2Exists == true) {
+						if ($numberOfEocsNeededForVoiceCallCompletion == 2 &&
+							(key1Exists == true && key2Exists == true)) {
 							// Since the voice call for this VGW session id has ended completely,
 							// we can also release the speech processor id assigned for this call so that 
 							// it can be repurposed for handling any new future calls.
@@ -690,16 +705,54 @@ public composite VgwDataRouter {
 							removeM(_vgwSessionIdToSpeechProcessorMap, EOCS.vgwSessionId);
 							removeM(_vgwSessionVgwVoiceChannelNumberCompletedMap, key1);
 							removeM(_vgwSessionVgwVoiceChannelNumberCompletedMap, key2);
-							appTrc(Trace.error, "A call with vgwSessionId=" + EOCS.vgwSessionId +
+							appTrc(Trace.error, "i) A call with vgwSessionId=" + EOCS.vgwSessionId +
+								" ended and its speech processor id " + (rstring)speechProcessorId + 
+								" got released.");						
+						} else if ($numberOfEocsNeededForVoiceCallCompletion == 1 &&
+							(key1Exists == true || key2Exists == true)) {
+							// If the user configured this application to handle
+							// a single EOCS as sufficient to consider a voice call
+							// completed for a given VGW session id, we will use this
+							// block of code. Please refer to the constant i.e. expression
+							// declaration section above to read the commentary about this idea.
+							//
+							// Since the voice call for this VGW session id has ended completely,
+							// we can also release the speech processor id assigned for this call so that 
+							// it can be repurposed for handling any new future calls.
+							// We can go ahead and release the speech processor id by adding it back to 
+							// the speech processor status list.
+							// Let us decrement the given speech processor's current call handling count.
+							// It is a zero based indexed array. Hence, we have to subtract by 1 to get the
+							// current index in that array.
+							_speechProcessorStatusList[speechProcessorId-1] = 
+								_speechProcessorStatusList[speechProcessorId-1] - 1;
+							
+							// We can now do the clean-up in our state variables.
+							removeM(_vgwSessionIdToSpeechProcessorMap, EOCS.vgwSessionId);
+
+							if(key1Exists == true) {
+								removeM(_vgwSessionVgwVoiceChannelNumberCompletedMap, key1);
+							}
+							
+							if(key2Exists == true) {
+								removeM(_vgwSessionVgwVoiceChannelNumberCompletedMap, key2);
+							}
+							
+							appTrc(Trace.error, "ii) A call with vgwSessionId=" + EOCS.vgwSessionId +
 								" ended and its speech processor id " + (rstring)speechProcessorId + 
 								" got released.");						
 						}
 					} else {
-						appTrc(Trace.error, 
-							"_YYYYY No speech processor id is available at this time for the " +
-							"vgwSessionId_vgwVoiceChannelNumber: " + _key + 
-							" We are not going to process the currently received EOCS " +
-							" of this speaker in this voice call. This is serious error.");					
+						// Flag an error only when the user configured for two
+						// EOCS tuples to be received for considering a voice call
+						// as complted.
+						if ($numberOfEocsNeededForVoiceCallCompletion == 2) {
+							appTrc(Trace.error, 
+								"_YYYYY No speech processor id is available at this time for the " +
+								"vgwSessionId_vgwVoiceChannelNumber: " + _key + 
+								" We are not going to process the currently received EOCS " +
+								" of this speaker in this voice call. This is a serious error.");
+						}					
 					}
 				} // End of onTuple EOCS.
 				

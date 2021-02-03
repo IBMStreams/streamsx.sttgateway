@@ -1,14 +1,14 @@
 /*
 ==============================================
 # Licensed Materials - Property of IBM
-# Copyright IBM Corp. 2019, 2020
+# Copyright IBM Corp. 2019, 2021
 ==============================================
 */
 
 /*
 ============================================================
 First created on: Sep/20/2019
-Last modified on: Jan/15/2021
+Last modified on: Feb/02/2021
 
 Please refer to the sttgateway-tech-brief.txt file in the 
 top-level directory of this toolkit to read about 
@@ -684,15 +684,8 @@ Tree query(Tree& pt, typename Tree::path_type path) {
 template <typename EndpointType>
 void MY_OPERATOR::on_message(EndpointType* s, websocketpp::connection_hdl hdl,
     typename EndpointType::message_ptr msg) {
-	bool vgwSessionLoggingDone = false;
 	
 	if (vgwSessionLoggingNeeded == true) {
-		SPLAPPTRC(L_ERROR, "on_message called with hdl: " << hdl.lock().get()
-			<< " with a message size of: " << msg->get_payload().size() << " bytes.", "on_message");
-		vgwSessionLoggingDone = true;
-	}
-	
-	if (vgwSessionLoggingDone == false) {
 		SPLAPPTRC(L_INFO, "on_message called with hdl: " << hdl.lock().get()
 			<< " with a message size of: " << msg->get_payload().size() << " bytes.", "on_message");
 	}
@@ -1295,6 +1288,15 @@ void MY_OPERATOR::on_message(EndpointType* s, websocketpp::connection_hdl hdl,
 					// have started arriving for this particular VGW session id.
 					con_metadata.vgwVoiceChannelNumber = 2;
 				}
+				
+				if (vgwSessionLoggingNeeded == true) {
+					SPLAPPTRC(L_ERROR, "Operator " << operatorPhysicalName <<
+						"-->Channel " << boost::to_string(udpChannelNumber) <<
+						"-->X2 Received the very first speech data packet. vgwSessionId=" << 
+						con_metadata.vgwSessionId << ", vgwVoiceChannelNumber=" << 
+						con_metadata.vgwVoiceChannelNumber <<
+						", vgwIsCaller=" << con_metadata.vgwIsCaller, "on_message");
+				}
 			} // End of if (con_metadata.speechPacketsReceivedCnt == 1)
 
 			// Update it in the client connections map.
@@ -1365,7 +1367,7 @@ void MY_OPERATOR::on_message(EndpointType* s, websocketpp::connection_hdl hdl,
 			submit(oTuple, 0);
 
 			if (vgwSessionLoggingNeeded == true) {
-				SPLAPPTRC(L_ERROR, "Operator " << operatorPhysicalName <<
+				SPLAPPTRC(L_INFO, "Operator " << operatorPhysicalName <<
 					"-->Channel " << boost::to_string(udpChannelNumber) <<
 					"-->X2 Received speech data from the vgwSessionId " << 
 					con_metadata.vgwSessionId << 
@@ -1484,7 +1486,15 @@ void MY_OPERATOR::on_close(websocketpp::connection_hdl hdl) {
 	bool vgwSessionIdFoundInMap = 
 		vgw_session_id_map.find(con_metadata.vgwSessionId) != vgw_session_id_map.end();
 	
-	if (vgwSessionIdFoundInMap == true) {
+	// For the correct call clean-up operation, this operator must have received
+	// call start session messages for both the voice channels in a call and it 
+	// must have also received speech data bytes from both the voice channels 
+	// (either silence fillers or real speech data). In that case,
+	// vgwVoiceChannelNumber must correctly be set to either 1 or 2.
+	// If not, that is going to cause trouble for the downstream operator logic 
+	// in properly releasing the speech engines assigned for a given call. 
+	// Please see the log message that will get written in the else block below.
+	if (vgwSessionIdFoundInMap == true && con_metadata.vgwVoiceChannelNumber > 0) {
 		// Send the "End of Voice Call" signal now for this
 		// vgwSessionId_vgwVoiceChannelNumber combo.
 		OPort1Type oTuple;
@@ -1521,6 +1531,25 @@ void MY_OPERATOR::on_close(websocketpp::connection_hdl hdl) {
 				nOutputTuplesSentMetric->setValueNoLock(nOutputTuplesSent);
 			}						
 		} // End of if (vgw_session_id_map[con_metadata.vgwSessionId] <= 0)
+	} else {
+		SPLAPPTRC(L_ERROR, "Operator " << operatorPhysicalName <<
+			"-->Channel " << boost::to_string(udpChannelNumber) <<
+			"-->Possible critical error: Received on_close for connection handle " <<
+			hdl.lock().get() << 
+			" with its VGW session id not found in the vgw_session_id_map. " <<
+			"Reason for this could be either the VGW never sent a start session "  <<
+			"message for one of the voice channels or it sent a start session message "
+			"followed by no binary speech data for that voice channel. This will " <<
+			"cause less than the required number of EOCS tuples to be sent to the " <<
+			"downstream operator. Unless the downstream operator is configured to " <<
+			"handle the reduced number of EOCS tuples for a given VGW session id, " <<
+			"it may eventually end up with all the speech processors and the " << 
+			"speech engines to be in unreleased i.e. unavailable state for handling " <<
+			"any new voice calls. vgwVoiceChannelNumber must be either 1 or 2. " <<
+			"If it is not, then it indicates the situation described above. " <<
+			"vgwSessionId=" << con_metadata.vgwSessionId << 
+			", vgwVoiceChannelNumber=" <<
+			con_metadata.vgwVoiceChannelNumber << ".", "on_close");
 	} // End of if (vgwSessionIdFoundInMap == true)
 
 	// This entire if block is a carry-over from the "stop" message processing section in the
