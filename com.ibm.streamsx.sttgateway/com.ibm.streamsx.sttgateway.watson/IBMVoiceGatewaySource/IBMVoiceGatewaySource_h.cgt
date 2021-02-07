@@ -1,14 +1,14 @@
 /*
 ==============================================
 # Licensed Materials - Property of IBM
-# Copyright IBM Corp. 2019, 2020
+# Copyright IBM Corp. 2019, 2021
 ==============================================
 */
 
 /*
 ============================================================
 First created on: Sep/17/2019
-Last modified on: Sep/03/2020
+Last modified on: Feb/07/2021
 ============================================================
 */
 
@@ -61,6 +61,7 @@ public:
 	server_tls endpoint_tls;
 	SPL::boolean tlsEndpointStarted;
 	SPL::boolean nonTlsEndpointStarted;
+	SPL::boolean boostAsioServiceRunning;
 	SPL::int64 timeOfPreviousStaleSessionRemoval;
 	// This map holds the phone numbers of the agent and 
 	// the customer for a given VGW session id.

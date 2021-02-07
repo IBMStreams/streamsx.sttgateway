@@ -1,5 +1,10 @@
 # Changes
 
+## v2.2.8
+* Feb/07/2021
+* Modified the IBMVoiceGatewaySource operator to handle the exception thrown when a given websocket connection handle can't be found in the connection metadata map.
+* Added new logic in the prepareToShutdown method to wait for the Boost ASIO service thread to perform its connection clean-up and exit before we can safely shut down the IBMVoiceGatewaySource operator.
+
 ## v2.2.7
 * Feb/02/2021
 * Modified the IBMVoiceGatewaySource operator to handle the missing VGW start session message and/or missing speech data packet.

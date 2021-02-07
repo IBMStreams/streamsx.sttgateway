@@ -8,7 +8,7 @@
 /*
 ============================================================
 First created on: Sep/20/2019
-Last modified on: Feb/02/2021
+Last modified on: Feb/07/2021
 
 Please refer to the sttgateway-tech-brief.txt file in the 
 top-level directory of this toolkit to read about 
@@ -315,6 +315,7 @@ MY_OPERATOR::MY_OPERATOR()
 	
 	tlsEndpointStarted = false;
 	nonTlsEndpointStarted = false;
+	boostAsioServiceRunning = false;
 }
 
 // Destructor
@@ -390,7 +391,38 @@ void MY_OPERATOR::prepareToShutdown()
 
 		it++;
 	}
-
+	
+	// We have to wait for the Boost ASIO run loop to end.
+	// Depending on the number of WebSocket connections active at this time,
+	// it will take several seconds for that run loop to complete doing its
+	// internal cleanup of such connections. If we go ahead and exit this method to 
+	// stop this operator without waiting for that run loop thread to complete, 
+	// it will most likely cause an error if this operator is restarted immediately.
+	// That error would look like this:
+	//
+	//  CDISR5030E: An exception occurred during the execution of the 
+	// VgwDataRouterSource operator. The exception is: Underlying Transport Error
+	//
+	// The reason for that error: Even if we exit this method, the Boost ASIO
+	// run loop is still running and doing its work to clean up all its 
+	// connections before closing and releasing the WebSocket server's  
+	// port (TLS and/or non-TLS). So let us wait here for a maximum of 
+	// three minutes or until the Boost ASIO service stops running whichever
+	// occurs first.
+	// 
+	// This technique to wait for the ASIO run method to end is discussed here.
+	// https://groups.google.com/g/websocketpp/c/rvBcIJ940Bc
+	//
+	SPL::int32 timerCount = 0;
+	
+	while(boostAsioServiceRunning == true && timerCount <= 18) {
+		// Wait for 10 seconds.
+		SPL::Functions::Utility::block(10.0);
+		// We will do this wait upto 3 minutes.
+		// i.e. 18 times each with a 10 seconds wait.
+		timerCount++;
+	}
+	
 	// This operator is being shutdown now.
 	// We can empty the following containers.
 	client_connections_map.clear();
@@ -515,12 +547,14 @@ void MY_OPERATOR::process(uint32_t idx)
 		
 		endpoint_tls.start_accept();
 		tlsEndpointStarted = true;
+		boostAsioServiceRunning = true;
 
 		// Start the Boost ASIO io_service run loop that can handle both endpoints.
 		// This will block until the server socket gets closed.
 		// For additional details, please refer to the commentary and 
 		// logic in the prepareToShutdown method
 		ios.run();
+		boostAsioServiceRunning = false;
 	// }
 }
 
@@ -690,8 +724,24 @@ void MY_OPERATOR::on_message(EndpointType* s, websocketpp::connection_hdl hdl,
 			<< " with a message size of: " << msg->get_payload().size() << " bytes.", "on_message");
 	}
 	
-	// Get the metadata details for this connection handle from our client connections map.
-	connection_metadata& con_metadata = get_con_metadata_from_hdl(hdl);
+	connection_metadata con_metadata;
+	
+	try {
+		// Get the metadata details for this connection handle from our client connections map.
+		con_metadata = get_con_metadata_from_hdl(hdl);
+	} catch (const std::invalid_argument & e) {
+		SPLAPPTRC(L_ERROR, "Operator " << operatorPhysicalName <<
+			"-->Channel " << boost::to_string(udpChannelNumber) << 
+			"-->hdl=" << hdl.lock().get() <<
+			".-->X1 Unable to get con_metadata-->" << e.what(), "on_message");
+		return;
+	} catch (...) {
+		SPLAPPTRC(L_ERROR, "Operator " << operatorPhysicalName <<
+			"-->Channel " << boost::to_string(udpChannelNumber) << 
+			"-->hdl=" << hdl.lock().get() <<
+			".-->X1 Unable to get con_metadata-->Other exception occurred.", "on_message");
+		return;
+	}
 	
 	// IBM Voice Gateway will send messages via a given client connection
 	// either with textual data or with binary data. 
@@ -1401,7 +1451,25 @@ void MY_OPERATOR::on_message(EndpointType* s, websocketpp::connection_hdl hdl,
 
 // When a client's established connection closes, this callback method is run.
 void MY_OPERATOR::on_close(websocketpp::connection_hdl hdl) {
-	connection_metadata& con_metadata = get_con_metadata_from_hdl(hdl);
+	connection_metadata con_metadata;
+	
+	try {
+		// Get the metadata details for this connection handle from our client connections map.
+		con_metadata = get_con_metadata_from_hdl(hdl);
+	} catch (const std::invalid_argument & e) {
+		SPLAPPTRC(L_ERROR, "Operator " << operatorPhysicalName <<
+			"-->Channel " << boost::to_string(udpChannelNumber) << 
+			"-->hdl=" << hdl.lock().get() <<
+			".-->X3 Unable to get con_metadata-->" << e.what(), "on_close");
+		return;
+	} catch (...) {
+		SPLAPPTRC(L_ERROR, "Operator " << operatorPhysicalName <<
+			"-->Channel " << boost::to_string(udpChannelNumber) << 
+			"-->hdl=" << hdl.lock().get() <<
+			".-->X3 Unable to get con_metadata-->Other exception occurred.", "on_close");
+		return;
+	}
+		
 	int64_t currentTimeInSeconds = 
 		SPL::Functions::Time::getSeconds(SPL::Functions::Time::getTimestamp());
 	int64_t sessionDuration = currentTimeInSeconds - con_metadata.vgwSessionStartTime;
