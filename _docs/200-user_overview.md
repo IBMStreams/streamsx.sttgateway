@@ -2,7 +2,7 @@
 title: "Toolkit Usage Overview"
 permalink: /docs/user/overview/
 excerpt: "How to use this toolkit."
-last_modified_at: 2020-11-28T23:16:48+01:00
+last_modified_at: 2021-02-19T08:18:48+01:00
 redirect_from:
    - /theme-setup/
 sidebar:
@@ -131,8 +131,7 @@ st  submitjob  -d  <YOUR_STREAMS_DOMAIN>  -i  <YOUR_STREAMS_INSTANCE>  output/co
 If you are planning to ingest the speech data from live voice calls, then you can invoke the **IBMVoiceGatewaySource** operator as shown below.
 
 ```
-(stream<BinarySpeech_t> BinarySpeechData as BSD;
- stream<EndOfCallSignal_t> EndOfCallSignal as EOCS) as VoiceGatewayInferface = 
+(stream<BinarySpeech_t> BinarySpeechData as BSD) as VoiceGatewayInferface = 
  IBMVoiceGatewaySource() {
     logic
        state: {

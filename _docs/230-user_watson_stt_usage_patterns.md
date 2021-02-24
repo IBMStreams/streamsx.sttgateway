@@ -2,7 +2,7 @@
 title: "Operator Usage Patterns"
 permalink: /docs/user/WatsonSTTUsagePatterns/
 excerpt: "Describes the streamsx.sttgateway toolkit usage patterns."
-last_modified_at: 2020-09-04T15:20:48+01:00
+last_modified_at: 2020-02-19T08:28:48+01:00
 redirect_from:
    - /theme-setup/
 sidebar:
@@ -34,7 +34,7 @@ At the full scope of this operator, output stream schema can be as shown below w
 
 ```
 // The following is the schema of the first output stream for the
-// IBMVoiceGatewaySource operator. The first four attributes are
+// IBMVoiceGatewaySource operator. The first five attributes are
 // very important and the other ones are purely optional if some
 // scenarios really require them.
 type BinarySpeech_t =
@@ -42,6 +42,7 @@ type BinarySpeech_t =
    rstring vgwSessionId, // Unique identifier of a voice call
    boolean isCustomerSpeechData, // Is it customer's speech?
    int32 vgwVoiceChannelNumber, // Voice channel number of this speech data
+   boolean endOfCallSignal, // Is it the end of a call for a voice channel?
    rstring callStartDateTime, // call start date time i.e. system clock time
    rstring callerPhoneNumber, 
    rstring agentPhoneNumber,
@@ -51,25 +52,11 @@ type BinarySpeech_t =
    int32 sttResultProcessorId; // Which result processor id is handling the STT result for this call?
 ```
 
-```
-// The following schema is for the second output stream of the
-// IBMVoiceGatewaySource operator. It has three attributes indicating
-// the speaker channel (vgwVoiceChannelNumber) of a given voice call (vgwSessionId) who
-// got completed with the call as well as an indicator (isCustomerSpeechData) to 
-// denote whether the speech data we received on this channel belonged
-// to a caller or an agent.
-type EndOfCallSignal_t =
-   rstring vgwSessionId, 
-   boolean isCustomerSpeechData,
-   int32 vgwVoiceChannelNumber;
-```
-
 ## Invoking the IBMVoiceGatewaySource operator
 In your SPL application, this operator can be invoked with either all operator parameters or a subset of the operator parameters. Similarly, in the output clause of the operator body, you can either call all the available custom output functions or a subset of those custom output functions to do your output stream attribute assignments. You can decide on the total number of operator parameters and the total number of custom output functions to use based on the real needs of your application.
 
 ```
-(stream<BinarySpeech_t> BinarySpeechData as BSD;
- stream<EndOfCallSignal_t> EndOfCallSignal as EOCS) as VoiceGatewayInferface = IBMVoiceGatewaySource() {
+(stream<BinarySpeech_t> BinarySpeechData as BSD) as VoiceGatewayInferface = IBMVoiceGatewaySource() {
     logic
        state: {
           // Initialize the default TLS certificate file name if the 
