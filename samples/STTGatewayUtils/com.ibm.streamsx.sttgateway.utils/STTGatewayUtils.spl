@@ -1,14 +1,14 @@
 /*
 ==============================================
 # Licensed Materials - Property of IBM
-# Copyright IBM Corp. 2018, 2020
+# Copyright IBM Corp. 2018, 2021
 ==============================================
 */
 
 /*
 ==============================================
 First created on: Nov/24/2020
-Last modified on: Nov/26/2020
+Last modified on: Feb/09/2021
 
 This is a utility composite that will get used in the following applications.
 
@@ -25,7 +25,7 @@ namespace com.ibm.streamsx.sttgateway.utils;
 // Code for the C++ native functions can be found in the impl/include directory of this project.
 //
 // The following is the schema of the first output stream for the
-// IBMVoiceGatewaySource operator. The first four attributes are
+// IBMVoiceGatewaySource operator. The first five attributes are
 // very important and the other ones are purely optional if some
 // scenarios really require them.
 // blob speech --> Speech fragments of a live conversation as captured and sent by the IBM Voice Gateway.
@@ -36,6 +36,9 @@ namespace com.ibm.streamsx.sttgateway.utils;
 //                                 Whoever (caller or agent) sends the first round of 
 //                                 speech data bytes will get assigned a voice channel of 1. 
 //                                 The next one to follow will get assigned a voice channel of 2.
+// boolean endOfCallSignal     --> This attribute will be set to true by the IBMVoiceGatewaySource
+//                                 operator when it sends an EOCS for a voice channel. It will be
+//                                 set to false by that operator when it sends binary speech data.
 // rstring id --> This attribute is needed by the WatsonS2T operator. 
 //                It is set to vgwSessionId_vgwVoiceChannelNumber
 // rstring callStartDateTime --> Call start date time i.e. system clock time.
@@ -47,18 +50,11 @@ namespace com.ibm.streamsx.sttgateway.utils;
 // int32 speechEngineId --> This attribute will be set in the speech processor job. (Please, read the comments there.)
 // int32 speechResultProcessorId --> This attribute will be set in the speech processor job. (Please, read the comments there.)
 type BinarySpeech_t = blob speech, rstring vgwSessionId, boolean isCustomerSpeechData, 
-	int32 vgwVoiceChannelNumber, rstring id, rstring callStartDateTime, 
+	int32 vgwVoiceChannelNumber, boolean endOfCallSignal, 
+	rstring id, rstring callStartDateTime, 
 	rstring callerPhoneNumber, rstring agentPhoneNumber, 
 	int32 speechDataFragmentCnt, int32 totalSpeechDataBytesReceived, 
 	int32 speechProcessorId, int32 speechEngineId, int32 speechResultProcessorId;
-// The following schema is for the second output stream of the
-// IBMVoiceGatewaySource operator. It has three attributes indicating
-// the speaker channel (vgwVoiceChannelNumber) of a given voice call (vgwSessionId) who
-// got completed with the call as well as an indicator (isCustomerSpeechData) to 
-// denote whether the speech data we received on this channel belonged
-// to a caller or an agent.
-type EndOfCallSignal_t = rstring vgwSessionId, 
-	boolean isCustomerSpeechData, int32 vgwVoiceChannelNumber;
 
 // The following schema will be for the data being sent here by the
 // VgwDataRouter application. It sends us raw binary data which 

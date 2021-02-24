@@ -304,6 +304,25 @@
         information and assign that meta data values to other optional attributes in this
         output port. 
         
+        In addition to sending the binary speech data on this port, this operator will
+        also send End Of Call Signal (EOCS) on this port whenever a particular
+        voice channel of an ongoing call closes its WebSocket connection. So, this operator 
+        produces periodic output tuples to give an indication about the end of a 
+        specific speaker (i.e. channel) in a voice call that was in progress moments ago for 
+        the given IBM Voice Gateway session id. When it sends EOCS, it only sets values to 
+        certain attributes of the output stream as shown here. 
+        rstring vgwSessionId, boolean isCustomerSpeechData, int32 vgwVoiceChannelNumber, boolean endOfCallSignal
+        This source operator will set the appropriate values for these attributes to 
+        indicate which particular speaker (i.e. voice channel number) of a given voice call 
+        (i.e. session id) just ended the conversation. This tuple also has an attribute 
+        (i.e. isCustomerSpeechData) to tell whether that recently ended voice channel
+        carried the speech data of a customer or an agent. More importantly, it will set
+        a value of true for the endOfCallSignal attribute to indicate that it is an EOCS message and not a 
+        binary speech message. It was decided to use the same output port to send both of these 
+        messages in order to avoid any port locks and/or tuple ordering issues that may happen if we choose to 
+        do it using two different output ports. Downstream operators can make use of this 
+        "End Of Voice Call" signal as they see fit.
+        
         **There are multiple available output functions**, and output attributes can also be 
         assigned values with any SPL expression that evaluates to the proper type. 
         </description>
@@ -319,31 +338,7 @@
         <tupleMutationAllowed>false</tupleMutationAllowed>
         <cardinality>1</cardinality>
         <optional>false</optional>
-      </outputPortSet> 
-      
-      <outputPortSet>
-        <description>
-        This port produces periodic output tuples to give an indication about the end of a 
-        specific speaker (i.e. channel) in a voice call that was in progress moments ago for 
-        the given IBM Voice Gateway session id. The schema for this port must have these 
-        three attributes with their correct data types as shown here. 
-        rstring vgwSessionId, boolean isCustomerSpeechData, int32 vgwVoiceChannelNumber
-        This source operator will set the appropriate values for these attributes to 
-        indicate which particular speaker (i.e. voice channel number) of a given voice call 
-        (i.e. session id) just ended the conversation. This tuple also has an attribute 
-        (i.e. isCustomerSpeechData) to tell whether that recently ended voice channel
-        carried the speech data of a customer or an agent. Downstream operators can make 
-        use of this "End Of Voice Call" signal as they see fit.
-        </description>
-        <expressionMode>Expression</expressionMode>
-        <autoAssignment>false</autoAssignment>
-        <completeAssignment>false</completeAssignment>
-        <rewriteAllowed>true</rewriteAllowed>
-        <windowPunctuationOutputMode>Free</windowPunctuationOutputMode>
-        <tupleMutationAllowed>false</tupleMutationAllowed>
-        <cardinality>1</cardinality>
-        <optional>false</optional>
-      </outputPortSet>
+      </outputPortSet>       
     </outputPorts>
   </cppOperatorModel>
 </operatorModel>

@@ -8,7 +8,7 @@
 /*
 ============================================================
 First created on: Sep/20/2019
-Last modified on: Feb/07/2021
+Last modified on: Feb/09/2021
 
 Please refer to the sttgateway-tech-brief.txt file in the 
 top-level directory of this toolkit to read about 
@@ -87,6 +87,15 @@ using websocketpp::lib::bind;
 	my $audioOutputAsBlob = undef;	
 	my $outputAttrs1 = $outputPort1->getAttributes();
 	my $speechAttributeFound = 0;
+	my $vgwSessionIdAsString = undef;
+	my $vgwSessionIdAttributeFound = 0;
+	my $isCustomerSpeechDataAsBoolean = undef;	
+	my $isCustomerSpeechDataAttributeFound = 0;
+	my $vgwVoiceChannelNumberAsInt32 = undef;	
+	my $vgwVoiceChannelNumberAttributeFound = 0;
+	my $endOfCallSignalAsBoolean = undef;	
+	my $endOfCallSignalAttributeFound = 0;
+
 	
 	foreach my $outputAttr (@$outputAttrs1) {
 		my $outAttrName = $outputAttr->getName();
@@ -100,6 +109,47 @@ using websocketpp::lib::bind;
 				$audioOutputAsBlob = 1;
 			}
 		}
+		
+		if ($outAttrName eq "vgwSessionId") {
+			$vgwSessionIdAttributeFound = 1;
+			
+			if ($outAttrType eq "rstring") {
+				# This tuple attribute will carry the Voice Gateway Session Id.
+				$vgwSessionIdAsString = 1;
+			}
+		}
+		
+		if ($outAttrName eq "isCustomerSpeechData") {
+			$isCustomerSpeechDataAttributeFound = 1;
+			
+			if ($outAttrType eq "boolean") {
+				# This tuple attribute will indicate whether the
+				# given channel of a given voice call carried the 
+				# speech data of a customer or an agent.
+				$isCustomerSpeechDataAsBoolean = 1;
+			}
+		}
+
+		if ($outAttrName eq "vgwVoiceChannelNumber") {
+			$vgwVoiceChannelNumberAttributeFound = 1;
+			
+			if ($outAttrType eq "int32") {
+				# This tuple attribute will indicate the
+				# channel number of given voice call.
+				$vgwVoiceChannelNumberAsInt32 = 1;
+			}
+		}
+		
+		if ($outAttrName eq "endOfCallSignal") {
+			$endOfCallSignalAttributeFound = 1;
+			
+			if ($outAttrType eq "boolean") {
+				# This tuple attribute will indicate whether the
+				# given channel of a given voice call has ended 
+				# sending speech data by closing its WebSocket connection.
+				$endOfCallSignalAsBoolean = 1;
+			}
+		}
 	}
 	
 	if ($speechAttributeFound == 0 ) {
@@ -111,53 +161,7 @@ using websocketpp::lib::bind;
 		SPL::CodeGen::exitln(SttGatewayResource::STTGW_OUT_ATTRIBUTE_TYPE_CHECK1("IBMVoiceGatewaySource", "speech", "blob"),
 				$model->getContext()->getSourceLocation());
 	}
-	
-	# Check the output port number 1 i.e. the second output port.
-	my $outputPort2 = $model->getOutputPortAt(1);
-	my $outputTupleName2 = $outputPort2->getCppTupleName();
-	my $vgwSessionIdAsString = undef;	
-	my $outputAttrs2 = $outputPort2->getAttributes();
-	my $vgwSessionIdAttributeFound = 0;
-	my $isCustomerSpeechDataAsBoolean = undef;	
-	my $isCustomerSpeechDataAttributeFound = 0;
-	my $vgwVoiceChannelNumberAsInt32 = undef;	
-	my $vgwVoiceChannelNumberAttributeFound = 0;
-	
-	foreach my $outputAttr2 (@$outputAttrs2) {
-		my $outAttrName2 = $outputAttr2->getName();
-		my $outAttrType2 = $outputAttr2->getSPLType();
-		
-		if ($outAttrName2 eq "vgwSessionId") {
-			$vgwSessionIdAttributeFound = 1;
-			
-			if ($outAttrType2 eq "rstring") {
-				# This tuple attribute will carry the Voice Gateway Session Id.
-				$vgwSessionIdAsString = 1;
-			}
-		}
-		
-		if ($outAttrName2 eq "isCustomerSpeechData") {
-			$isCustomerSpeechDataAttributeFound = 1;
-			
-			if ($outAttrType2 eq "boolean") {
-				# This tuple attribute will indicate whether the
-				# given channel of a given voice call carried the 
-				# speech data of a customer or an agent.
-				$isCustomerSpeechDataAsBoolean = 1;
-			}
-		}
 
-		if ($outAttrName2 eq "vgwVoiceChannelNumber") {
-			$vgwVoiceChannelNumberAttributeFound = 1;
-			
-			if ($outAttrType2 eq "int32") {
-				# This tuple attribute will indicate the
-				# channel number of given voice call.
-				$vgwVoiceChannelNumberAsInt32 = 1;
-			}
-		}
-	}
-	
 	if ($vgwSessionIdAttributeFound == 0 ) {
 		SPL::CodeGen::exitln(SttGatewayResource::STTGW_OUT_ATTRIBUTE_CHECK2("IBMVoiceGatewaySource", "vgwSessionId"),
 				$model->getContext()->getSourceLocation());
@@ -185,6 +189,16 @@ using websocketpp::lib::bind;
 	
 	if (!(defined($vgwVoiceChannelNumberAsInt32))) {
 		SPL::CodeGen::exitln(SttGatewayResource::STTGW_OUT_ATTRIBUTE_TYPE_CHECK2("IBMVoiceGatewaySource", "vgwVoiceChannelNumber", "int32"),
+				$model->getContext()->getSourceLocation());
+	}
+
+	if ($endOfCallSignalAttributeFound == 0 ) {
+		SPL::CodeGen::exitln(SttGatewayResource::STTGW_OUT_ATTRIBUTE_CHECK2("IBMVoiceGatewaySource", "endOfCallSignal"),
+				$model->getContext()->getSourceLocation());
+	}
+	
+	if (!(defined($endOfCallSignalAsBoolean))) {
+		SPL::CodeGen::exitln(SttGatewayResource::STTGW_OUT_ATTRIBUTE_TYPE_CHECK2("IBMVoiceGatewaySource", "endOfCallSignal", "boolean"),
 				$model->getContext()->getSourceLocation());
 	}
 	
@@ -1035,11 +1049,12 @@ void MY_OPERATOR::on_message(EndpointType* s, websocketpp::connection_hdl hdl,
 					if (vgwSessionIdFoundInMap == true) {
 						// Send the "End of Voice Call" signal now for this
 						// vgwSessionId_vgwVoiceChannelNumber combo.
-						OPort1Type oTuple;
+						OPort0Type oTuple;
 						oTuple.set_vgwSessionId(con_metadata.vgwSessionId);
 						oTuple.set_isCustomerSpeechData(con_metadata.vgwIsCaller);
 						oTuple.set_vgwVoiceChannelNumber(con_metadata.vgwVoiceChannelNumber);
-						submit(oTuple, 1);
+						oTuple.set_endOfCallSignal(true);
+						submit(oTuple, 0);
 						
 						if (vgwSessionLoggingNeeded == true) {
 							SPLAPPTRC(L_ERROR, "Operator " << operatorPhysicalName <<
@@ -1135,17 +1150,19 @@ void MY_OPERATOR::on_message(EndpointType* s, websocketpp::connection_hdl hdl,
 								// vgwSessionId_vgwVoiceChannelNumber combo.
 								// Send it for voice channel 1 which is an 
 								// agent channel most of the time.
-								OPort1Type oTuple;
+								OPort0Type oTuple;
 								oTuple.set_vgwSessionId(*it);
 								oTuple.set_isCustomerSpeechData(false);
 								oTuple.set_vgwVoiceChannelNumber(1);
-								submit(oTuple, 1);
+								oTuple.set_endOfCallSignal(true);
+								submit(oTuple, 0);
 								// Do the same for voice channel 2 which is a
 								// customer channel most of the time.
 								oTuple.set_vgwSessionId(*it);
 								oTuple.set_isCustomerSpeechData(true);
 								oTuple.set_vgwVoiceChannelNumber(2);
-								submit(oTuple, 1);
+								oTuple.set_endOfCallSignal(true);
+								submit(oTuple, 0);
 								
 								// We have a map where the agent and caller phone numbers of a given
 								// call session id are stored. Since this call has gone stale,
@@ -1205,11 +1222,12 @@ void MY_OPERATOR::on_message(EndpointType* s, websocketpp::connection_hdl hdl,
 									// do its own clean-up and release of the STT engines.
 									// Send the "End of Voice Call" signal now for this
 									// vgwSessionId_vgwVoiceChannelNumber combo.
-									OPort1Type oTuple;
+									OPort0Type oTuple;
 									oTuple.set_vgwSessionId(cmd.vgwSessionId);
 									oTuple.set_isCustomerSpeechData(cmd.vgwIsCaller);
 									oTuple.set_vgwVoiceChannelNumber(cmd.vgwVoiceChannelNumber);
-									submit(oTuple, 1);
+									oTuple.set_endOfCallSignal(true);
+									submit(oTuple, 0);
 									
 									// Added this logic on Sep/04/2020.
 									// We have a map where the agent and caller phone numbers of a given
@@ -1368,6 +1386,7 @@ void MY_OPERATOR::on_message(EndpointType* s, websocketpp::connection_hdl hdl,
 			speechBlob.setData((unsigned char*)payloadBuffer, (uint64_t)payloadSize);
 			OPort0Type oTuple;
 			oTuple.set_speech(speechBlob);
+			oTuple.set_endOfCallSignal(false);
 			
 			// Now let us set any attributes that the caller of this operator is trying to
 			// assign through this operator's output functions.
@@ -1565,11 +1584,12 @@ void MY_OPERATOR::on_close(websocketpp::connection_hdl hdl) {
 	if (vgwSessionIdFoundInMap == true && con_metadata.vgwVoiceChannelNumber > 0) {
 		// Send the "End of Voice Call" signal now for this
 		// vgwSessionId_vgwVoiceChannelNumber combo.
-		OPort1Type oTuple;
+		OPort0Type oTuple;
 		oTuple.set_vgwSessionId(con_metadata.vgwSessionId);
 		oTuple.set_isCustomerSpeechData(con_metadata.vgwIsCaller);
 		oTuple.set_vgwVoiceChannelNumber(con_metadata.vgwVoiceChannelNumber);
-		submit(oTuple, 1);
+		oTuple.set_endOfCallSignal(true);
+		submit(oTuple, 0);
 		
 		if (vgwSessionLoggingNeeded == true) {
 			SPLAPPTRC(L_ERROR, "Operator " << operatorPhysicalName <<
@@ -1688,17 +1708,19 @@ void MY_OPERATOR::on_close(websocketpp::connection_hdl hdl) {
 				// vgwSessionId_vgwVoiceChannelNumber combo.
 				// Send it for voice channel 1 which is an 
 				// agent channel most of the time.
-				OPort1Type oTuple;
+				OPort0Type oTuple;
 				oTuple.set_vgwSessionId(*it);
 				oTuple.set_isCustomerSpeechData(false);
 				oTuple.set_vgwVoiceChannelNumber(1);
-				submit(oTuple, 1);
+				oTuple.set_endOfCallSignal(true);
+				submit(oTuple, 0);
 				// Do the same for voice channel 2 which is a
 				// customer channel most of the time.
 				oTuple.set_vgwSessionId(*it);
 				oTuple.set_isCustomerSpeechData(true);
 				oTuple.set_vgwVoiceChannelNumber(2);
-				submit(oTuple, 1);
+				oTuple.set_endOfCallSignal(true);
+				submit(oTuple, 0);
 				
 				// We have a map where the agent and caller phone numbers of a given
 				// call session id are stored. Since this call has gone stale,
@@ -1758,11 +1780,12 @@ void MY_OPERATOR::on_close(websocketpp::connection_hdl hdl) {
 					// do its own clean-up and release of the STT engines.
 					// Send the "End of Voice Call" signal now for this
 					// vgwSessionId_vgwVoiceChannelNumber combo.
-					OPort1Type oTuple;
+					OPort0Type oTuple;
 					oTuple.set_vgwSessionId(cmd.vgwSessionId);
 					oTuple.set_isCustomerSpeechData(cmd.vgwIsCaller);
 					oTuple.set_vgwVoiceChannelNumber(cmd.vgwVoiceChannelNumber);
-					submit(oTuple, 1);
+					oTuple.set_endOfCallSignal(true);
+					submit(oTuple, 0);
 					
 					// Added this logic on Sep/04/2020.
 					// We have a map where the agent and caller phone numbers of a given

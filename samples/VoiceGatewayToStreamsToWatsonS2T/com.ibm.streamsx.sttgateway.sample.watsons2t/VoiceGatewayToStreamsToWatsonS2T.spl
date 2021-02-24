@@ -8,7 +8,7 @@
 /*
 ==============================================
 First created on: Oct/28/2019
-Last modified on: Feb/02/2021
+Last modified on: Feb/10/2021
 
 A) What does this example application do?
    --------------------------------------
@@ -428,6 +428,9 @@ public composite VoiceGatewayToStreamsToWatsonS2T {
 		//                                 Whoever (caller or agent) sends the first round of 
 		//                                 speech data bytes will get assigned a voice channel of 1. 
 		//                                 The next one to follow will get assigned a voice channel of 2.
+		// boolean endOfCallSignal     --> This attribute will be set to true by the IBMVoiceGatewaySource
+		//                                 operator when it sends an EOCS for a voice channel. It will be
+		//                                 set to false by that operator when it sends binary speech data.
 		// rstring id --> This attribute is needed by the WatsonS2T operator. 
 		//                It is set to vgwSessionId_vgwVoiceChannelNumber
 		// rstring callStartDateTime --> Call start date time i.e. system clock time.
@@ -438,18 +441,11 @@ public composite VoiceGatewayToStreamsToWatsonS2T {
 		// int32 s2tEngineId --> This attribute will be set in the next operator. (Please, read the comments there.)
 		// int32 s2tResultProcessorId --> This attribute will be set in the next operator. (Please, read the comments there.)
 		BinarySpeech_t = blob speech, rstring vgwSessionId, boolean isCustomerSpeechData, 
-			int32 vgwVoiceChannelNumber, rstring id, rstring callStartDateTime, 
+			int32 vgwVoiceChannelNumber, boolean endOfCallSignal,
+			rstring id, rstring callStartDateTime, 
 			rstring callerPhoneNumber, rstring agentPhoneNumber, 
 			int32 speechDataFragmentCnt, int32 totalSpeechDataBytesReceived, 
 			int32 s2tEngineId, int32 s2tResultProcessorId;
-		// The following schema is for the second output stream of the
-		// IBMVoiceGatewaySource operator. It has three attributes indicating
-		// the speaker channel (vgwVoiceChannelNumber) of a given voice call (vgwSessionId) who
-		// got completed with the call as well as an indicator (isCustomerSpeechData) to 
-		// denote whether the speech data we received on this channel belonged
-		// to a caller or an agent.
-		EndOfCallSignal_t = rstring vgwSessionId, 
-			boolean isCustomerSpeechData, int32 vgwVoiceChannelNumber;
 			
 		// The following schema is for the call recording feature where we will
 		// store the call metadata details for a specific voice channel of a given
@@ -498,8 +494,7 @@ public composite VoiceGatewayToStreamsToWatsonS2T {
 		// your own needs of further analytics on the S2T results as well as
 		// specific ways of delivering the S2T results to other 
 		// downstream systems rather than only writing to files as this example does below.
-		(stream<BinarySpeech_t> BinarySpeechData as BSD;
-		 stream<EndOfCallSignal_t> EndOfCallSignal as EOCS) as VoiceGatewayInterface = 
+		(stream<BinarySpeech_t> BinarySpeechData as BSD) as VoiceGatewayInterface = 
 			IBMVoiceGatewaySource() {
 			logic
 				state: {
@@ -567,15 +562,13 @@ public composite VoiceGatewayToStreamsToWatsonS2T {
 		// real-time voice calls.
 		//
 		@parallel(width=$numberOfCallReplayEngines)
-		(stream<BinarySpeech_t> PreRecordedBinarySpeechData;
-		 stream<EndOfCallSignal_t> PreRecordedEndOfCallSignal) as 
+		(stream<BinarySpeech_t> PreRecordedBinarySpeechData) as 
 		 VoiceCallReplayer = CallRecordingReplay(CallReplaySignalFileName) {
 		 	param
 		 		callRecordingReadDirectory: $callRecordingReadDirectory;
 		 		// Pass these stream types as composite operator parameters.
 		 		callMetaData_t: CallMetaData_t;
 		 		binarySpeech_t: BinarySpeech_t;
-		 		endOfCallSignal_t: EndOfCallSignal_t;
 		 }
 
 		// We have to always route the speech data bytes (fragments) coming from  
@@ -599,8 +592,7 @@ public composite VoiceGatewayToStreamsToWatsonS2T {
 		// That special logic happens inside this operator.
 		(stream<BinarySpeech_t> BinarySpeechDataFragment as BSDF) as
 			BinarySpeechDataRouter = Custom(
-			BinarySpeechData, PreRecordedBinarySpeechData as BSD;
-			EndOfCallSignal, PreRecordedEndOfCallSignal as EOCS) {
+			BinarySpeechData, PreRecordedBinarySpeechData as BSD) {
 			logic
 				state: {
 					// This map tells us which UDP channel is processing a 
@@ -628,209 +620,172 @@ public composite VoiceGatewayToStreamsToWatsonS2T {
 				onTuple BSD: {
 					// Get the sessionId + channelNumber combo string.
 					_key = BSD.vgwSessionId + "_" + (rstring)BSD.vgwVoiceChannelNumber;
-					
-					// Check if this vgwSessionId_vgwVoiceChannelNumber combo already 
-					// has an S2T engine allocated for it via an UDP channel.					
-					if (has(_vgwSessionIdToUdpChannelMap, _key) == true) {
-						// This is a speaker of an ongoing voice call who has 
-						// already been assigned to an S2T engine.
-						// Always send this speaker's speech data fragment to 
-						// that same S2T engine.
-						BSD.s2tEngineId = _vgwSessionIdToUdpChannelMap[_key];
-						// We can always assume that there is a preselected 
-						// S2T result processor UDP channel available for this 
-						// voice call (i.e. vgwSessionId). Because, it is already 
-						// done in the else block below when this voice call's 
-						// first speaker's speech data arrives here.
-						// Let us fetch and assign it here.
-						if (has(_vgwSessionToResultProcessorChannelMap, 
-							BSD.vgwSessionId) == true) {
-							BSD.s2tResultProcessorId = 
-								_vgwSessionToResultProcessorChannelMap[BSD.vgwSessionId];
-						} else {
-							// This should never happen since the call will end
-							// for both the speakers almost at the same time after 
-							// which there will be no speech data from any of the
-							// speakers participating in a given voice call.
-							// This else block is just part of defensive coding.
-							appTrc(Trace.error, 
-								"_XXXXX No S2T result processor engine available at this time for the " +
-								"vgwSessionId_vgwVoiceChannelNumber: " + _key + 
-								". This should be a rare occurrence towards the very end of the call." + 
-								" We are not going to process the speech data bytes" +
-								" of this speaker in this voice call.");
-							return;
-						}
-					} else {
-						// If we are here, that means this is a brand new speaker of a
-						// voice call for whom we must find an idle UDP channel a.k.a
-						// an idle S2T engine that can process this speaker's speech data.
-						int32 myS2TEngineId = getAnIdleUdpChannel(_idleUdpChannelsList);
-						
-						if (myS2TEngineId == -1) {
-							// This is not good and we should never end up in this situation.
-							// This means we have not provisioned sufficient number of S2T engines to
-							// handle the maximum planned concurrent calls. We have to ignore this
-							// speech data fragment and hope that an idle UDP channel number will
-							// become available by the time the next speech data fragment for this
-							// particular vgwSessionId_vgwVoiceChannelNumber combo arrives here. 
-							if (BSD.speechDataFragmentCnt == 1) {
-								// Display this alert only for the very first data fragment of a 
-								// given speaker of a given voice call.
-								appTrc(Trace.error, "No idle S2T engine available at this time for the " +
+
+					// We will get the regular binary speech data and the End Of Call Signal (EOCS) in
+					// the same input stream. This design change was done on Feb/09/2021 to avoid any
+					// any port locks and/or tuple ordering issues that may happen if we choose to 
+        			// do it using two different output ports. The incoming tuple has an attribute
+        			// that is set to true or false by the IBMVoiceGatewaySource operator to indicate
+        			// whether it is sending binary speech data or an EOCS.
+        			if(BSD.endOfCallSignal == false) {
+        				// The incoming tuple contains binary speech data.
+						//										
+						// Check if this vgwSessionId_vgwVoiceChannelNumber combo already 
+						// has an S2T engine allocated for it via an UDP channel.					
+						if (has(_vgwSessionIdToUdpChannelMap, _key) == true) {
+							// This is a speaker of an ongoing voice call who has 
+							// already been assigned to an S2T engine.
+							// Always send this speaker's speech data fragment to 
+							// that same S2T engine.
+							BSD.s2tEngineId = _vgwSessionIdToUdpChannelMap[_key];
+							// We can always assume that there is a preselected 
+							// S2T result processor UDP channel available for this 
+							// voice call (i.e. vgwSessionId). Because, it is already 
+							// done in the else block below when this voice call's 
+							// first speaker's speech data arrives here.
+							// Let us fetch and assign it here.
+							if (has(_vgwSessionToResultProcessorChannelMap, 
+								BSD.vgwSessionId) == true) {
+								BSD.s2tResultProcessorId = 
+									_vgwSessionToResultProcessorChannelMap[BSD.vgwSessionId];
+							} else {
+								// This should never happen since the call will end
+								// for both the speakers almost at the same time after 
+								// which there will be no speech data from any of the
+								// speakers participating in a given voice call.
+								// This else block is just part of defensive coding.
+								appTrc(Trace.error, 
+									"_XXXXX No S2T result processor engine available at this time for the " +
 									"vgwSessionId_vgwVoiceChannelNumber: " + _key + 
-									". There are " + (rstring)$numberOfS2TEngines +
-									" S2T engines configured and they are all processing other" +
-									" voice calls at this time. Please start sufficient number of S2T engines" +
-									" next time to handle your maximum expected concurrent calls." +
-									" A rule of thumb is to have two S2T engines to process" +
-									" two speakers in every given concurrent voice call.");
+									". This should be a rare occurrence towards the very end of the call." + 
+									" We are not going to process the speech data bytes" +
+									" of this speaker in this voice call.");
+								return;
 							}
-
-							return;	
 						} else {
-							// We got an idle S2T engine.
-							BSD.s2tEngineId = myS2TEngineId;
-
-							// If this call is just beginning, then we will create a
-							// tiny text file to indicate that we started receiving 
-							// speech data from the IBM Voice Gateway for this new call.
-							rstring key1 = BSD.vgwSessionId + "_" + "1";
-							rstring key2 = BSD.vgwSessionId + "_" + "2";
+							// If we are here, that means this is a brand new speaker of a
+							// voice call for whom we must find an idle UDP channel a.k.a
+							// an idle S2T engine that can process this speaker's speech data.
+							int32 myS2TEngineId = getAnIdleUdpChannel(_idleUdpChannelsList);
 							
-							// If we have not yet created any entry in our state map for this call,
-							// then we can be sure that it is the start of this call.
-							if (has(_vgwSessionIdToUdpChannelMap, key1) == false &&
-								has(_vgwSessionIdToUdpChannelMap, key2) == false) {
-								// We can now write a "Start of Call" indicator file in the
-								// application's data directory. e-g: 5362954-call-started.txt
-								mutable int32 err = 0ul;
-								rstring socsFileName = dataDirectory() + "/" +
-									BSD.vgwSessionId + "-call-started.txt";
-								uint64 fileHandle = fopen (socsFileName, "w+", err);
+							if (myS2TEngineId == -1) {
+								// This is not good and we should never end up in this situation.
+								// This means we have not provisioned sufficient number of S2T engines to
+								// handle the maximum planned concurrent calls. We have to ignore this
+								// speech data fragment and hope that an idle UDP channel number will
+								// become available by the time the next speech data fragment for this
+								// particular vgwSessionId_vgwVoiceChannelNumber combo arrives here. 
+								if (BSD.speechDataFragmentCnt == 1) {
+									// Display this alert only for the very first data fragment of a 
+									// given speaker of a given voice call.
+									appTrc(Trace.error, "No idle S2T engine available at this time for the " +
+										"vgwSessionId_vgwVoiceChannelNumber: " + _key + 
+										". There are " + (rstring)$numberOfS2TEngines +
+										" S2T engines configured and they are all processing other" +
+										" voice calls at this time. Please start sufficient number of S2T engines" +
+										" next time to handle your maximum expected concurrent calls." +
+										" A rule of thumb is to have two S2T engines to process" +
+										" two speakers in every given concurrent voice call.");
+								}
+	
+								return;	
+							} else {
+								// We got an idle S2T engine.
+								BSD.s2tEngineId = myS2TEngineId;
+	
+								// If this call is just beginning, then we will create a
+								// tiny text file to indicate that we started receiving 
+								// speech data from the IBM Voice Gateway for this new call.
+								rstring key1 = BSD.vgwSessionId + "_" + "1";
+								rstring key2 = BSD.vgwSessionId + "_" + "2";
 								
-								if(err == 0) {
-									fwriteString ("VGW call session id " + BSD.vgwSessionId + 
-										" started at " + ctime(getTimestamp()) + ".", fileHandle, err);
-									fclose(fileHandle, err);
+								// If we have not yet created any entry in our state map for this call,
+								// then we can be sure that it is the start of this call.
+								if (has(_vgwSessionIdToUdpChannelMap, key1) == false &&
+									has(_vgwSessionIdToUdpChannelMap, key2) == false) {
+									// We can now write a "Start of Call" indicator file in the
+									// application's data directory. e-g: 5362954-call-started.txt
+									mutable int32 err = 0ul;
+									rstring socsFileName = dataDirectory() + "/" +
+										BSD.vgwSessionId + "-call-started.txt";
+									uint64 fileHandle = fopen (socsFileName, "w+", err);
+									
+									if(err == 0) {
+										fwriteString ("VGW call session id " + BSD.vgwSessionId + 
+											" started at " + ctime(getTimestamp()) + ".", fileHandle, err);
+										fclose(fileHandle, err);
+									}
+									
+									appTrc(Trace.error, "A new voice call has started. vgwSessionId=" + BSD.vgwSessionId);
 								}
 								
-								appTrc(Trace.error, "A new voice call has started. vgwSessionId=" + BSD.vgwSessionId);
-							}
-							
-							// Insert into the state map for future reference.
-							insertM(_vgwSessionIdToUdpChannelMap, _key, myS2TEngineId);
+								// Insert into the state map for future reference.
+								insertM(_vgwSessionIdToUdpChannelMap, _key, myS2TEngineId);
+									
+								// For this voice call (i.e. vgwSessionId), select a 
+								// single result processor UDP channel. Both speakers in this 
+								// same voice call will use that same result processor instance.
+								// This will ensure that the S2T results for both the speakers 
+								// will reach the same result processor.
+								if (has(_vgwSessionToResultProcessorChannelMap, 
+									BSD.vgwSessionId) == false) {
+									insertM(_vgwSessionToResultProcessorChannelMap,
+										BSD.vgwSessionId, myS2TEngineId);
+								} 
 								
-							// For this voice call (i.e. vgwSessionId), select a 
-							// single result processor UDP channel. Both speakers in this 
-							// same voice call will use that same result processor instance.
-							// This will ensure that the S2T results for both the speakers 
-							// will reach the same result processor.
-							if (has(_vgwSessionToResultProcessorChannelMap, 
-								BSD.vgwSessionId) == false) {
-								insertM(_vgwSessionToResultProcessorChannelMap,
-									BSD.vgwSessionId, myS2TEngineId);
-							} 
-							
-							// Set the S2T result processor id.
-							BSD.s2tResultProcessorId = 
-								_vgwSessionToResultProcessorChannelMap[BSD.vgwSessionId];
-						} // End of if (myS2TEngineId == -1)
-					} // End of if (has(_vgwSessionIdToUdpChannelMap, _key)
-
-					appTrc(Trace.debug, "vgwSessionId=" + BSD.vgwSessionId +
-						", isCustomerSpeechData=" + (rstring)BSD.isCustomerSpeechData +
-						", vgwVoiceChannelNumber=" + (rstring)BSD.vgwVoiceChannelNumber +
-						", speechDataFragmentCnt=" + (rstring)BSD.speechDataFragmentCnt +
-						", totalSpeechDataBytesReceived=" + 
-						(rstring)BSD.totalSpeechDataBytesReceived +
-						", s2tEngineId=" + (rstring)BSD.s2tEngineId +
-						", s2tResultProcessorId=" + (rstring)BSD.s2tResultProcessorId); 
-					// Submit this tuple.
-					submit(BSD, BSDF);
-				} // End of onTuple BSD
-				
-				// Process the end of voice call signal.
-				// Since there are two channels in every voice call,
-				// those two channels will carry their own "End S2T session"
-				// message from the Voice Gateway. The logic below takes care of
-				// handling two End of Call Signals for every voice call.
-				onTuple EOCS: {
-					// Get the allocated S2T engine id for a given 
-					// vgwSessionId_vgwVoiceChannelNumber combo.
-					// We should always have an S2T engine id. If not, that is a 
-					// case where the user didn't provision sufficient number of 
-					// S2T engines and there was no idle S2T engine available for that 
-					// given vgwSessionId_vgwVoiceChannelNumber combo. 
-					// This situation can be avoided by starting the application with a 
-					// sufficient number of S2T engines needed for the anticipated 
-					// maximum concurrent voice calls. A rule of thumb is to have 
-					// two S2T engines to process two speakers in every given 
-					// concurrent voice call.
-					//
-					// Get the sessionId + channelNumber combo string.
-					_key = EOCS.vgwSessionId + "_" + (rstring)EOCS.vgwVoiceChannelNumber;
-					
-					if (has(_vgwSessionIdToUdpChannelMap, _key) == true) {
-						// Let us send an empty blob to the WatsonS2T operator to indicate that
-						// this speaker of a given voice call is done.
-						_oTuple = (BinarySpeech_t){};
-						// Copy the three input tuple attributes that must
-						// match with that of the outgoing tuple.
-						assignFrom(_oTuple, EOCS);
-						// Assign the S2T engine id where this voice channel was
-						// getting processed until now.
-						_oTuple.s2tEngineId = _vgwSessionIdToUdpChannelMap[_key];
-						// We have to send this tuple to the result processor as well for 
-						// the call recording logic to work correctly.
-						_oTuple.s2tResultProcessorId = 
-							_vgwSessionToResultProcessorChannelMap[EOCS.vgwSessionId];
-						submit(_oTuple, BSDF);
-						// We are now done with this vgwSessionId_vgwVoiceChannelNumber combo.
-						removeM(_vgwSessionIdToUdpChannelMap, _key);
-						// Add the S2T engine id to this call completed map to be released later in the
-						// following if block only after receiving EOCS for both the voice channels of this call.
-						insertM(_vgwSessionToCompletedUdpChannelMap, _key, _oTuple.s2tEngineId);
-					}
-
-					// Senthil added this if block on Feb/01/2020.
-					if($numberOfEocsNeededForVoiceCallCompletion == 1) {
-						// If the user configured this application to handle
-						// only one EOCS to treat a voice call as completed, then we
-						// will try to clean-up the other voice channel if it exists.
-						mutable int32 otherVgwVoiceChannelNumber = 1;
-						
-						if(EOCS.vgwVoiceChannelNumber == 1) {
-							otherVgwVoiceChannelNumber = 2;
-						}
-						
-						// Get the sessionId + channelNumber combo string.
-						_key = EOCS.vgwSessionId + "_" + (rstring)otherVgwVoiceChannelNumber;
-						
+								// Set the S2T result processor id.
+								BSD.s2tResultProcessorId = 
+									_vgwSessionToResultProcessorChannelMap[BSD.vgwSessionId];
+							} // End of if (myS2TEngineId == -1)
+						} // End of if (has(_vgwSessionIdToUdpChannelMap, _key)
+	
+						appTrc(Trace.debug, "vgwSessionId=" + BSD.vgwSessionId +
+							", isCustomerSpeechData=" + (rstring)BSD.isCustomerSpeechData +
+							", vgwVoiceChannelNumber=" + (rstring)BSD.vgwVoiceChannelNumber +
+							", speechDataFragmentCnt=" + (rstring)BSD.speechDataFragmentCnt +
+							", totalSpeechDataBytesReceived=" + 
+							(rstring)BSD.totalSpeechDataBytesReceived +
+							", s2tEngineId=" + (rstring)BSD.s2tEngineId +
+							", s2tResultProcessorId=" + (rstring)BSD.s2tResultProcessorId); 
+						// Submit this tuple.
+						submit(BSD, BSDF);
+					} else {
+						// The incoming tuple contains an End of Call Signal (EOCS).
+						appTrc(Trace.error, "Received an EOCS. vgwSessionId=" + BSD.vgwSessionId +
+							", voiceChannelNumber=" + (rstring)BSD.vgwVoiceChannelNumber);
+						//
+						// Process the end of voice call signal.
+						// Since there are two channels in every voice call,
+						// those two channels will carry their own "End S2T session"
+						// message from the Voice Gateway. The logic below takes care of
+						// handling two End of Call Signals for every voice call.
+						//
+						// Get the allocated S2T engine id for a given 
+						// vgwSessionId_vgwVoiceChannelNumber combo.
+						// We should always have an S2T engine id. If not, that is a 
+						// case where the user didn't provision sufficient number of 
+						// S2T engines and there was no idle S2T engine available for that 
+						// given vgwSessionId_vgwVoiceChannelNumber combo. 
+						// This situation can be avoided by starting the application with a 
+						// sufficient number of S2T engines needed for the anticipated 
+						// maximum concurrent voice calls. A rule of thumb is to have 
+						// two S2T engines to process two speakers in every given 
+						// concurrent voice call.
+						//
 						if (has(_vgwSessionIdToUdpChannelMap, _key) == true) {
 							// Let us send an empty blob to the WatsonS2T operator to indicate that
 							// this speaker of a given voice call is done.
 							_oTuple = (BinarySpeech_t){};
 							// Copy the three input tuple attributes that must
 							// match with that of the outgoing tuple.
-							assignFrom(_oTuple, EOCS);
-							// Override the following two attributes to reflect the other voice channel.
-							// Flip this attribute value.
-							if(_oTuple.isCustomerSpeechData == true) {
-								_oTuple.isCustomerSpeechData = false;
-							} else {
-								_oTuple.isCustomerSpeechData = true;
-							}
-							
-							_oTuple.vgwVoiceChannelNumber = otherVgwVoiceChannelNumber;
-							
+							assignFrom(_oTuple, BSD);
 							// Assign the S2T engine id where this voice channel was
 							// getting processed until now.
 							_oTuple.s2tEngineId = _vgwSessionIdToUdpChannelMap[_key];
 							// We have to send this tuple to the result processor as well for 
 							// the call recording logic to work correctly.
 							_oTuple.s2tResultProcessorId = 
-								_vgwSessionToResultProcessorChannelMap[EOCS.vgwSessionId];
+								_vgwSessionToResultProcessorChannelMap[BSD.vgwSessionId];
 							submit(_oTuple, BSDF);
 							// We are now done with this vgwSessionId_vgwVoiceChannelNumber combo.
 							removeM(_vgwSessionIdToUdpChannelMap, _key);
@@ -838,80 +793,127 @@ public composite VoiceGatewayToStreamsToWatsonS2T {
 							// following if block only after receiving EOCS for both the voice channels of this call.
 							insertM(_vgwSessionToCompletedUdpChannelMap, _key, _oTuple.s2tEngineId);
 						}
-					}
-					
-					// Since this voice call is ending, let us release the S2T result processor 
-					// instance that was allocated above for this voice call.
-					if (has(_vgwSessionToResultProcessorChannelMap, 
-						EOCS.vgwSessionId) == true) {
-						// Let us remove the result processor id only after the logic
-						// in the previous if-block took care of sending the EOCS for 
-						// both the voice channels in a given voice call.
-						// Checking for this condition is important for the
-						// call recording logic inside the S2T result processor 
-						// composite to work correctly. 
-						rstring key1 = EOCS.vgwSessionId + "_" + "1";
-						rstring key2 = EOCS.vgwSessionId + "_" + "2";
-						
-						// Remove the result processor id only if the EOCS signal
-						// was sent for both of the voice channels. That must first 
-						// happen before we can release the result processor id.
-						//
-						// This if condition was changed by Senthil on 
-						// Feb/01/2021 for the following reason.
-						// If the user configured this application to handle
-						// a single EOCS as sufficient to consider a voice call
-						// completed for a given VGW session id, we will use the 
-						// second || i.e. OR condition. Please refer to the 
-						// constant i.e. expression declaration section above to 
-						// read the commentary about this idea.
-						//
-						if (($numberOfEocsNeededForVoiceCallCompletion == 2 &&
-							(has(_vgwSessionIdToUdpChannelMap, key1) == false &&
-							has(_vgwSessionIdToUdpChannelMap, key2) == false)) || 
-							($numberOfEocsNeededForVoiceCallCompletion == 1 &&
-							(has(_vgwSessionIdToUdpChannelMap, key1) == false ||
-							has(_vgwSessionIdToUdpChannelMap, key2) == false))) {
-							removeM(_vgwSessionToResultProcessorChannelMap, EOCS.vgwSessionId);
+	
+						// Senthil added this if block on Feb/01/2020.
+						if($numberOfEocsNeededForVoiceCallCompletion == 1) {
+							// If the user configured this application to handle
+							// only one EOCS to treat a voice call as completed, then we
+							// will try to clean-up the other voice channel if it exists.
+							mutable int32 otherVgwVoiceChannelNumber = 1;
 							
-							// Since the voice call for this VGW session id has ended completely,
-							// we can also release the S2T engine(s) assigned for this call so that 
-							// they can be repurposed for handling any new future calls.
-							// We can go ahead and release the S2T engine by adding it back to 
-							// the idle UDP channels list.
-							if(has(_vgwSessionToCompletedUdpChannelMap, key1) == true) {
-								appendM(_idleUdpChannelsList, _vgwSessionToCompletedUdpChannelMap[key1]);
-								// We are done. Remove it from the map as well.
-								removeM(_vgwSessionToCompletedUdpChannelMap, key1);
-							}
-
-							if(has(_vgwSessionToCompletedUdpChannelMap, key2) == true) {
-								appendM(_idleUdpChannelsList, _vgwSessionToCompletedUdpChannelMap[key2]);
-								// We are done. Remove it from the map as well.
-								removeM(_vgwSessionToCompletedUdpChannelMap, key2);
+							if(BSD.vgwVoiceChannelNumber == 1) {
+								otherVgwVoiceChannelNumber = 2;
 							}
 							
-							// At this time, the voice call for this VGW session id has ended.
-							// We can now write an "End of Call" indicator file in the
-							// application's data directory. e-g: 5362954-call-completed.txt
-							mutable int32 err = 0ul;
-							rstring eocsFileName = dataDirectory() + "/" +
-								EOCS.vgwSessionId + "-call-completed.txt";
-							uint64 fileHandle = fopen (eocsFileName, "w+", err);
+							// Get the sessionId + channelNumber combo string.
+							_key = BSD.vgwSessionId + "_" + (rstring)otherVgwVoiceChannelNumber;
 							
-							if(err == 0) {
-								fwriteString ("VGW call session id " + EOCS.vgwSessionId + 
-									" ended at " + ctime(getTimestamp()) + ".", fileHandle, err);
-								fclose(fileHandle, err);
+							if (has(_vgwSessionIdToUdpChannelMap, _key) == true) {
+								// Let us send an empty blob to the WatsonS2T operator to indicate that
+								// this speaker of a given voice call is done.
+								_oTuple = (BinarySpeech_t){};
+								// Copy the three input tuple attributes that must
+								// match with that of the outgoing tuple.
+								assignFrom(_oTuple, BSD);
+								// Override the following two attributes to reflect the other voice channel.
+								// Flip this attribute value.
+								if(_oTuple.isCustomerSpeechData == true) {
+									_oTuple.isCustomerSpeechData = false;
+								} else {
+									_oTuple.isCustomerSpeechData = true;
+								}
+								
+								_oTuple.vgwVoiceChannelNumber = otherVgwVoiceChannelNumber;
+								
+								// Assign the S2T engine id where this voice channel was
+								// getting processed until now.
+								_oTuple.s2tEngineId = _vgwSessionIdToUdpChannelMap[_key];
+								// We have to send this tuple to the result processor as well for 
+								// the call recording logic to work correctly.
+								_oTuple.s2tResultProcessorId = 
+									_vgwSessionToResultProcessorChannelMap[BSD.vgwSessionId];
+								submit(_oTuple, BSDF);
+								// We are now done with this vgwSessionId_vgwVoiceChannelNumber combo.
+								removeM(_vgwSessionIdToUdpChannelMap, _key);
+								// Add the S2T engine id to this call completed map to be released later in the
+								// following if block only after receiving EOCS for both the voice channels of this call.
+								insertM(_vgwSessionToCompletedUdpChannelMap, _key, _oTuple.s2tEngineId);
 							}
-							
-							appTrc(Trace.error, "An ongoing voice call has completed. vgwSessionId=" + EOCS.vgwSessionId);
 						}
-					}
-				}
+						
+						// Since this voice call is ending, let us release the S2T result processor 
+						// instance that was allocated above for this voice call.
+						if (has(_vgwSessionToResultProcessorChannelMap, 
+							BSD.vgwSessionId) == true) {
+							// Let us remove the result processor id only after the logic
+							// in the previous if-block took care of sending the EOCS for 
+							// both the voice channels in a given voice call.
+							// Checking for this condition is important for the
+							// call recording logic inside the S2T result processor 
+							// composite to work correctly. 
+							rstring key1 = BSD.vgwSessionId + "_" + "1";
+							rstring key2 = BSD.vgwSessionId + "_" + "2";
+							
+							// Remove the result processor id only if the EOCS signal
+							// was sent for both of the voice channels. That must first 
+							// happen before we can release the result processor id.
+							//
+							// This if condition was changed by Senthil on 
+							// Feb/01/2021 for the following reason.
+							// If the user configured this application to handle
+							// a single EOCS as sufficient to consider a voice call
+							// completed for a given VGW session id, we will use the 
+							// second || i.e. OR condition. Please refer to the 
+							// constant i.e. expression declaration section above to 
+							// read the commentary about this idea.
+							//
+							if (($numberOfEocsNeededForVoiceCallCompletion == 2 &&
+								(has(_vgwSessionIdToUdpChannelMap, key1) == false &&
+								has(_vgwSessionIdToUdpChannelMap, key2) == false)) || 
+								($numberOfEocsNeededForVoiceCallCompletion == 1 &&
+								(has(_vgwSessionIdToUdpChannelMap, key1) == false ||
+								has(_vgwSessionIdToUdpChannelMap, key2) == false))) {
+								removeM(_vgwSessionToResultProcessorChannelMap, BSD.vgwSessionId);
+								
+								// Since the voice call for this VGW session id has ended completely,
+								// we can also release the S2T engine(s) assigned for this call so that 
+								// they can be repurposed for handling any new future calls.
+								// We can go ahead and release the S2T engine by adding it back to 
+								// the idle UDP channels list.
+								if(has(_vgwSessionToCompletedUdpChannelMap, key1) == true) {
+									appendM(_idleUdpChannelsList, _vgwSessionToCompletedUdpChannelMap[key1]);
+									// We are done. Remove it from the map as well.
+									removeM(_vgwSessionToCompletedUdpChannelMap, key1);
+								}
+	
+								if(has(_vgwSessionToCompletedUdpChannelMap, key2) == true) {
+									appendM(_idleUdpChannelsList, _vgwSessionToCompletedUdpChannelMap[key2]);
+									// We are done. Remove it from the map as well.
+									removeM(_vgwSessionToCompletedUdpChannelMap, key2);
+								}
+								
+								// At this time, the voice call for this VGW session id has ended.
+								// We can now write an "End of Call" indicator file in the
+								// application's data directory. e-g: 5362954-call-completed.txt
+								mutable int32 err = 0ul;
+								rstring eocsFileName = dataDirectory() + "/" +
+									BSD.vgwSessionId + "-call-completed.txt";
+								uint64 fileHandle = fopen (eocsFileName, "w+", err);
+								
+								if(err == 0) {
+									fwriteString ("VGW call session id " + BSD.vgwSessionId + 
+										" ended at " + ctime(getTimestamp()) + ".", fileHandle, err);
+									fclose(fileHandle, err);
+								}
+								
+								appTrc(Trace.error, "An ongoing voice call has completed. vgwSessionId=" + BSD.vgwSessionId);
+							}
+						}						
+					} // End of if(BSD.endOfCallSignal == false)
+				} // End of onTuple BSD
 				
 			config
-				threadedPort: queue(BSD, Sys.Wait), queue(EOCS, Sys.Wait);
+				threadedPort: queue(BSD, Sys.Wait);
 		} // End of Custom operator.
 
 		// Invoke one or more instances of the IBMWatsonSpeech2Text composite operator.
@@ -1768,14 +1770,13 @@ public composite CallRecordingWriteCoordinator(input SpeechFragment;
 // parallel region for the purpose of load testing by 
 // replaying many pre-recorded voice calls at the same time.
 public composite CallRecordingReplay(input CallReplaySignalFileNameIn;
-	output PreRecordedBinarySpeechData, PreRecordedEndOfCallSignal) {
+	output PreRecordedBinarySpeechData) {
 	param
 		expression <rstring> $callRecordingReadDirectory;
 		// This composite operator receives externally
 		// defined stream types via operator parameters.
 		type $callMetaData_t;
 		type $binarySpeech_t;
-		type $endOfCallSignal_t;
 	
 	// Replaying the pre-recorded voice calls.
 	// The graph below will perform the logic necessary to
@@ -2008,7 +2009,6 @@ public composite CallRecordingReplay(input CallReplaySignalFileNameIn;
 		// mix both of them and send out a tuple for transcription by
 		// downstream operators.
 		(stream<$binarySpeech_t> PreRecordedBinarySpeechData as PRBSD;
-		 stream<$endOfCallSignal_t> PreRecordedEndOfCallSignal as PREOCS;
 		 stream<uint32 count> Acknowledgement as Ack) as 
 		 PreRecordedCallReplayer = Custom(CallMetaDataVC1, CallMetaDataVC2 as CMD;
 		 	CallSpeechDataVC1, CallSpeechDataVC2 as CSD; TimerSignal as TS) {
@@ -2034,7 +2034,6 @@ public composite CallRecordingReplay(input CallReplaySignalFileNameIn;
 					// waiting for data to be read from the pre-recorded files.
 					mutable rstring lastObservedReplayMapKey = "abcxyz";
 		 			mutable $binarySpeech_t _oTuple1 = {};
-		 			mutable $endOfCallSignal_t _oTuple2 = {};
 		 		}
 		 		
 		 		onTuple CMD: {
@@ -2126,8 +2125,10 @@ public composite CallRecordingReplay(input CallReplaySignalFileNameIn;
 					// We have the call meta data. We can create a new 
 					// binary speech data tuple now and send it out for transcription.
 					// Copy all the call meta data attributes to the outgoing tuple.
+					_oTuple1 = ($binarySpeech_t){};
 					assignFrom(_oTuple1, _callMetaDataMap[key]);
 					_oTuple1.speech = CSD.speech;
+					_oTuple1.endOfCallSignal = false;
 					_oTuple1.speechDataFragmentCnt = _speechDataFragmentCount[key];
 					_oTuple1.totalSpeechDataBytesReceived = _speechDataBytesCount[key];
 					submit(_oTuple1, PRBSD);
@@ -2159,12 +2160,14 @@ public composite CallRecordingReplay(input CallReplaySignalFileNameIn;
 						
 						// Send two EOCS signals one for each voice channel in the given call.
 						for (rstring str in _callMetaDataMap) {
-							_oTuple2.vgwSessionId = _callMetaDataMap[str].vgwSessionId;
-							_oTuple2.isCustomerSpeechData = 
+							_oTuple1 = ($binarySpeech_t){};
+							_oTuple1.vgwSessionId = _callMetaDataMap[str].vgwSessionId;
+							_oTuple1.isCustomerSpeechData = 
 								_callMetaDataMap[str].isCustomerSpeechData;
-							_oTuple2.vgwVoiceChannelNumber = 
+							_oTuple1.vgwVoiceChannelNumber = 
 								_callMetaDataMap[str].vgwVoiceChannelNumber;
-							submit(_oTuple2, PREOCS);
+							_oTuple1.endOfCallSignal = true;
+							submit(_oTuple1, PRBSD);
 						}
 						
 						// Clear all the state maps to be ready for the
@@ -2228,12 +2231,14 @@ public composite CallRecordingReplay(input CallReplaySignalFileNameIn;
 						// we are required to send an EOCS for that voice channel.
 						for (rstring str in _callMetaDataMap) {
 							if (_speechDataTuplesSentCount[str] > 0) {
-								_oTuple2.vgwSessionId = _callMetaDataMap[str].vgwSessionId;
-								_oTuple2.isCustomerSpeechData = 
+								_oTuple1 = ($binarySpeech_t){};
+								_oTuple1.vgwSessionId = _callMetaDataMap[str].vgwSessionId;
+								_oTuple1.isCustomerSpeechData = 
 									_callMetaDataMap[str].isCustomerSpeechData;
-								_oTuple2.vgwVoiceChannelNumber = 
+								_oTuple1.vgwVoiceChannelNumber = 
 									_callMetaDataMap[str].vgwVoiceChannelNumber;
-								submit(_oTuple2, PREOCS);
+								_oTuple1.endOfCallSignal = true;
+								submit(_oTuple1, PRBSD);
 							}
 						}
 						

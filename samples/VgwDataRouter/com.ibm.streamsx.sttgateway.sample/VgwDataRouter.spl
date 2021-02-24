@@ -8,7 +8,7 @@
 /*
 ==============================================
 First created on: Nov/24/2020
-Last modified on: Feb/02/2021
+Last modified on: Feb/10/2021
 
 A) What does this example application do?
    --------------------------------------
@@ -431,8 +431,7 @@ public composite VgwDataRouter {
 		// your own needs of further analytics on the Speech results as well as
 		// specific ways of delivering the Speech results to other 
 		// downstream systems rather than only writing to files as this example does below.
-		(stream<BinarySpeech_t> BinarySpeechData as BSD;
-		 stream<EndOfCallSignal_t> EndOfCallSignal as EOCS) as VgwDataRouterSource = 
+		(stream<BinarySpeech_t> BinarySpeechData as BSD) as VgwDataRouterSource = 
 			IBMVoiceGatewaySource() {
 			logic
 				state: {
@@ -504,15 +503,13 @@ public composite VgwDataRouter {
 		// real-time voice calls.
 		//
 		@parallel(width=$numberOfCallReplayEngines)
-		(stream<BinarySpeech_t> PreRecordedBinarySpeechData;
-		 stream<EndOfCallSignal_t> PreRecordedEndOfCallSignal) as 
+		(stream<BinarySpeech_t> PreRecordedBinarySpeechData) as 
 		 VoiceCallReplayer = CallRecordingReplay(CallReplaySignalFileName) {
 		 	param
 		 		callRecordingReadDirectory: $callRecordingReadDirectory;
 		 		// Pass these stream types as composite operator parameters.
 		 		callMetaData_t: CallMetaData_t;
 		 		binarySpeech_t: BinarySpeech_t;
-		 		endOfCallSignal_t: EndOfCallSignal_t;
 		 }
 
 		// We have to always route the speech data bytes (fragments) coming from  
@@ -536,8 +533,7 @@ public composite VgwDataRouter {
 		// That special speech data distribution logic happens inside this operator.
 		(stream<WebSocketSinkSendData_t> CallDataForSpeechProcessor as CDFSP) as
 			VoiceCallDataRouter = Custom(
-			BinarySpeechData, PreRecordedBinarySpeechData as BSD;
-			EndOfCallSignal, PreRecordedEndOfCallSignal as EOCS) {
+			BinarySpeechData, PreRecordedBinarySpeechData as BSD) {
 			logic
 				state: {
 					// This variable tells us how many total concurrent calls can be
@@ -569,96 +565,59 @@ public composite VgwDataRouter {
 					// Get the sessionId + channelNumber combo string.
 					_key = BSD.vgwSessionId + "_" + (rstring)BSD.vgwVoiceChannelNumber;
 
-					// We have to first check if this speech data belongs to a 
-					// brand new voice call or an already ongoing voice call.
-					if(has(_vgwSessionIdToSpeechProcessorMap, BSD.vgwSessionId) == false) {
-						// This is a brand new voice call. Get a speech processor id to
-						// send the speech data belonging to this call.
-						// Store this VGW session id to change the status of this 
-						// voice call from "brand new" to "ongoing".
-						int32 speechProcessorId = 
-							getSpeechProcessorIdForNewCallProcessing(
-							_numberOfConcurrentCallsAllowedPerSpeechProcessor,
-							_speechProcessorStatusList);
-						
-						if(speechProcessorId == -1) {
-							// This condition should not happen as long as there are enough
-							// number of speech processors with more than sufficient number of
-							// speech engines configured to run in them.
-							appTrc(Trace.error, 
-								"_XXXXX No speech processor job is available at this time for the " +
-								"vgwSessionId_vgwVoiceChannelNumber: " + _key + 
-								" We are not going to process the currently received speech data bytes" +
-								" of this speaker in this voice call." +
-								" Please start sufficient number of speech processor jobs " +
-								" next time to handle your maximum expected concurrent calls." +
-								" A rule of thumb is to have two S2T engines to process" +
-								" two speakers in every given concurrent voice call.");
-							return;
+					// We will get the regular binary speech data and the End Of Call Signal (EOCS) in
+					// the same input stream. This design change was done on Feb/09/2021 to avoid any
+					// any port locks and/or tuple ordering issues that may happen if we choose to 
+        			// do it using two different output ports. The incoming tuple has an attribute
+        			// that is set to true or false by the IBMVoiceGatewaySource operator to indicate
+        			// whether it is sending binary speech data or an EOCS.
+        			if(BSD.endOfCallSignal == false) {
+        				// The incoming tuple contains binary speech data.
+        				//
+						// We have to first check if this speech data belongs to a 
+						// brand new voice call or an already ongoing voice call.
+						if(has(_vgwSessionIdToSpeechProcessorMap, BSD.vgwSessionId) == false) {
+							// This is a brand new voice call. Get a speech processor id to
+							// send the speech data belonging to this call.
+							// Store this VGW session id to change the status of this 
+							// voice call from "brand new" to "ongoing".
+							int32 speechProcessorId = 
+								getSpeechProcessorIdForNewCallProcessing(
+								_numberOfConcurrentCallsAllowedPerSpeechProcessor,
+								_speechProcessorStatusList);
+							
+							if(speechProcessorId == -1) {
+								// This condition should not happen as long as there are enough
+								// number of speech processors with more than sufficient number of
+								// speech engines configured to run in them.
+								appTrc(Trace.error, 
+									"_XXXXX No speech processor job is available at this time for the " +
+									"vgwSessionId_vgwVoiceChannelNumber: " + _key + 
+									" We are not going to process the currently received speech data bytes" +
+									" of this speaker in this voice call." +
+									" Please start sufficient number of speech processor jobs " +
+									" next time to handle your maximum expected concurrent calls." +
+									" A rule of thumb is to have two S2T engines to process" +
+									" two speakers in every given concurrent voice call.");
+								return;
+							}
+							
+							// Let us store the speech processor id of this call for
+							// future use as the speech data keeps coming.
+							insertM(_vgwSessionIdToSpeechProcessorMap, BSD.vgwSessionId, speechProcessorId);
+							appTrc(Trace.error, "A new call with vgwSessionId=" + BSD.vgwSessionId +
+								" is being assigned to speech processor id " + (rstring)speechProcessorId);						
 						}
 						
-						// Let us store the speech processor id of this call for
-						// future use as the speech data keeps coming.
-						insertM(_vgwSessionIdToSpeechProcessorMap, BSD.vgwSessionId, speechProcessorId);
-						appTrc(Trace.error, "A new call with vgwSessionId=" + BSD.vgwSessionId +
-							" is being assigned to speech processor id " + (rstring)speechProcessorId);						
-					}
-					
-					// We can prepare this speech data to be sent to the chosen speech processor id.
-					// We will do double serialization of the speech data as shown below.
-					//
-					// 1) Let us serialize the received speech data tuple.
-					// msgType = 1 means that it carries the binary speech data tuple.
-					_serializedTuple.msgType = 1;
-					clearM(_serializedTuple.payload);
-					// Call a native function to do the Tuple-->Blob conversion.
-					serializeTuple(BSD, _serializedTuple.payload);
-					
-					// 2) Let us now serialize it one more time to be sent as the final tuple.
-					_oTuple.strData = "";
-					// We can tell the downstream WebSocketSink operator about to which
-					// speech processor id our serialized data should be sent.
-					// That is done by specifying the URL context path of the WebSocketSink
-					// operator where a selected speech processor has connected to.
-					// As shown in the param section of the downstream sink operator,
-					// we have configured it to allow URL context path such as "1","2","3" and so on.
-					// With this arrangement, remote speech processor jobs can connect to our
-					// WebSocketSink via a distinct URL that carries their respective speech processor ids.
-					_oTuple.sendToUrlContextPaths = 
-						[(rstring)_vgwSessionIdToSpeechProcessorMap[BSD.vgwSessionId]];
-					serializeTuple(_serializedTuple, _oTuple.blobData);
-					submit(_oTuple, CDFSP);					
-				} // End of onTuple BSD
-				
-				// Process the end of voice call signal.
-				// Since there are two channels in every voice call,
-				// those two channels will carry their own "End STT session"
-				// message from the Voice Gateway. The logic below takes care of
-				// handling two End of Call Signals for every voice call.
-				onTuple EOCS: {
-					_key = EOCS.vgwSessionId + "_" + (rstring)EOCS.vgwVoiceChannelNumber;
-					
-					// Get the allocated speech processor id for a given vgwSessionId.
-					// We should always have a speech processor id. If not, that is a 
-					// case where the user didn't provision sufficient number of 
-					// Speech engines and there was no idle speech processor available for that given vgwSessionId. 
-					// This situation can be avoided by starting the application with a 
-					// sufficient number of speech processors along with sufficient
-					// speech engines needed for the anticipated maximum concurrent voice calls. 
-					// A rule of thumb is to have two speech engines to process 
-					// two speakers in every given concurrent voice call.
-					//					
-					if (has(_vgwSessionIdToSpeechProcessorMap, EOCS.vgwSessionId) == true) {
-						int32 speechProcessorId = 
-							_vgwSessionIdToSpeechProcessorMap[EOCS.vgwSessionId];
-						// Let us send the EOCS tuple to the chosen speech processor id.
-						// We will do double serialization of the data as shown below.
+						// We can prepare this speech data to be sent to the chosen speech processor id.
+						// We will do double serialization of the speech data as shown below.
+						//
 						// 1) Let us serialize the received speech data tuple.
-						// msgType = 2 means that it carries the EOCS tuple.
-						_serializedTuple.msgType = 2;
+						// msgType = 1 means that it carries the binary speech data tuple.
+						_serializedTuple.msgType = 1;
 						clearM(_serializedTuple.payload);
 						// Call a native function to do the Tuple-->Blob conversion.
-						serializeTuple(EOCS, _serializedTuple.payload);
+						serializeTuple(BSD, _serializedTuple.payload);
 						
 						// 2) Let us now serialize it one more time to be sent as the final tuple.
 						_oTuple.strData = "";
@@ -670,94 +629,140 @@ public composite VgwDataRouter {
 						// we have configured it to allow URL context path such as "1","2","3" and so on.
 						// With this arrangement, remote speech processor jobs can connect to our
 						// WebSocketSink via a distinct URL that carries their respective speech processor ids.
-						_oTuple.sendToUrlContextPaths = [(rstring)speechProcessorId];
+						_oTuple.sendToUrlContextPaths = 
+							[(rstring)_vgwSessionIdToSpeechProcessorMap[BSD.vgwSessionId]];
 						serializeTuple(_serializedTuple, _oTuple.blobData);
-						submit(_oTuple, CDFSP);										
-						// Add the _key to the call completed list for the speech processor id to be
-						// released later in the following if block only after receiving EOCS for 
-						// both the voice channels of this call.
-						insertM(_vgwSessionVgwVoiceChannelNumberCompletedMap, _key, true);
-						
-						rstring key1 = EOCS.vgwSessionId + "_" + "1";
-						rstring key2 = EOCS.vgwSessionId + "_" + "2";						
-						// Since this voice call is ending, let us release the speech processor id 
-						// that was allocated above for this voice call.
-						// Remove the speech processor id only if the EOCS signal
-						// was sent for both of the voice channels. That must first 
-						// happen before we can release the speech processor id.
-						boolean key1Exists = has(_vgwSessionVgwVoiceChannelNumberCompletedMap, key1);
-						boolean key2Exists = has(_vgwSessionVgwVoiceChannelNumberCompletedMap, key2);
-						
-						if ($numberOfEocsNeededForVoiceCallCompletion == 2 &&
-							(key1Exists == true && key2Exists == true)) {
-							// Since the voice call for this VGW session id has ended completely,
-							// we can also release the speech processor id assigned for this call so that 
-							// it can be repurposed for handling any new future calls.
-							// We can go ahead and release the speech processor id by adding it back to 
-							// the speech processor status list.
-							// Let us decrement the given speech processor's current call handling count.
-							// It is a zero based indexed array. Hence, we have to subtract by 1 to get the
-							// current index in that array.
-							_speechProcessorStatusList[speechProcessorId-1] = 
-								_speechProcessorStatusList[speechProcessorId-1] - 1;
-							
-							// We can now do the clean-up in our state variables.
-							removeM(_vgwSessionIdToSpeechProcessorMap, EOCS.vgwSessionId);
-							removeM(_vgwSessionVgwVoiceChannelNumberCompletedMap, key1);
-							removeM(_vgwSessionVgwVoiceChannelNumberCompletedMap, key2);
-							appTrc(Trace.error, "i) A call with vgwSessionId=" + EOCS.vgwSessionId +
-								" ended and its speech processor id " + (rstring)speechProcessorId + 
-								" got released.");						
-						} else if ($numberOfEocsNeededForVoiceCallCompletion == 1 &&
-							(key1Exists == true || key2Exists == true)) {
-							// If the user configured this application to handle
-							// a single EOCS as sufficient to consider a voice call
-							// completed for a given VGW session id, we will use this
-							// block of code. Please refer to the constant i.e. expression
-							// declaration section above to read the commentary about this idea.
-							//
-							// Since the voice call for this VGW session id has ended completely,
-							// we can also release the speech processor id assigned for this call so that 
-							// it can be repurposed for handling any new future calls.
-							// We can go ahead and release the speech processor id by adding it back to 
-							// the speech processor status list.
-							// Let us decrement the given speech processor's current call handling count.
-							// It is a zero based indexed array. Hence, we have to subtract by 1 to get the
-							// current index in that array.
-							_speechProcessorStatusList[speechProcessorId-1] = 
-								_speechProcessorStatusList[speechProcessorId-1] - 1;
-							
-							// We can now do the clean-up in our state variables.
-							removeM(_vgwSessionIdToSpeechProcessorMap, EOCS.vgwSessionId);
-
-							if(key1Exists == true) {
-								removeM(_vgwSessionVgwVoiceChannelNumberCompletedMap, key1);
-							}
-							
-							if(key2Exists == true) {
-								removeM(_vgwSessionVgwVoiceChannelNumberCompletedMap, key2);
-							}
-							
-							appTrc(Trace.error, "ii) A call with vgwSessionId=" + EOCS.vgwSessionId +
-								" ended and its speech processor id " + (rstring)speechProcessorId + 
-								" got released.");						
-						}
+						submit(_oTuple, CDFSP);
 					} else {
-						// Flag an error only when the user configured for two
-						// EOCS tuples to be received for considering a voice call
-						// as complted.
-						if ($numberOfEocsNeededForVoiceCallCompletion == 2) {
-							appTrc(Trace.error, 
-								"_YYYYY No speech processor id is available at this time for the " +
-								"vgwSessionId_vgwVoiceChannelNumber: " + _key + 
-								" We are not going to process the currently received EOCS " +
-								" of this speaker in this voice call. This is a serious error.");
-						}					
-					}
-				} // End of onTuple EOCS.
-				
+						//The incoming tuple contains an End of Call Signal (EOCS).
+						//
+						// Process the end of voice call signal.
+						// Since there are two channels in every voice call,
+						// those two channels will carry their own "End STT session"
+						// message from the Voice Gateway. The logic below takes care of
+						// handling two End of Call Signals for every voice call.
+						//
+						// Get the allocated speech processor id for a given vgwSessionId.
+						// We should always have a speech processor id. If not, that is a 
+						// case where the user didn't provision sufficient number of 
+						// Speech engines and there was no idle speech processor available for that given vgwSessionId. 
+						// This situation can be avoided by starting the application with a 
+						// sufficient number of speech processors along with sufficient
+						// speech engines needed for the anticipated maximum concurrent voice calls. 
+						// A rule of thumb is to have two speech engines to process 
+						// two speakers in every given concurrent voice call.
+						//					
+						if (has(_vgwSessionIdToSpeechProcessorMap, BSD.vgwSessionId) == true) {
+							int32 speechProcessorId = 
+								_vgwSessionIdToSpeechProcessorMap[BSD.vgwSessionId];
+							// Let us send the EOCS to the chosen speech processor id.
+							// We will do double serialization of the data as shown below.
+							// 1) Let us serialize the received speech data tuple.
+							// msgType = 2 means that it carries the EOCS tuple.
+							_serializedTuple.msgType = 2;
+							clearM(_serializedTuple.payload);
+							// Call a native function to do the Tuple-->Blob conversion.
+							serializeTuple(BSD, _serializedTuple.payload);
+							
+							// 2) Let us now serialize it one more time to be sent as the final tuple.
+							_oTuple.strData = "";
+							// We can tell the downstream WebSocketSink operator about to which
+							// speech processor id our serialized data should be sent.
+							// That is done by specifying the URL context path of the WebSocketSink
+							// operator where a selected speech processor has connected to.
+							// As shown in the param section of the downstream sink operator,
+							// we have configured it to allow URL context path such as "1","2","3" and so on.
+							// With this arrangement, remote speech processor jobs can connect to our
+							// WebSocketSink via a distinct URL that carries their respective speech processor ids.
+							_oTuple.sendToUrlContextPaths = [(rstring)speechProcessorId];
+							serializeTuple(_serializedTuple, _oTuple.blobData);
+							submit(_oTuple, CDFSP);										
+							// Add the _key to the call completed list for the speech processor id to be
+							// released later in the following if block only after receiving EOCS for 
+							// both the voice channels of this call.
+							insertM(_vgwSessionVgwVoiceChannelNumberCompletedMap, _key, true);
+							
+							rstring key1 = BSD.vgwSessionId + "_" + "1";
+							rstring key2 = BSD.vgwSessionId + "_" + "2";						
+							// Since this voice call is ending, let us release the speech processor id 
+							// that was allocated above for this voice call.
+							// Remove the speech processor id only if the EOCS signal
+							// was sent for both of the voice channels. That must first 
+							// happen before we can release the speech processor id.
+							boolean key1Exists = has(_vgwSessionVgwVoiceChannelNumberCompletedMap, key1);
+							boolean key2Exists = has(_vgwSessionVgwVoiceChannelNumberCompletedMap, key2);
+							
+							if ($numberOfEocsNeededForVoiceCallCompletion == 2 &&
+								(key1Exists == true && key2Exists == true)) {
+								// Since the voice call for this VGW session id has ended completely,
+								// we can also release the speech processor id assigned for this call so that 
+								// it can be repurposed for handling any new future calls.
+								// We can go ahead and release the speech processor id by adding it back to 
+								// the speech processor status list.
+								// Let us decrement the given speech processor's current call handling count.
+								// It is a zero based indexed array. Hence, we have to subtract by 1 to get the
+								// current index in that array.
+								_speechProcessorStatusList[speechProcessorId-1] = 
+									_speechProcessorStatusList[speechProcessorId-1] - 1;
+								
+								// We can now do the clean-up in our state variables.
+								removeM(_vgwSessionIdToSpeechProcessorMap, BSD.vgwSessionId);
+								removeM(_vgwSessionVgwVoiceChannelNumberCompletedMap, key1);
+								removeM(_vgwSessionVgwVoiceChannelNumberCompletedMap, key2);
+								appTrc(Trace.error, "i) A call with vgwSessionId=" + BSD.vgwSessionId +
+									" ended and its speech processor id " + (rstring)speechProcessorId + 
+									" got released.");						
+							} else if ($numberOfEocsNeededForVoiceCallCompletion == 1 &&
+								(key1Exists == true || key2Exists == true)) {
+								// If the user configured this application to handle
+								// a single EOCS as sufficient to consider a voice call
+								// completed for a given VGW session id, we will use this
+								// block of code. Please refer to the constant i.e. expression
+								// declaration section above to read the commentary about this idea.
+								//
+								// Since the voice call for this VGW session id has ended completely,
+								// we can also release the speech processor id assigned for this call so that 
+								// it can be repurposed for handling any new future calls.
+								// We can go ahead and release the speech processor id by adding it back to 
+								// the speech processor status list.
+								// Let us decrement the given speech processor's current call handling count.
+								// It is a zero based indexed array. Hence, we have to subtract by 1 to get the
+								// current index in that array.
+								_speechProcessorStatusList[speechProcessorId-1] = 
+									_speechProcessorStatusList[speechProcessorId-1] - 1;
+								
+								// We can now do the clean-up in our state variables.
+								removeM(_vgwSessionIdToSpeechProcessorMap, BSD.vgwSessionId);
+	
+								if(key1Exists == true) {
+									removeM(_vgwSessionVgwVoiceChannelNumberCompletedMap, key1);
+								}
+								
+								if(key2Exists == true) {
+									removeM(_vgwSessionVgwVoiceChannelNumberCompletedMap, key2);
+								}
+								
+								appTrc(Trace.error, "ii) A call with vgwSessionId=" + BSD.vgwSessionId +
+									" ended and its speech processor id " + (rstring)speechProcessorId + 
+									" got released.");						
+							}
+						} else {
+							// Flag an error only when the user configured for two
+							// EOCS tuples to be received for considering a voice call
+							// as complted.
+							if ($numberOfEocsNeededForVoiceCallCompletion == 2) {
+								appTrc(Trace.error, 
+									"_YYYYY No speech processor id is available at this time for the " +
+									"vgwSessionId_vgwVoiceChannelNumber: " + _key + 
+									" We are not going to process the currently received EOCS " +
+									" of this speaker in this voice call. This is a serious error.");
+							}					
+						}						
+					} // End of if(BSD.endOfCallSignal == false)				
+				} // End of onTuple BSD
+								
 			config
-				threadedPort: queue(BSD, Sys.Wait), queue(EOCS, Sys.Wait);
+				threadedPort: queue(BSD, Sys.Wait);
 		} // End of Custom operator.
 
 		// Invoke one or more instances of the WebSocketSink operator.
@@ -828,14 +833,13 @@ public composite VgwDataRouter {
 // parallel region for the purpose of load testing by 
 // replaying many pre-recorded voice calls at the same time.
 public composite CallRecordingReplay(input CallReplaySignalFileNameIn;
-	output PreRecordedBinarySpeechData, PreRecordedEndOfCallSignal) {
+	output PreRecordedBinarySpeechData) {
 	param
 		expression <rstring> $callRecordingReadDirectory;
 		// This composite operator receives externally
 		// defined stream types via operator parameters.
 		type $callMetaData_t;
 		type $binarySpeech_t;
-		type $endOfCallSignal_t;
 	
 	// Replaying the pre-recorded voice calls.
 	// The graph below will perform the logic necessary to
@@ -1068,7 +1072,6 @@ public composite CallRecordingReplay(input CallReplaySignalFileNameIn;
 		// mix both of them and send out a tuple for transcription by
 		// downstream operators.
 		(stream<$binarySpeech_t> PreRecordedBinarySpeechData as PRBSD;
-		 stream<$endOfCallSignal_t> PreRecordedEndOfCallSignal as PREOCS;
 		 stream<uint32 count> Acknowledgement as Ack) as 
 		 PreRecordedCallReplayer = Custom(CallMetaDataVC1, CallMetaDataVC2 as CMD;
 		 	CallSpeechDataVC1, CallSpeechDataVC2 as CSD; TimerSignal as TS) {
@@ -1094,7 +1097,6 @@ public composite CallRecordingReplay(input CallReplaySignalFileNameIn;
 					// waiting for data to be read from the pre-recorded files.
 					mutable rstring lastObservedReplayMapKey = "abcxyz";
 		 			mutable $binarySpeech_t _oTuple1 = {};
-		 			mutable $endOfCallSignal_t _oTuple2 = {};
 		 		}
 		 		
 		 		onTuple CMD: {
@@ -1186,8 +1188,10 @@ public composite CallRecordingReplay(input CallReplaySignalFileNameIn;
 					// We have the call meta data. We can create a new 
 					// binary speech data tuple now and send it out for transcription.
 					// Copy all the call meta data attributes to the outgoing tuple.
+					_oTuple1 = ($binarySpeech_t){};
 					assignFrom(_oTuple1, _callMetaDataMap[key]);
 					_oTuple1.speech = CSD.speech;
+					_oTuple1.endOfCallSignal = false;
 					_oTuple1.speechDataFragmentCnt = _speechDataFragmentCount[key];
 					_oTuple1.totalSpeechDataBytesReceived = _speechDataBytesCount[key];
 					submit(_oTuple1, PRBSD);
@@ -1219,12 +1223,14 @@ public composite CallRecordingReplay(input CallReplaySignalFileNameIn;
 						
 						// Send two EOCS signals one for each voice channel in the given call.
 						for (rstring str in _callMetaDataMap) {
-							_oTuple2.vgwSessionId = _callMetaDataMap[str].vgwSessionId;
-							_oTuple2.isCustomerSpeechData = 
+							_oTuple1 = ($binarySpeech_t){};
+							_oTuple1.vgwSessionId = _callMetaDataMap[str].vgwSessionId;
+							_oTuple1.isCustomerSpeechData = 
 								_callMetaDataMap[str].isCustomerSpeechData;
-							_oTuple2.vgwVoiceChannelNumber = 
+							_oTuple1.vgwVoiceChannelNumber = 
 								_callMetaDataMap[str].vgwVoiceChannelNumber;
-							submit(_oTuple2, PREOCS);
+							_oTuple1.endOfCallSignal = true;
+							submit(_oTuple1, PRBSD);
 						}
 						
 						// Clear all the state maps to be ready for the
@@ -1288,12 +1294,14 @@ public composite CallRecordingReplay(input CallReplaySignalFileNameIn;
 						// we are required to send an EOCS for that voice channel.
 						for (rstring str in _callMetaDataMap) {
 							if (_speechDataTuplesSentCount[str] > 0) {
-								_oTuple2.vgwSessionId = _callMetaDataMap[str].vgwSessionId;
-								_oTuple2.isCustomerSpeechData = 
+								_oTuple1 = ($binarySpeech_t){};
+								_oTuple1.vgwSessionId = _callMetaDataMap[str].vgwSessionId;
+								_oTuple1.isCustomerSpeechData = 
 									_callMetaDataMap[str].isCustomerSpeechData;
-								_oTuple2.vgwVoiceChannelNumber = 
+								_oTuple1.vgwVoiceChannelNumber = 
 									_callMetaDataMap[str].vgwVoiceChannelNumber;
-								submit(_oTuple2, PREOCS);
+								_oTuple1.endOfCallSignal = true;
+								submit(_oTuple1, PRBSD);
 							}
 						}
 						

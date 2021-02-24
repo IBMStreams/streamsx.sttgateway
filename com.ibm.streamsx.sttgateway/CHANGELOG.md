@@ -1,5 +1,10 @@
 # Changes
 
+## v2.2.9
+* Feb/11/2021
+* Removed the EndOfCallSignal (EOCS) output stream completely to avoid port locks and out of order processing between the binary speech data (BSD) and the EOCS tuples. Now, a single output stream will deliver both the BSD and EOCS tuples in the correct sequence for downstream processing. 
+* The change described above triggered foundational changes in the IBMVoiceGatewaySource operator and in the examples that invoke that operator.
+
 ## v2.2.8
 * Feb/07/2021
 * Modified the IBMVoiceGatewaySource operator to handle the exception thrown when a given websocket connection handle can't be found in the connection metadata map.
