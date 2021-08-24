@@ -2,7 +2,7 @@
 title: "Toolkit Usage Overview"
 permalink: /docs/user/overview/
 excerpt: "How to use this toolkit."
-last_modified_at: 2021-02-19T08:18:48+01:00
+last_modified_at: 2021-08-23T22:08:48+01:00
 redirect_from:
    - /theme-setup/
 sidebar:
@@ -51,9 +51,17 @@ This toolkit is packaged with a comprehensive build.xml automation file that wil
 
 If all those commands ran successfully, this toolkit is ready for use.
 
-If there is no direct Internet access from the IBM Streams machine and if there is a need to go through a proxy server, then the ant all command may not work. In that case, you can try this command instead. 
+If there is no direct Internet access from the IBM Streams machine and if there is a need to go through a proxy server, then the ant all command may not work. When a corporate network uses proxy servers to go to the Internet, there are certain known problems with the ant tool. Presence of a network proxy forces ant not to work correctly in downloading the external websocket and boost packages from the Internet thereby requiring the following manual steps. Run the following commands in sequence from the top-level directory (e-g: streamsx.sttgateway) of this toolkit.
 
-`ant all -Dwebsocket.archive=file://localhost$(pwd)/ext -Dwebsocket.version=0.8.2 -Dboost.archive.src0=file://localhost$(pwd)/ext/boost-install-files/boost_1_73_0.tar.gz`
+1. `ant clean-total`
+
+2. Now, you can download the two external packages (websocketpp-0.8.2.tar.gz and boost-1.73.0.tar.gz) on your own from any Windows or Mac or Linux box that has Internet connection and then you can copy those two tar.gz files manually to your Linux machine's toolkit directory as <toolkit-top-level-directory>/ext/0.8.2.tar.gz and <toolkit-top-level-directory>/ext/boost-install-files/boost-1.73.0.tar.gz.  [Please note that the websocketpp package should be named as 0.8.2.tar.gz] After that, you can run the following "ant all" command with additional parameters.
+
+`ant all -Dwebsocket.archive=file://localhost$(pwd)/ext -Dwebsocket.version=0.8.2 -Dboost.archive.src0=file://localhost$(pwd)/ext/boost-install-files/boost-1.73.0.tar.gz`
+
+3. If the build is successful, you can now run this command.
+
+`ant download-clean`
 
 ## A must do in the Streams applications that will use this toolkit
 i. You must add this toolkit as a dependency in your application.

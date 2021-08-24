@@ -2,7 +2,7 @@
 title: "Operator Usage Patterns"
 permalink: /docs/user/WatsonSTTUsagePatterns/
 excerpt: "Describes the streamsx.sttgateway toolkit usage patterns."
-last_modified_at: 2020-02-19T08:28:48+01:00
+last_modified_at: 2020-08-23T20:28:48+01:00
 redirect_from:
    - /theme-setup/
 sidebar:
@@ -33,7 +33,7 @@ This operator provides nine parameters to configure the way in which this operat
 At the full scope of this operator, output stream schema can be as shown below with all possible attributes. It is shown here to explain the basic and additional features of this operator. Not all real life applications will need all these attributes. You can decide to include or omit these attributes based on the specific features your application will need. Trimming the unused attributes will also help in reducing the message processing overhead and in turn help in receiving the speech data fragments faster.
 
 ```
-// The following is the schema of the first output stream for the
+// The following is the schema of the output stream for the
 // IBMVoiceGatewaySource operator. The first five attributes are
 // very important and the other ones are purely optional if some
 // scenarios really require them.
@@ -46,6 +46,7 @@ type BinarySpeech_t =
    rstring callStartDateTime, // call start date time i.e. system clock time
    rstring callerPhoneNumber, 
    rstring agentPhoneNumber,
+   rstring ciscoGuid, // Value of the SIP invite custom header Cisco-Guid if present.
    int32 speechDataFragmentCnt, // How many speech fragments on this channel so far?
    int32 totalSpeechDataBytesReceived, // How many speech data bytes on this channel so far?
    int32 sttEngineId, // Which WatsonSTT engine id is processing this channel? 
@@ -87,6 +88,7 @@ In your SPL application, this operator can be invoked with either all operator p
        vgwVoiceChannelNumber = getVoiceChannelNumber(),
        callerPhoneNumber = getCallerPhoneNumber(),
        agentPhoneNumber = getAgentPhoneNumber(),
+       ciscoGuid = getCiscoGuid(),
        speechDataFragmentCnt = getTupleCnt(),
        totalSpeechDataBytesReceived = getTotalSpeechDataBytesReceived();
 }
@@ -112,6 +114,8 @@ At the very basic level, users should call the very first three custom output fu
 **getTotalSpeechDataBytesReceived ()** is used to get the total number of speech data bytes received so far on the given voice channel.
 
 **getCallStartDateTime ()** is used to get the call start date time i.e. in system clock time.
+
+**getCiscoGuid ()** is used to get the value for the SIP invite custom header Cisco-Guid.
 
 ## Custom metrics available in the IBMVoiceGatewaySource operator
 This operator provides the following custom metrics that can be queried via the IBM Streams REST/JMX APIs or viewed via the commonly used utilities such as streamtool and Streams Web Console. These Gauge kind metrics will be updated live during the reception of the speech data only when the vgwLiveMetricsUpdateNeeded operator parameter is set to true.
