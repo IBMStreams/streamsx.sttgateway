@@ -2,7 +2,7 @@
 title: "Operator Design"
 permalink: /docs/user/OperatorDesign/
 excerpt: "Describes the design of the streamsx.sttgateway toolkit operators."
-last_modified_at: 2020-02-19T08:23:48+01:00
+last_modified_at: 2020-08-23T20:42:40+01:00
 redirect_from:
    - /theme-setup/
 sidebar:
@@ -56,7 +56,7 @@ Following are the custom output functions supported by the IBMVoiceGatewaySource
 | `rstring getCallerPhoneNumber()` | Returns an rstring value with details about the caller's phone number. |
 | `rstring getAgentPhoneNumber()` | Returns an rstring value with details about the agent's phone number. |
 | `rstring getCallStartDateTime()` | Returns an rstring value with the call start date time i.e. system clock time. |
-
+| `rstring getCiscoGuid()` | Returns the value for the SIP invite custom header Cisco-Guid. |
 
 *******************************
 
