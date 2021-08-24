@@ -145,6 +145,10 @@
             <description>Returns an rstring value with the call start date time i.e. system clock time.</description>
             <prototype><![CDATA[rstring getCallStartDateTime()]]></prototype>
           </function>          
+          <function>
+            <description>Returns an rstring value for the SIP invite custom header Cisco-Guid.</description>
+            <prototype><![CDATA[rstring getCiscoGuid()]]></prototype>
+          </function>          
         </customOutputFunction>
       </customOutputFunctions>
       

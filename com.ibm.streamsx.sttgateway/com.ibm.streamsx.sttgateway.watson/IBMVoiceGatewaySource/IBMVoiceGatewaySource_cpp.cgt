@@ -8,7 +8,7 @@
 /*
 ============================================================
 First created on: Sep/20/2019
-Last modified on: Feb/09/2021
+Last modified on: Aug/23/2021
 
 Please refer to the sttgateway-tech-brief.txt file in the 
 top-level directory of this toolkit to read about 
@@ -690,6 +690,7 @@ void MY_OPERATOR::on_open(websocketpp::connection_hdl hdl, bool isTlsConnection)
 	con_metadata.vgwParticipantURI = "";
 	con_metadata.vgwTenantID = "";
 	con_metadata.vgwSIPToURI = "";
+	con_metadata.ciscoGuid = "";
 	con_metadata.vgwIsCaller = false;
 	con_metadata.vgwVoiceChannelNumber = 0;
 	client_connections_map[hdl] = con_metadata;
@@ -812,13 +813,18 @@ void MY_OPERATOR::on_message(EndpointType* s, websocketpp::connection_hdl hdl,
 			// ===========================================================
 			{
 			  "action": "start",
-			  "siprecMetadata": {
-			      "vgwSessionID" : "8443572187904004@192.168.208.5",
-			      "vgwSIPCallID" : "8443572187904004@192.168.208.5",
-			      "vgwParticipantURI" : "sip:alice@10.10.10.7",
-			      "vgwIsCaller" : true
-			  }
-			}
+			  "siprecMetadata": {            
+   	   	   	  	  "vgwTenantID": "siprec-tenant",
+   	   	   	   	  "vgwSIPToURI": "sip:10.145.203.161:5060;transport=udp",
+   	   	   	   	  "vgwIsCaller": true,
+   	   	   	   	  "vgwSessionID": "fccd47f1-a44e-4060-b713-4f19c5baebcf",
+   	   	   	   	  "vgwSIPCallID": "f75e487831ff12e517ee10159b31e0d9020@10.145.203.161",
+   	   	   	   	  "vgwParticipantURI": "sip:9737046347@143.91.19.6",
+    			  "vgwSIPCustomInviteHeaders": {
+      	  	  		 "Cisco-Guid": "3502874379-4113371627-2730858090-1212179876"
+      	  	  	  }
+    		  }
+ 	 	 	}
 			// ===========================================================
 			*/
 			if (action == "start") {
@@ -828,7 +834,7 @@ void MY_OPERATOR::on_message(EndpointType* s, websocketpp::connection_hdl hdl,
 				//
 				// Look for vgwSessionId
 				try {
-					// This is an important metadata that identiies
+					// This is an important metadata that identifies
 					// every unique voice call. It must be present.
 					con_metadata.vgwSessionId = query(root, 
 						"siprecMetadata.vgwSessionID").get_value<std::string>();
@@ -924,7 +930,24 @@ void MY_OPERATOR::on_message(EndpointType* s, websocketpp::connection_hdl hdl,
 							", IBM Voice Gateway sent this message: " << msg->get_payload(), "on_message");
 					}					
 				}
-								
+
+				// Look for Cisco-Guid
+				try {
+					// It is fine even if this field is not present in the JSON message.
+					// Because, it is a SIP invite custom header. Depending on the
+					// underlying voice infrastructure and the configuration done in
+					// the IBM Voice Gateway product, this header may or may not be there.
+					con_metadata.ciscoGuid = query(root, 
+						"siprecMetadata.vgwSIPCustomInviteHeaders.Cisco-Guid").get_value<std::string>();
+				}  catch (std::exception const& e) {
+					if (vgwSessionLoggingNeeded == true) {
+						SPLAPPTRC(L_ERROR, "Operator " << operatorPhysicalName <<
+							"-->Channel " << boost::to_string(udpChannelNumber) <<
+							"-->X1 JSON parsing error when reading the field : " << e.what() <<
+							", IBM Voice Gateway sent this message: " << msg->get_payload(), "on_message");
+					}					
+				}
+
 				// If we reached this far, then we can give an 
 				// affirmative response back to the IBM Voice Gateway for 
 				// its session start message.
@@ -973,7 +996,9 @@ void MY_OPERATOR::on_message(EndpointType* s, websocketpp::connection_hdl hdl,
 						", vgwParticipantURI=" << con_metadata.vgwParticipantURI <<
 						", vgwTenantID=" << con_metadata.vgwTenantID <<
 						", vgwSIPToURI=" << con_metadata.vgwSIPToURI << 
-						".", "on_message");
+						", Cisco-Guid=" << con_metadata.ciscoGuid <<
+						". Full JSON message=" << msg->get_payload(),
+						"on_message");
 				}					
 
 				return;
@@ -1430,6 +1455,10 @@ void MY_OPERATOR::on_message(EndpointType* s, websocketpp::connection_hdl hdl,
 		  	%> 
 		  		   oTuple.set_<%=$name%>( 
 		  		   	    <%=$operation%>(con_metadata.callStartDateTime));
+		  		  <%} elsif ($operation eq "getCiscoGuid") { 
+		  	%> 
+		  		   oTuple.set_<%=$name%>( 
+		  		  		<%=$operation%>(con_metadata.ciscoGuid));
 		  		  <%}
 			}%>
 						
@@ -1932,6 +1961,10 @@ std::string MY_OPERATOR::getAgentOrCallerPhoneNumber(std::string const & vgwSess
 
 SPL::rstring MY_OPERATOR::getCallStartDateTime(SPL::rstring const & callStartDateTime) {
 	return(callStartDateTime);
+}
+
+SPL::rstring MY_OPERATOR::getCiscoGuid(SPL::rstring const & ciscoGuid) {
+	return(ciscoGuid);
 }
 
 <%SPL::CodeGen::implementationEpilogue($model);%>

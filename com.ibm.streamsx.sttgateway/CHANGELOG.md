@@ -1,5 +1,13 @@
 # Changes
 
+## v2.3.0
+* Aug/23/2021
+* Made changes in the IBMVoiceGatewaySource operator to parse the SIP invite custom header fields such as Cisco-Guid and include it in the output stream.
+* Made changes in the VgwDataRouter, VgwDataRouterToWatsonSTT and VoiceGatewayToStreamsToWatsonSTT applications to propagate the ciscoGuid value received as part of the speech metadata.
+* Changed the default speech model to the next gen model i.e. from en-US_NarrowbandModel to en-US_Telephony.
+* Changed the STT result schema to include call start date time and utterance result reception time which will help the users to see the time it took for the STT engine to return a given utterance.
+* Added ciscoGuid attribute to the call metadata schema to be useful in call recording and call replay.
+
 ## v2.2.9
 * Feb/11/2021
 * Removed the EndOfCallSignal (EOCS) output stream completely to avoid port locks and out of order processing between the binary speech data (BSD) and the EOCS tuples. Now, a single output stream will deliver both the BSD and EOCS tuples in the correct sequence for downstream processing. 

@@ -8,7 +8,7 @@
 /*
 ==============================================
 First created on: Nov/24/2020
-Last modified on: Feb/09/2021
+Last modified on: Aug/21/2021
 
 This is a utility composite that will get used in the following applications.
 
@@ -20,7 +20,7 @@ This is a utility composite that will get used in the following applications.
 
 namespace com.ibm.streamsx.sttgateway.utils;
 
-// It is a dummpy Main composite.
+// It is a dummy Main composite.
 // Major goal of this project is to have reusable SPL, C++ and Java functions snd types.
 // Code for the C++ native functions can be found in the impl/include directory of this project.
 //
@@ -44,6 +44,7 @@ namespace com.ibm.streamsx.sttgateway.utils;
 // rstring callStartDateTime --> Call start date time i.e. system clock time.
 // rstring callerPhoneNumber --> Details about the caller's phone number.
 // rstring agentPhoneNumber --> Details about the agent's phone number.
+// rstring ciscoGuid --> Value of the SIP invite custom header Cisco-Guid if present.
 // int32 speechDataFragmentCnt --> Number of fragments (tuples) emitted so far on a given channel (customer or agent) for a given vgwSessionId.
 // int32 totalSpeechDataBytesReceived --> Number of speech bytes received so far on a given channel (customer or agent) for a given vgwSessionId.
 // int32 int32 speechProcessorId --> Id of the speech processor job that is analyzing the speech data.
@@ -53,8 +54,9 @@ type BinarySpeech_t = blob speech, rstring vgwSessionId, boolean isCustomerSpeec
 	int32 vgwVoiceChannelNumber, boolean endOfCallSignal, 
 	rstring id, rstring callStartDateTime, 
 	rstring callerPhoneNumber, rstring agentPhoneNumber, 
-	int32 speechDataFragmentCnt, int32 totalSpeechDataBytesReceived, 
-	int32 speechProcessorId, int32 speechEngineId, int32 speechResultProcessorId;
+	rstring ciscoGuid, int32 speechDataFragmentCnt, 
+	int32 totalSpeechDataBytesReceived, int32 speechProcessorId, 
+	int32 speechEngineId, int32 speechResultProcessorId;
 
 // The following schema will be for the data being sent here by the
 // VgwDataRouter application. It sends us raw binary data which 
@@ -68,7 +70,7 @@ type DataFromVgwRouter_t = int32 msgType, blob payload;
 // voice call.
 type CallMetaData_t = rstring vgwSessionId, boolean isCustomerSpeechData, 
 	int32 vgwVoiceChannelNumber, rstring callerPhoneNumber, 
-	rstring agentPhoneNumber;
+	rstring agentPhoneNumber, rstring ciscoGuid;
 	
 // The following schema is for the call recording feature where we will
 // store the call speech data for a specific voice channel of a given

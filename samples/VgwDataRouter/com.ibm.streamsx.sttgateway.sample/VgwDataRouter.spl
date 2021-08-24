@@ -8,7 +8,7 @@
 /*
 ==============================================
 First created on: Nov/24/2020
-Last modified on: Feb/10/2021
+Last modified on: Aug/21/2021
 
 A) What does this example application do?
    --------------------------------------
@@ -83,7 +83,7 @@ deploying them. Please refer to the streamsx.sttgateway documentation section ti
 2) Once you are sure that the IBM Voice Gateway can send the speech data to this
 application, then you can give the following command to deploy this application in distributed mode.
 
-There are certain importat submisstion time parameters that are required while
+There are certain important submission time parameters that are required while
 launching this application.
 
 Mandatory submission time parameter(s) for the VgwDataRouter application:
@@ -249,7 +249,7 @@ public composite VgwDataRouter {
 		// Is a password needed for the private key in the certificate file?
 		expression<rstring> $certificatePassword : 
 			getSubmissionTimeValue("certificatePassword", "");
-		// Do you want to specifiy a file name that contains the public certificates of
+		// Do you want to specify a file name that contains the public certificates of
 		// the trusted client(s). If this file name is not empty, then the
 		// WebSocketSink operator will perform a client (mutual) authentication.
 		expression<rstring> $trustedClientCertificateFileName :
@@ -285,7 +285,7 @@ public composite VgwDataRouter {
         // We will allow different speech processor jobs with their own
         // unique ids to connect to this application for getting the
         // speech data to get routed for processing. Such speech processor jobs will
-        // use their respectivce unique speech processor id at the end end of the
+        // use their respective unique speech processor id at the end end of the
         // URL as context path. Hence, we will prepare the WebSocketSink operator
         // invoked in this application to allow a set of context paths.
         // e-g: wss://MyHostName:8444/14  This URL must be used by a 
@@ -331,8 +331,8 @@ public composite VgwDataRouter {
 		// Is IBM Voice Gateway message exchange logging needed for debugging?
 		expression<boolean> $vgwSessionLoggingNeeded : 
 			(boolean)getSubmissionTimeValue("vgwSessionLoggingNeeded", "false");
-		// Under some cicumstances, if the IBMVoiceGatewaySource operator sends 
-		// only one EOCS (End Of Call Sigmal) tuple instead of two as required for
+		// Under some circumstances, if the IBMVoiceGatewaySource operator sends 
+		// only one EOCS (End Of Call Signal) tuple instead of two as required for
 		// the two voice channels, that may eventually cause the application logic
 		// below not be able to release the speech processor jobs properly at the end of
 		// a voice call for a given VGW session id. We have seen it in certain
@@ -450,7 +450,7 @@ public composite VgwDataRouter {
 				// Initial delay before generating the very first tuple.
 				// This is a one time delay when this operator starts up.
 				// This delay should give sufficient time for the
-				// speech processor jpbs to come up and be ready to
+				// speech processor jobs to come up and be ready to
 				// receive the speech data tuples sent by this operator.
 				initDelay: $initDelayBeforeSendingDataToSpeechProcessors;
 				vgwLiveMetricsUpdateNeeded: $vgwLiveMetricsUpdateNeeded;
@@ -467,6 +467,7 @@ public composite VgwDataRouter {
 					vgwVoiceChannelNumber = getVoiceChannelNumber(),
 					callerPhoneNumber = getCallerPhoneNumber(),
 					agentPhoneNumber = getAgentPhoneNumber(),
+					ciscoGuid = getCiscoGuid(), 
 					speechDataFragmentCnt = getTupleCnt(),
 					totalSpeechDataBytesReceived = getTotalSpeechDataBytesReceived();
 
@@ -749,7 +750,7 @@ public composite VgwDataRouter {
 						} else {
 							// Flag an error only when the user configured for two
 							// EOCS tuples to be received for considering a voice call
-							// as complted.
+							// as completed.
 							if ($numberOfEocsNeededForVoiceCallCompletion == 2) {
 								appTrc(Trace.error, 
 									"_YYYYY No speech processor id is available at this time for the " +
@@ -767,10 +768,10 @@ public composite VgwDataRouter {
 
 		// Invoke one or more instances of the WebSocketSink operator.
 		// This operator listens on a TLS port and is configured with
-		// multiple URL context paths to aceept connections from the
+		// multiple URL context paths to accept connections from the
 		// remote speech processor jobs that will each connect to a
-		// particular context path expresded by their speech processor id.
-		// It then routes the voice cslls' speech data and EOCS to the
+		// particular context path expressed by their speech processor id.
+		// It then routes the voice calls' speech data and EOCS to the
 		// corresponding speech processor job.
 		// For now, we will have a parallel width of 1.
 		// If it doesn't perform well, we can think of increasing the 

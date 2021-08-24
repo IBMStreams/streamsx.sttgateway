@@ -8,7 +8,7 @@
 /*
 ============================================================
 First created on: Sep/17/2019
-Last modified on: Feb/07/2021
+Last modified on: Aug/21/2021
 ============================================================
 */
 
@@ -112,6 +112,11 @@ public:
 		std::string vgwSIPToURI;
 		// This tells if this connection carries caller's or agent's speech data.
 		bool vgwIsCaller;
+		// This field indicates the SIP invite custom header named Ciso-Guid.
+		// This field will be sent in the SIPREC metadata only if the IBM Voice Gateway
+		// product is configured to parse this field from the SIP headers.
+		std::string ciscoGuid;
+		// 
 		// This indicates the voice channel number i.e. 1 or 2.
 		// Whoever (caller or agent) sends the first round of speech data bytes will
 		// get assigned a voice channel of 1. The next one to follow will get
@@ -207,6 +212,7 @@ private:
 	int32_t getVoiceChannelNumber(int32_t const & voiceChannelNumber);
 	std::string getAgentOrCallerPhoneNumber(std::string const & vgwSessionId, bool const & vgwIsCaller);
 	SPL::rstring getCallStartDateTime(SPL::rstring const & callStartDateTime);
+	SPL::rstring getCiscoGuid(SPL::rstring const & ciscoGuid);
 }; 
 
 <%SPL::CodeGen::headerEpilogue($model);%>

@@ -8,7 +8,7 @@
 /*
 ==============================================
 First created on: Sep/25/2019
-Last modified on: Feb/10/2021
+Last modified on: Aug/23/2021
 
 A) What does this example application do?
    --------------------------------------
@@ -74,7 +74,7 @@ D) Running this example application
    --------------------------------
 1) In order to run this example, you must first configure the IBM Voice Gateway v1.0.3.0 or higher 
 to send the binary speech data to this IBM Streams application. That involves configuring the 
-IBM Voice Gateway media relay and the IBM Voice Gateway SIP integrator components and then
+IBM Voice Gateway media relay and the IBM Voice Gateway SIP Orchestrator components and then
 deploying them. Please refer to the streamsx.sttgateway documentation section titled 
 "Requirements for this toolkit".
 
@@ -177,9 +177,11 @@ use com.ibm.streamsx.json::*;
 type MySTTResult_t = rstring vgwSessionId, boolean isCustomerSpeechData, 
 	int32 vgwVoiceChannelNumber, 
 	rstring callerPhoneNumber, rstring agentPhoneNumber,
+	rstring ciscoGuid, 
 	int32 speechDataFragmentCnt, int32 totalSpeechDataBytesReceived, 
 	int32 sttEngineId, int32 sttResultProcessorId,
 	rstring callStartDateTime, 
+	rstring utteranceResultReceptionTime,
 	int32 utteranceNumber,
 	rstring utteranceText, boolean finalizedUtterance,
 	float64 confidence, 
@@ -359,8 +361,8 @@ public composite VoiceGatewayToStreamsToWatsonSTT {
 		// Is IBM Voice Gateway message exchange logging needed for debugging?
 		expression<boolean> $vgwSessionLoggingNeeded : 
 			(boolean)getSubmissionTimeValue("vgwSessionLoggingNeeded", "false");
-		// Under some cicumstances, if the IBMVoiceGatewaySource operator sends 
-		// only one EOCS (End Of Call Sigmal) tuple instead of two as required for
+		// Under some circumstances, if the IBMVoiceGatewaySource operator sends 
+		// only one EOCS (End Of Call Signal) tuple instead of two as required for
 		// the two voice channels, that may eventually cause the application logic
 		// below not be able to release the speech engines properly at the end of
 		// a voice call for a given VGW session id. We have seen it in certain
@@ -476,6 +478,7 @@ public composite VoiceGatewayToStreamsToWatsonSTT {
 		// rstring callStartDateTime --> Call start date time i.e. system clock time.
 		// rstring callerPhoneNumber --> Details about the caller's phone number.
 		// rstring agentPhoneNumber --> Details about the agent's phone number.
+		// rstring ciscoGuid --> Value of the SIP invite custom header Cisco-Guid if present.
 		// int32 speechDataFragmentCnt --> Number of fragments (tuples) emitted so far on a given channel (customer or agent) for a given vgwSessionId.
 		// int32 totalSpeechDataBytesReceived --> Number of speech bytes received so far on a given channel (customer or agent) for a given vgwSessionId.
 		// int32 sttEngineId --> This attribute will be set in the next operator. (Please, read the comments there.)
@@ -483,16 +486,16 @@ public composite VoiceGatewayToStreamsToWatsonSTT {
 		BinarySpeech_t = blob speech, rstring vgwSessionId, boolean isCustomerSpeechData, 
 			int32 vgwVoiceChannelNumber, boolean endOfCallSignal,
 			rstring callStartDateTime, rstring callerPhoneNumber,
-			rstring agentPhoneNumber, int32 speechDataFragmentCnt,
-			int32 totalSpeechDataBytesReceived, int32 sttEngineId, 
-			int32 sttResultProcessorId;
+			rstring agentPhoneNumber, rstring ciscoGuid,  
+			int32 speechDataFragmentCnt, int32 totalSpeechDataBytesReceived, 
+			int32 sttEngineId, int32 sttResultProcessorId;
 
 		// The following schema is for the call recording feature where we will
 		// store the call metadata details for a specific voice channel of a given
 		// voice call.
 		CallMetaData_t = rstring vgwSessionId, boolean isCustomerSpeechData, 
 			int32 vgwVoiceChannelNumber, rstring callerPhoneNumber, 
-			rstring agentPhoneNumber;
+			rstring agentPhoneNumber, rstring ciscoGuid;
 			
 		// The following schema is for the call recording feature where we will
 		// store the call speech data for a specific voice channel of a given
@@ -570,6 +573,7 @@ public composite VoiceGatewayToStreamsToWatsonSTT {
 					vgwVoiceChannelNumber = getVoiceChannelNumber(),
 					callerPhoneNumber = getCallerPhoneNumber(),
 					agentPhoneNumber = getAgentPhoneNumber(),
+					ciscoGuid = getCiscoGuid(), 
 					speechDataFragmentCnt = getTupleCnt(),
 					totalSpeechDataBytesReceived = getTotalSpeechDataBytesReceived();
 		}
@@ -753,16 +757,25 @@ public composite VoiceGatewayToStreamsToWatsonSTT {
 									// We can now write a "Start of Call" indicator file in the
 									// application's data directory. e-g: 5362954-call-started.txt
 									mutable int32 err = 0ul;
+									rstring callStartDateTime = ctime(getTimestamp());
 									rstring socsFileName = dataDirectory() + "/" +
 										BSD.vgwSessionId + "-call-started.txt";
 									uint64 fileHandle = fopen (socsFileName, "w+", err);
 									
 									if(err == 0) {
 										fwriteString ("VGW call session id " + BSD.vgwSessionId + 
-											" started at " + ctime(getTimestamp()) + ".", fileHandle, err);
+											" started at " + callStartDateTime + ".", fileHandle, err);
 										fclose(fileHandle, err);
 									}
 									
+									// If call start date time is not set for some reason, we can set it now.
+									// This will happen only for those calls that are being replayed.
+									// For the actual calls coming through Voice Gateway, this must have been
+									// already set inside the Voice Gateway source operator above.
+									if(BSD.callStartDateTime == "") {
+										BSD.callStartDateTime = callStartDateTime;
+									}
+
 									appTrc(Trace.error, "A new voice call has started. vgwSessionId=" + BSD.vgwSessionId);
 								}
 								
@@ -1061,7 +1074,7 @@ public composite IBMWatsonSpeechToText(input AudioBlobContent, AccessToken;
 		expression<rstring> $sttUri : getSubmissionTimeValue("sttUri",
 			"wss://stream.watsonplatform.net/speech-to-text/api/v1/recognize");
 		expression<rstring> $sttBaseLanguageModel : 
-			getSubmissionTimeValue("sttBaseLanguageModel", "en-US_NarrowbandModel");
+			getSubmissionTimeValue("sttBaseLanguageModel", "en-US_Telephony");
 		expression<rstring> $contentType : 
 			getSubmissionTimeValue("contentType", "audio/wav");
 		expression<rstring> $baseModelVersion : 
@@ -1275,6 +1288,10 @@ public composite STTResultProcessor(input MyTranscriptionResult, BinarySpeechDat
 		// Do you want to create a persistent (Keep-Alive) HTTP connection?
 		expression<boolean> $createPersistentHttpConnection :
 			(boolean)getSubmissionTimeValue("createPersistentHttpConnection", "false");		
+
+		// Do you want to include the utterance result reception time?
+		expression<boolean> $includeUtteranceResultReceptionTime :
+			(boolean)getSubmissionTimeValue("includeUtteranceResultReceptionTime", "false");		
 			
 	type
 		// Schema for the input stream of the HttpPost operator.
@@ -1308,6 +1325,13 @@ public composite STTResultProcessor(input MyTranscriptionResult, BinarySpeechDat
 			Custom(MyTranscriptionResult as MTR) {
 			logic
 				onTuple MTR: {
+					// If the user opted for include the time of the
+					// utterance result reception time, let us add it to
+					// the transcription result.
+					if($includeUtteranceResultReceptionTime == true) {
+						MTR.utteranceResultReceptionTime = ctime(getTimestamp());
+					}
+
 					// We will write the transcription results to 
 					// files if the user wanted it that way.
 					if ($writeTranscriptionResultsToFiles == true) {
@@ -1351,8 +1375,11 @@ public composite STTResultProcessor(input MyTranscriptionResult, BinarySpeechDat
 		// In this operator, we will filter only the utterances and send it 
 		// to the downstream operator to be written to the individual files.
 		(stream<rstring vgwSessionId, 
+		 rstring ciscoGuid, 
 		 boolean isCustomerSpeechData,
-		 int32 vgwVoiceChannelNumber, 
+		 int32 vgwVoiceChannelNumber,
+		 rstring callStartDateTime, 
+		 rstring utteranceResultReceptionTime, 
 		 rstring utteranceText> Utterance as U) 
 			as UtteranceFilter = Custom(TranscriptionResultForWritingToFile as TRFWTF) {
 			logic
@@ -1838,7 +1865,7 @@ public composite CallRecordingWriteCoordinator(input SpeechFragment;
 				// call recording write activity.
 				if (_currentVgwSessionId != "" && size(SF.speech) > 0) {
 					// Voice call in progress.
-					// Copy all the only requied number of subset of 
+					// Copy only the required number of subset of 
 					// attributes from the incoming tuple.
 					assignFrom(_oTuple2, SF);
 					submit(_oTuple2, CRSD);

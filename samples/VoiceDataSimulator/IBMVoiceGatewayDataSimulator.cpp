@@ -1,14 +1,14 @@
 /*
 ==============================================
 # Licensed Materials - Property of IBM
-# Copyright IBM Corp. 2018, 2019
+# Copyright IBM Corp. 2018, 2021
 ==============================================
 */
 
 /*
 ==============================================
 First created on: Oct/03/2019
-Last modified on: Jul/09/2020
+Last modified on: Aug/23/2021
 
 This C++ example below can be used to generate voice traffic to test the
 other streamsx.sttgateway toolkit example named VoiceGatewayToStreamsToWatsonSTT.
@@ -485,8 +485,11 @@ int main(int argc, char *argv[]) {
        std::string("\"vgwParticipantURI\":\"sip:+19149453000@4.55.11.163:5060\",") +
        std::string("\"vgwIsCaller\":true,") +
        std::string("\"vgwTenantID\":\"vgwTenantID123\",") +
-       std::string("\"vgwSIPToURI\":\"vgwSIPToURI123\"}}");
-    
+       std::string("\"vgwSIPToURI\":\"vgwSIPToURI123\",") +
+       std::string("\"vgwSIPCustomInviteHeaders\": {") +
+       std::string("\"Cisco-Guid\": ") +
+       std::string("\"3502874379-4113371627-2730858090-1212179876\"}}}");
+
     // Send the Start STT session message on connection 1.
     endpoint1.send(con_id1, sttStartSessionMessage);
 
@@ -503,7 +506,10 @@ int main(int argc, char *argv[]) {
        std::string("\"vgwParticipantURI\":\"sip:+15712487798@169.61.56.229\",") +
        std::string("\"vgwIsCaller\":false,") +
        std::string("\"vgwTenantID\":\"vgwTenantID123\",") +
-       std::string("\"vgwSIPToURI\":\"vgwSIPToURI123\"}}");
+       std::string("\"vgwSIPToURI\":\"vgwSIPToURI123\",") +
+       std::string("\"vgwSIPCustomInviteHeaders\": {") +
+       std::string("\"Cisco-Guid\": ") +
+       std::string("\"3502874379-4113371627-2730858090-1212179876\"}}}");
     
     // Send the Start STT session message on connection 2.
     endpoint2.send(con_id2, sttStartSessionMessage2);
