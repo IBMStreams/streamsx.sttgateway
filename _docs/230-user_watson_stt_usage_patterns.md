@@ -2,7 +2,7 @@
 title: "Operator Usage Patterns"
 permalink: /docs/user/WatsonSTTUsagePatterns/
 excerpt: "Describes the streamsx.sttgateway toolkit usage patterns."
-last_modified_at: 2020-08-23T20:28:48+01:00
+last_modified_at: 2020-09-18T21:30:48+01:00
 redirect_from:
    - /theme-setup/
 sidebar:
@@ -122,15 +122,17 @@ This operator provides the following custom metrics that can be queried via the 
 
 1. **nVoiceCallsProcessed**: It shows the total number of voice calls processed by this operator instance.
 
-2. **nSpeechDataBytesReceived**: It shows the total number of speech data bytes received by this operator instance.
+2. **nVoiceCallsThrottled**: It shows the total number of voice calls throttled by this operator instance.
 
-3. **nOutputTuplesSent**: It shows the total number of output tuples emitted by this operator instance.
+3. **nSpeechDataBytesReceived**: It shows the total number of speech data bytes received by this operator instance.
 
-4. **nTlsPort**: It shows the TLS port number configured for this operator.
+4. **nOutputTuplesSent**: It shows the total number of output tuples emitted by this operator instance.
 
-5. **nNonTlsPortNeeded**: It shows whether the user has configured to exchange data via a non-TLS port.
+5. **nTlsPort**: It shows the TLS port number configured for this operator.
 
-6. **nNonTlsPort**: It shows the Non-TLS port number configured for this operator.
+6. **nNonTlsPortNeeded**: It shows whether the user has configured to exchange data via a non-TLS port.
+
+7. **nNonTlsPort**: It shows the Non-TLS port number configured for this operator.
 
 ## Running the example application that use the IBMVoiceGatewaySource operator
 There is a working example included within this toolkit. You can use it as a reference to learn more about putting this operator to use in your own applications. You can use similar streamtool submitjob commands as shown below in your own applications.

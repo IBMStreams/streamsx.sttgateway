@@ -2,7 +2,7 @@
 title: "Operator Design"
 permalink: /docs/user/OperatorDesign/
 excerpt: "Describes the design of the streamsx.sttgateway toolkit operators."
-last_modified_at: 2020-08-23T20:42:40+01:00
+last_modified_at: 2020-09-18T21:30:40+01:00
 redirect_from:
    - /theme-setup/
 sidebar:
@@ -26,6 +26,11 @@ Main goal of this operator is to receive speech data from the iBM Voice Gateway.
 
 The IBMVoiceGatewaySource operator is designed to ingest speech data from the IBM Voice Gateway product. This speech data is ingested in binary format from the IBM Voice Gateway into this operator via the Websocket interface. Such speech data arrives here in multiple fragments directly from a live voice call. This operator is capable of receiving speech data from multiple calls that can all happen at the very same time between different pairs of speakers. For every voice call it handles in real-time, the IBM Voice Gateway product will open two Websocket connections into this operator and start sending the live speech data on both of those connections. One of those connections will carry the speech data of the agent and the other connection will carry the speech data of the customer. This operator will keep sending the audio chunks received on those two Websocket connections via its output stream for consumption by the downstream operators. At the end of the any given call, IBM Voice Gateway will close the two WebSocket connections it opened into this operator. This operator will also produce periodic output tuples on its single output port to give an indication about the end of a specific speaker (i.e. channel) in a voice call that was in progress moments ago for the given IBM Voice Gateway session id. Downstream operators can make use of this "End Of Voice Call" signal as they see fit.
 
+This operator allows the user to set the maximum number of concurrent calls allowed via the operator parameter named maxConcurrentCallsAllowed. In addition, it also allows the user to dynamically query and adjust the maximum allowed concurrent calls count via the following CURL commands.
+      
+curl -k -X POST https://host:port -H GetMaxConcurrentCalls:true
+curl -k -X POST https://host:port -H SetMaxConcurrentCalls:150
+
 ### IBMVoiceGatewaySource operator parameters
 Following are the parameters accepted by the IBMVoiceGatewaySource operator. Some parameters are mandatory with user-provided values and others are optional with default values assigned within the C++ operator logic.
 
@@ -42,6 +47,7 @@ Following are the parameters accepted by the IBMVoiceGatewaySource operator. Som
 | vgwSessionLoggingNeeded | `boolean` | `false` | This parameter specifies whether logging is needed when the IBM Voice Gateway session is in progress with this operator. |
 | vgwStaleSessionPurgeInterval | `uint32` | `10800` | This parameter specifies periodic time interval in seconds during which any stale Voice Gateway sessions should be purged to free up memory usage. |
 | ipv6Available | `boolean` | `true` | This parameter indicates whether the ipv6 protocol stack is available in the Linux machine where the IBMVoiceGatewaySource operator is running. |
+| maxConcurrentCallsAllowed | `uint32` | `10` | This parameter specifies the maximum concurrent calls allowed for processing by this operator. |
 
 ### IBMVoiceGatewaySource operator's custom output functions
 Following are the custom output functions supported by the IBMVoiceGatewaySource operator. These functions can be called as needed within the output clause of this operator's SPL invocation code.
@@ -56,6 +62,7 @@ Following are the custom output functions supported by the IBMVoiceGatewaySource
 | `rstring getCallerPhoneNumber()` | Returns an rstring value with details about the caller's phone number. |
 | `rstring getAgentPhoneNumber()` | Returns an rstring value with details about the agent's phone number. |
 | `rstring getCallStartDateTime()` | Returns an rstring value with the call start date time i.e. system clock time. |
+| `int64 getCallStartTimeInEpochSeconds()` | Returns an int64 value with the call start time in epoch seconds. |
 | `rstring getCiscoGuid()` | Returns the value for the SIP invite custom header Cisco-Guid. |
 
 *******************************
@@ -98,6 +105,7 @@ Following are the parameters accepted by the WatsonSTT operator. Some parameters
 | maxUtteranceAlternatives | `int32` | `1` | This parameter indicates the required number of n-best alternative hypotheses for the transcription results. |
 | wordAlternativesThreshold | `float64` | `0.0` | This parameter controls the density of the word alternatives results (a.k.a. Confusion Networks). A value of 0.0 disables this feature. Valid value must be less than 1.0 |
 | smartFormattingNeeded | `boolean` | `false` | This parameter indicates whether to convert date, time, phone numbers, currency values, email and URLs into conventional representations. |
+| redactionNeeded | `boolean` | `false` | This parameter indicates whether to redact (mask) numeric data in the transcription result. |
 | keywordsSpottingThreshold | `float64` | `0.0` | This parameter specifies the minimum confidence level that the STT service must have for an utterance word to match a given keyword. A value of 0.0 disables this feature. Valid value must be less than 1.0. |
 | keywordsToBeSpotted | `list<rstring>` | `Empty list` | This parameter specifies a list (array) of strings to be spotted. |
 | websocketLoggingNeeded | `boolean` | `false` | This parameter specifies whether logging is needed from the Websocket library. |
