@@ -92,6 +92,15 @@ These three products will work in the following sequence:
 
 Your Telephony SIPREC-->IBM Voice Gateway-->IBM Streams-->IBM Watson STT
 
+Note
+----
+This is a miniature version of a similarly named application that can be found
+in the samples directory of the streamsx.sttgateway toolkit. In this mini version,
+the application logic is trimmed so that it will not have other features such as 
+call replay, call recording, additional logging of utterances/full results,
+sending utterance results via HTTP etc. If you have a need for such features,
+please use the other non-miniature version.
+
 B) Other IBM Streams toolkits you will need for this application
    -------------------------------------------------------------
 1) You must first ensure that your Streams machine where you will be compiling
@@ -124,9 +133,9 @@ to point to the correct location on your IBM Streams machine.
 
    a) It will be necessary to export the STREAMS_STTGATEWAY_TOOLKIT (v2.2.5 or higher) environment variable by
       pointing it to the full path of your com.ibm.streamsx.sttgateway directory. 
-      * 
+
    b) You have to export the STREAMS_JSON_TOOLKIT (v1.4.6 or higher) and point to the correct directory.
-   
+
    c) You have to export the STREAMS_WEBSOCKET_TOOLKIT (v1.0.6 or higher) and point to the correct directory.
 
    d) There is an indirect dependency on the streamsx.inet toolkit. So, you have to export the 
@@ -150,11 +159,6 @@ the following command to deploy this application in distributed mode one or more
 NOTE: At the very end of the VgwDataRouterTxURL in the command below, you must include the unique id of each speech processor.
 st submitjob -d <YOUR_STREAMS_DOMAIN> -i <YOUR_STREAMS_INSTANCE>  -P idOfThisSpeechProcessor=5 -P vgwDataRouterTxUrl=wss://myhost10:8444/5 -P numberOfSTTEngines=40 -P numberOfResultProcessors=20 -P sttApiKey=<YOUR_WATSON_STT_API_KEY> -P contentType="audio/mulaw;rate=8000" com.ibm.streamsx.sttgateway.sample.watsonstt.VgwDataRouterToWatsonSTT.sab
 
-NOTE: Just to prove that the STT JSON results are getting sent via HTTP,
-you can use a test http receiver Streams application included in the
-samples directory of the streamsx.sttgateway toolkit.
-stt_restults_http_receiver is the name of that test application.
-
 3) When the live calls are happening, you can watch the data directory in your copy of
 this application for specific files per call that will show you just the utterances or 
 the full transcription details for every voice call.
@@ -166,8 +170,7 @@ My IBM Streams instance had 10 application machines with a total of 344 virtual 
 
 time st submitjob -d <YOUR_STREAMS_DOMAIN> -i <YOUR_STREAMS_INSTANCE> -P idOfThisSpeechProcessor=5 -P vgwDataRouterTxUrl=wss://myhost10:8444/5 -P numberOfSTTEngines=200 -P numberOfResultProcessors=100 -P sttApiKey=<YOUR_WATSON_STT_API_KEY> -P contentType="audio/mulaw;rate=8000" -P writeTranscriptionResultsToFiles=true -P sendTranscriptionResultsToHttpEndpoint=true -P httpEndpointForSendingTranscriptionResults=<YOUR_HTTP_ENDPOINT_URL> -C fusionScheme=legacy com.ibm.streamsx.sttgateway.sample.watsonstt.VgwDataRouterToWatsonSTT.sab
 
-When deploying a large number of STT engines (more than 14) and large number of 
-call replay engines (more than 7), it is recommended to follow these tips.
+When deploying a large number of STT engines (more than 14), it is recommended to follow these tips.
 
 --> Before deploying applications with large number of PEs, it is necessary to have the 
     following domain and instance timeout properties set to higher values.
@@ -206,8 +209,6 @@ use com.ibm.streamsx.sttgateway.utils::*;
 use spl.file::*;
 // HttpPost comes from this namespace..
 use com.ibm.streamsx.websocket.op::*;
-// com.ibm.streamsx.json toolkit shipped with your IBM Streams installation is sufficient.
-use com.ibm.streamsx.json::*;
 
 // This is a schema that will get used in two different 
 // composites in this file. So, we have to define it
@@ -316,7 +317,7 @@ type MySTTResult_t = rstring vgwSessionId, boolean isCustomerSpeechData,
  * @param	initDelayBeforeSendingDataToSttEngines	Time in seconds to wait before sending data to the STT engines.
  * 
  * wss://api.{location}.speech-to-text.watson.cloud.ibm.com/instances/{instance_id}/v1/recognize
- * @param	sttUri	Mandatory parameter with no default. 
+ * @param	sttUri	Mandatory parameter with no default.
  * 
  * @param	sttBaseLanguageModel	sttBaseLanguageModel
  * 
@@ -340,6 +341,7 @@ type MySTTResult_t = rstring vgwSessionId, boolean isCustomerSpeechData,
  * 
  * @param	wordAlternativesThreshold	wordAlternativesThreshold
  * @param	smartFormattingNeeded	smartFormattingNeeded
+ * @param	redactionNeeded	redactionNeeded
  * @param	keywordsSpottingThreshold	keywordsSpottingThreshold
  * @param	keywordsToBeSpotted	keywordsToBeSpotted
  * @param	sttWebsocketLoggingNeeded	sttWebsocketLoggingNeeded
@@ -450,50 +452,6 @@ public composite VgwDataRouterToWatsonSTT {
 		// Time in seconds to wait before sending data to the STT engines.
 		expression<float64> $initDelayBeforeSendingDataToSttEngines :
 			(float64)getSubmissionTimeValue("initDelayBeforeSendingDataToSttEngines", "15.0"); 			
-		// Recording the voice calls (A differentiating feature that we offer for free).
-		// Specify the directory where we can write the raw audio files using the
-		// real-time mulaw binary speech data that we receive from the 
-		// IBM Voice Gateway for a given voice channel in a voice call.
-		// This is simply a voice call recording activity that we are 
-		// doing here as a bonus and an optional feature.
-		// If a valid directory is specified by the user, this call recording
-		// feature will write one raw audio file per channel in a given voice call.
-		// File name format:  <vgwSessionId>-<voiceChannelNumber>-mulaw.bin
-		// e-g: 73269584-1-mulaw.bin  and  73269584-2-mulaw.bin
-		//
-		// In addition, it will also write a call metadata file for that voice channel.
-		// File name format:  <vgwSessionId>-<voiceChannelNumber>-metadata.json
-		// e-g: 73269584-1-metadata.json  and  73269584-2-metadata.json
-		expression<rstring> $callRecordingWriteDirectory : 
-			getSubmissionTimeValue("callRecordingWriteDirectory", "/dev");
-		
-		// Replaying the pre-recorded voice calls (A differentiating feature that we offer for free).
-		// User can specify a directory name in which they can keep
-		// copying pre-recorded speech files, call metadata files along with a signal file
-		// to initiate transcription by using the speech data stored in them.
-		// User must first ensure that the pre-recorded raw speech files, call metadata files 
-		// for both the voice channels of a given call exist in this directory.
- 		// After ensuring that those files for both the voice channels of a 
- 		// given call exist, user can execute the following Linux command inside that directory.
-		// touch  <vgwSessionId>.process-mulaw
-		// e-g: touch  73269584.process-mulaw
-		// This command will initiate the replay of the audio data as it   
-		// gets read from the pre-recorded voice calls.
-		expression<rstring> $callRecordingReadDirectory : 
-			getSubmissionTimeValue("callRecordingReadDirectory", "/dev");
-
-		// Users can configure a required number of call replayers. 
-		// A given replayer will represent a single voice call by playing
-		// speech data for the two voice channels (agent and customer).
-		// It is important to ensure that there are equal number or 
-		// more speech to text engines available to absorb the replay load 
-		// from the configured number of call replayers. A single replayer
-		// will need two speech to text engines for both the voice channels.
-		// You must also plan to have additional number of speech to text engines to
-		// satisfy your need to support the planned number of concurrent
-		// real-time voice calls.
-		expression<int32> $numberOfCallReplayEngines :(int32)
-			getSubmissionTimeValue("numberOfCallReplayEngines", "1") ;
 			
 	graph
 		// Ingest the speech data coming from the IBM Voice Gateway Data Router application.
@@ -757,50 +715,6 @@ public composite VgwDataRouterToWatsonSTT {
 				threadedPort: queue(RD, Sys.Wait);
 		}
 
-		// Scan the call recording read directory for a 
-		// replay signal file for every pre-recorded call.
-		(stream<rstring fileName> CallReplaySignalFileName) as 
-		 ReplaySignalFileNameReader = DirectoryScan() {
-			param
-				directory: $callRecordingReadDirectory;
-				ignoreDotFiles: true;
-				pattern: ".*\\.process-mulaw";
-				sleepTime: 20.0;
-		}		
-
-		// The following code block invokes a composite operator to do the
-		// replay of the pre-recorded calls when signaled by the user.
-		// Please read the commentary about this voice call replay feature in the
-		// code at the bottom of this file where this operator logic is implemented.
-		//
-		// We will invoke the configured number of replay composites.
-		// Users can configure a required number of call replayers. 
-		// A given replayer will represent a single voice call by playing
-		// speech data for the two voice channels (agent and customer).
-		// It is important to ensure that there are equal number or 
-		// more speech to text engines available to absorb the replay load 
-		// from the configured number of call replayers. A single replayer
-		// will need two speech to text engines for both the voice channels.
-		// You must also plan to have additional number of speech to text engines to
-		// satisfy your need to support the planned number of concurrent
-		// real-time voice calls.
-		//
-		// If you are using STT on IBM Cloud, it is not a good idea to
-		// have too many replay engines since making that many connections to
-		// the public cloud will not work optimally. If you have STT on CP4D,
-		// then you can provision enough STT capacity and test with a 
-		// high number of replay engines before deciding on a suitable parallel width.
-		//
-		@parallel(width=$numberOfCallReplayEngines)
-		(stream<BinarySpeech_t> PreRecordedBinarySpeechData) as 
-		 VoiceCallReplayer = CallRecordingReplay(CallReplaySignalFileName) {
-		 	param
-		 		callRecordingReadDirectory: $callRecordingReadDirectory;
-		 		// Pass these stream types as composite operator parameters.
-		 		callMetaData_t: CallMetaData_t;
-		 		binarySpeech_t: BinarySpeech_t;
-		 }
-
 		// We have to always route the speech data bytes (fragments) coming from  
 		// a given vgwSessionId_vgwVoiceChannelNumber to a particular 
 		// WatsonSTT operator instance available within a parallel region. 
@@ -821,14 +735,13 @@ public composite VgwDataRouterToWatsonSTT {
 		// given vgwSessionId_vgwVoiceChannelNumber.
 		// That special logic happens inside this operator.
 		(stream<BinarySpeech_t> BinarySpeechDataFragment as BSDF) as
-			BinarySpeechDataRouter = Custom(
-			BinarySpeechData, PreRecordedBinarySpeechData as BSD) {
+			BinarySpeechDataRouter = Custom(BinarySpeechData as BSD) {
 			logic
 				state: {
 					// This map tells us which UDP channel is processing a 
 					// given vgwSessionId_vgwVoiceChannelNumber combo.
 					mutable map<rstring, int32> _vgwSessionIdToUdpChannelMap = {};
-					// This list tells us which UDP channels are 
+					// This list tells us which UDP channels for STT engines are 
 					// idle at any given time.
 					mutable list<int32> _idleUdpChannelsList = 
 						prepareIdleUdpChannelsList($numberOfSTTEngines);
@@ -841,8 +754,9 @@ public composite VgwDataRouterToWatsonSTT {
 					// results in the STTResultProcessor composite that appears
 					// below in this SPL source file.
 					mutable map<rstring, int32> _vgwSessionToResultProcessorChannelMap = {};
-					// This map tells us which UDP channel can be released after comp;eting
-					// the speech to text work for a given vgwSessionId_vgwVoiceChannelNumber.
+					// This map tells us which UDP channel for the STT engine that 
+					// can be released after completing the speech to text work for a given 
+					// vgwSessionId_vgwVoiceChannelNumber.
 					// After getting released, such UDP channels will become available for 
 					// doing speech to text work for any new voice calls.
 					mutable map<rstring, int32> _vgwSessionToCompletedUdpChannelMap = {};
@@ -889,7 +803,7 @@ public composite VgwDataRouterToWatsonSTT {
 								// speakers participating in a given voice call.
 								// This else block is just part of defensive coding.
 								appTrc(Trace.error, 
-									"_XXXXX No STT result processor engine available at this time for the " +
+									"_XXXXX No STT result processor available at this time for the " +
 									"vgwSessionId_vgwVoiceChannelNumber: " + _key + 
 									". This should be a rare occurrence towards the very end of the call." + 
 									" We are not going to process the speech data bytes" +
@@ -926,7 +840,7 @@ public composite VgwDataRouterToWatsonSTT {
 							} else {
 								// We got an idle STT engine.
 								BSD.speechEngineId = mySpeechEngineId;
-
+									
 								// For this voice call (i.e. vgwSessionId), select a 
 								// single result processor UDP channel. Both speakers in this 
 								// voice call will use that single result processor instance.
@@ -1043,10 +957,10 @@ public composite VgwDataRouterToWatsonSTT {
 									
 								// Insert into the state map for future reference.
 								insertM(_vgwSessionIdToUdpChannelMap, 
-									_key, mySpeechEngineId);
+									_key, mySpeechEngineId);									
 							} // End of if (mySpeechEngineId == -1)
 						} // End of if (has(_vgwSessionIdToUdpChannelMap, _key)
-	
+
 						appTrc(Trace.debug, "vgwSessionId=" + BSD.vgwSessionId +
 							", isCustomerSpeechData=" + (rstring)BSD.isCustomerSpeechData +
 							", vgwVoiceChannelNumber=" + (rstring)BSD.vgwVoiceChannelNumber +
@@ -1091,8 +1005,7 @@ public composite VgwDataRouterToWatsonSTT {
 							// Assign the STT engine id where this voice channel was
 							// getting processed until now.
 							_oTuple.speechEngineId = _vgwSessionIdToUdpChannelMap[_key];
-							// We have to send this tuple to the result processor as well for 
-							// the call recording logic to work correctly.
+							// We have to send this tuple to the result processor as well.
 							_oTuple.speechResultProcessorId = 
 								_vgwSessionToResultProcessorChannelMap[BSD.vgwSessionId];
 							submit(_oTuple, BSDF);
@@ -1118,7 +1031,7 @@ public composite VgwDataRouterToWatsonSTT {
 							_key = BSD.vgwSessionId + "_" + (rstring)otherVgwVoiceChannelNumber;
 							
 							if (has(_vgwSessionIdToUdpChannelMap, _key) == true) {
-								// Let us send an empty blob to the WatsonS2T operator to indicate that
+								// Let us send an empty blob to the WatsonSTT operator to indicate that
 								// this speaker of a given voice call is done.
 								_oTuple = (BinarySpeech_t){};
 								// Copy the three input tuple attributes that must
@@ -1134,17 +1047,16 @@ public composite VgwDataRouterToWatsonSTT {
 								
 								_oTuple.vgwVoiceChannelNumber = otherVgwVoiceChannelNumber;
 								
-								// Assign the S2T engine id where this voice channel was
+								// Assign the STT engine id where this voice channel was
 								// getting processed until now.
 								_oTuple.speechEngineId = _vgwSessionIdToUdpChannelMap[_key];
-								// We have to send this tuple to the result processor as well for 
-								// the call recording logic to work correctly.
+								// We have to send this tuple to the result processor as well.
 								_oTuple.speechResultProcessorId = 
 									_vgwSessionToResultProcessorChannelMap[BSD.vgwSessionId];
 								submit(_oTuple, BSDF);
 								// We are now done with this vgwSessionId_vgwVoiceChannelNumber combo.
 								removeM(_vgwSessionIdToUdpChannelMap, _key);
-								// Add the S2T engine id to this call completed map to be released later in the
+								// Add the STT engine id to this call completed map to be released later in the
 								// following if block only after receiving EOCS for both the voice channels of this call.
 								insertM(_vgwSessionToCompletedUdpChannelMap, _key, _oTuple.speechEngineId);
 							}
@@ -1157,9 +1069,6 @@ public composite VgwDataRouterToWatsonSTT {
 							// Let us remove the result processor id only after the logic
 							// in the previous if-block took care of sending the EOCS for 
 							// both the voice channels in a given voice call.
-							// Checking for this condition is important for the
-							// call recording logic inside the STT result processor 
-							// composite to work correctly. 
 							rstring key1 = BSD.vgwSessionId + "_" + "1";
 							rstring key2 = BSD.vgwSessionId + "_" + "2";
 							
@@ -1181,7 +1090,7 @@ public composite VgwDataRouterToWatsonSTT {
 								has(_vgwSessionIdToUdpChannelMap, key2) == false)) || 
 								($numberOfEocsNeededForVoiceCallCompletion == 1 &&
 								(has(_vgwSessionIdToUdpChannelMap, key1) == false ||
-								has(_vgwSessionIdToUdpChannelMap, key2) == false))) {
+								has(_vgwSessionIdToUdpChannelMap, key2) == false))) {								
 								// Since the same result processor is used for both the
 								// voice channels in a call, there will be a single
 								// result processor UDP channel allocated for a given voice call.
@@ -1209,7 +1118,7 @@ public composite VgwDataRouterToWatsonSTT {
 									// We are done. Remove it from the map as well.
 									removeM(_vgwSessionToCompletedUdpChannelMap, key2);
 								}
-	
+
 								// At this time, the voice call for this VGW session id has ended.
 								// We can now write an "End of Call" indicator file in the
 								// application's data directory. e-g: 5362954-call-completed.txt
@@ -1292,11 +1201,6 @@ public composite VgwDataRouterToWatsonSTT {
 			// keep each instance of this operator on its own PE (a.k.a Linux process) by
 			// activating this config clause.
 			//
-			// In my testing (Apr/2020), I found out the following.
-			// For pre-recorded call replay to work correctly, it is necessary to
-			// avoid fusing the STT operators and it is better to leave them on
-			// their own PEs. If call recording and replay features are not
-			// needed, then fusion is fine by commenting out the following config clause. 
 			config
 				placement : partitionExlocation("sttpartition");
 		}
@@ -1309,15 +1213,8 @@ public composite VgwDataRouterToWatsonSTT {
 		// avoiding cross talk and mix up of data from multiple 
 		// voice calls landing in a given parallel channel etc.
 		@parallel(width = $numberOfResultProcessors, 
-		partitionBy=[{port=MSR, attributes=[speechResultProcessorId]},
-			{port=BSDF, attributes=[speechResultProcessorId]}])
-		() as STTResultProcessorSink = STTResultProcessor(MySTTResult as MSR; 
-			BinarySpeechDataFragment as BSDF) {
-			param
-				callRecordingWriteDirectory: $callRecordingWriteDirectory;
-				// Pass these stream types as composite operator parameters.
-				callMetaData_t: CallMetaData_t;
-				callSpeechData_t: CallSpeechData_t;
+		partitionBy=[{port=MSR, attributes=[speechResultProcessorId]}])
+		() as STTResultProcessorSink = STTResultProcessor(MySTTResult as MSR) {
 		}
 } // End of the main composite.
 
@@ -1533,97 +1430,22 @@ public composite IBMWatsonSpeechToText(input AudioBlobContent, AccessToken;
 // storing in files, message queues, databases or make it 
 // accessible from a web application.
 // Please note that this composite has its own parallel region.
-public composite STTResultProcessor(input MyTranscriptionResult, BinarySpeechDataFragmentIn) {
+public composite STTResultProcessor(input MyTranscriptionResult) {
 	param
-		expression <rstring> $callRecordingWriteDirectory;
-		// This composite operator receives externally
-		// defined stream types via operator parameters.
-		type $callMetaData_t;
-		type $callSpeechData_t;
-		
 		// This submission time value decides whether to write the
 		// transcription results to files or not.
 		expression<boolean> $writeTranscriptionResultsToFiles : (boolean)
 			getSubmissionTimeValue("writeTranscriptionResultsToFiles", "true");
 
-		// This submission time value decides whether to send the full 
-		// transcription results to an HTTP endpoint or not.
-		// CAUTION: Don't enable this option if you have a large number of
-		// maximum concurrent voice calls. In such scenarios, sending the
-		// live transcription results via HTTP may not scale well.
-		expression<boolean> $sendTranscriptionResultsToHttpEndpoint : (boolean)
-			getSubmissionTimeValue("sendTranscriptionResultsToHttpEndpoint", "false");
-			
-		// This submission time value allows the user to specify the
-		// HTTP endpoint to where the transcription results must be sent.
-		expression<rstring> $httpEndpointForSendingTranscriptionResults : 
-			getSubmissionTimeValue("httpEndpointForSendingTranscriptionResults", 
-				"http://www.MyTranscriptionResults.com");
+		// This submission time value decides whether to send the
+		// transcription results to an outside application either
+		// via Export or via WebSocket.
+		expression<boolean> $sendTranscriptionResultsToOutsideApplication : (boolean)
+			getSubmissionTimeValue("sendTranscriptionResultsToOutsideApplication", "true");
 		
-		// This submission time value indicates a file name where the HTTP responses will be logged.	
-		expression<rstring> $httpResponseFile : 
-			getSubmissionTimeValue("httpResponseFile", "/dev/null");
-			
-		// This submission time value allows the user to enable the 
-		// writing of the CSV and JSON result files to individual files based on the voice channel number.
-		expression<boolean> $writeResultsToVoiceChannelFiles : (boolean)
-			getSubmissionTimeValue("writeResultsToVoiceChannelFiles", "false");
-
-		// Do we want to accept all the TLS server certificates (an insecure option)?
-		expression<boolean> $tlsAcceptAllCertificates :
-			(boolean)getSubmissionTimeValue("tlsAcceptAllCertificates", "false");
-
-		// Do you want to point to a TLS trust store that has the certificates for
-		// the servers that we can trust?
-		expression<rstring> $tlsTrustStoreFileOnClientSide : 
-			getSubmissionTimeValue("tlsTrustStoreFileOnClientSide", "");
-			
-		// Do you have a TLS trust store password?
-		expression<rstring> $tlsTrustStorePasswordOnClientSide : 
-			getSubmissionTimeValue("tlsTrustStorePasswordOnClientSide", "");
-		
-		// Do you want to point to a TLS key store that has the 
-		// certificate and private key for the client?
-		expression<rstring> $tlsKeyStoreFileOnClientSide :
-			getSubmissionTimeValue("tlsKeyStoreFileOnClientSide", "");
-			
-		// Do you have a TLS key store password?
-		expression<rstring> $tlsKeyStorePasswordOnClientSide :
-			getSubmissionTimeValue("tlsKeyStorePasswordOnClientSide", "");
-			
-		// Do you have a TLS key password?
-		expression<rstring> $tlsKeyPasswordOnClientSide :
-			getSubmissionTimeValue("tlsKeyPasswordOnClientSide", "");
-		
-		// Do we want HttpsPost to display the status of its POST steps/actions.
-		expression<boolean> $logHttpPostActions : 
-			(boolean)getSubmissionTimeValue("LogHttpPostActions", "false");
-
-		// Do you want to change the HTTP connection timeout value in seconds?
-		expression<int32> $httpTimeout :
-			(int32)getSubmissionTimeValue("httpTimeout", "30");
-
-		// Do we want to impose a tiny delay in milliseconds between consecutive HTTP Posts?
-		expression<int32> $delayBetweenConsecutiveHttpPosts : 
-			(int32)getSubmissionTimeValue("delayBetweenConsecutiveHttpPosts", "0");
-			
-		// Do you want to create a persistent (Keep-Alive) HTTP connection?
-		expression<boolean> $createPersistentHttpConnection :
-			(boolean)getSubmissionTimeValue("createPersistentHttpConnection", "false");		
-
 		// Do you want to include the utterance result reception time?
 		expression<boolean> $includeUtteranceResultReceptionTime :
 			(boolean)getSubmissionTimeValue("includeUtteranceResultReceptionTime", "false");		
-			
-	type
-		// Schema for the input stream of the HttpPost operator.
-		HttpPostInput_t = rstring strData, blob blobData, 
-			map<rstring, rstring> requestHeaders, rstring postDateTime;
-			
-		// Schema for the output stream of the HttpPost operator.
-		HttpPostOutput_t = int32 statusCode, rstring statusMessage,
-			map<rstring, rstring> responseHeaders, 
-			rstring strData, blob blobData, rstring postDateTime, rstring ackDateTime;
 			
 	graph
 		// In a real-life application, there will be additional operators here with the 
@@ -1641,9 +1463,7 @@ public composite STTResultProcessor(input MyTranscriptionResult, BinarySpeechDat
 		// send the STT results to other downstream systems such as your
 		// web dashboarding applications.
 		(stream<MyTranscriptionResult> TranscriptionResultForWritingToFile as TRFWTF;
-		 stream<MyTranscriptionResult> TranscriptionResultForSendingToHttp as TRFSTH;
-		 stream<MyTranscriptionResult> TranscriptionResultForFirstVoiceChanel as TRFFVC;
-		 stream<MyTranscriptionResult> TranscriptionResultForSecondVoiceChanel as TRFSVC) = 
+			stream<MyTranscriptionResult> SendTranscriptionResultToOutsideApp as STRTOA) = 
 			Custom(MyTranscriptionResult as MTR) {
 			logic
 				state: {
@@ -1689,7 +1509,12 @@ public composite STTResultProcessor(input MyTranscriptionResult, BinarySpeechDat
 					// utterance result reception time, let us add it to
 					// the transcription result.
 					if($includeUtteranceResultReceptionTime == true) {
+						// This is the current time expressed in ctime format.
 						MTR.utteranceResultReceptionTime = ctime(getTimestamp());
+						// We will also do the utterance reception time expressed
+						// in seconds elapsed since the start of the call.
+						MTR.utteranceRxTime = 
+							getSeconds(getTimestamp()) - MTR.callStartTimeInEpochSeconds;
 					}
 					
 					// We will write the transcription results to 
@@ -1698,23 +1523,33 @@ public composite STTResultProcessor(input MyTranscriptionResult, BinarySpeechDat
 						submit(MTR, TRFWTF);
 					} 
 					
-					// We will send the transcription results to an
-					// HTTP endpoint if the user wanted it that way.
-					if ($sendTranscriptionResultsToHttpEndpoint == true &&
-						$httpEndpointForSendingTranscriptionResults != "") {
-						// We need a valid URL in order to send the results there.
-						submit(MTR, TRFSTH);
-					}
-					
-					// Change done by Senthil on Feb/14/2020 based on the
-					// request from our important banking customer.
-					if ($writeResultsToVoiceChannelFiles == true) {
-						if (MTR.vgwVoiceChannelNumber == 1) {
-							submit(MTR, TRFFVC);
-						} else {
-							submit(MTR, TRFSVC);
-						}
-					}					
+					// If we have to send the utterances to an outside application,
+					// let us do it now.
+					if($sendTranscriptionResultsToOutsideApplication == true) {
+						submit(MTR, STRTOA);
+					}	
+				}
+		}
+		
+		// If we have to send the utterances to an outside application,
+		// replace this operator with an Export operator. 
+		// But, exporting from multiple speech processors may not be
+		// the right approach. A preferred and better approach would be
+		// to use a WebSocketSink operator to send the utterances to be 
+		// received on the other end by a WebSocketSendReceive operator. 
+		// That approach will scale well without putting more stress on the 
+		// Streams instance since the data transfer is done outside the 
+		// confines of the Streams runtime. If more details are needed about 
+		// this preferred approach, please contact the author of this code for help.
+		// 
+		// For now, we will have a dummy Custom sink here.
+		() as NoOpSink = Custom(SendTranscriptionResultToOutsideApp as STRTOA) {
+			logic
+				onTuple STRTOA: {
+					// Do nothing here.
+					// Please read the commentary above this operator to
+					// follow a suitable approach to make use of this incoming tuple.
+					return;
 				}
 		}
 		
@@ -1738,7 +1573,8 @@ public composite STTResultProcessor(input MyTranscriptionResult, BinarySpeechDat
 		 boolean isCustomerSpeechData,
 		 int32 vgwVoiceChannelNumber,
 		 rstring callStartDateTime, 
-		 rstring utteranceResultReceptionTime, 
+		 rstring utteranceResultReceptionTime,
+		 int64 utteranceRxTime, 
 		 rstring utteranceText> Utterance as U) 
 			as UtteranceFilter = Custom(TranscriptionResultForWritingToFile as TRFWTF) {
 			logic
@@ -1773,978 +1609,14 @@ public composite STTResultProcessor(input MyTranscriptionResult, BinarySpeechDat
 			config
 				threadedPort: queue(U, Sys.Wait);
 		}
-		
-		// CAUTION: This logic of converting to JSON and then 
-		// pushing/streaming it via HTTP REST call to an http endpoint is 
-		// fine for a low maximum number of concurrent voice calls (e-g: 100 calls).
-		// For a large maximum number of concurrent calls, this approach
-		// of sending the transcription results to an HTTP endpoint may not
-		// scale very well.
-		//
-		// Let us now convert the transcription result tuple into JSON.
-		(stream<Json> TranscriptionResultInJson) as ResultToJson = 
-			TupleToJSON(TranscriptionResultForSendingToHttp as TRFSTH) {
-			config
-				threadedPort: queue(TRFSTH, Sys.Wait);
-		}
-		
-		// Let us add the JSON string data to the correct input tuple as
-		// expected by the http post operator's input port schema.
-		(stream<HttpPostInput_t> HttpPostInput as HPI) as HttpPostDataMaker = 
-			Functor(TranscriptionResultInJson as TRIJ) {
-			output
-				HPI: strData = TRIJ.jsonString, blobData = (blob)[],
-					requestHeaders=(map<rstring,rstring>){}, 
-					postDateTime = ctime(getTimestamp());
-				
-			config
-				threadedPort: queue(TRIJ, Sys.Wait);
-		}		
-		
-		// Send the transcription result in JSON to the HTTP endpoint.
-		// Sending results via HTTP may not scale well for a high number of
-		// concurrent voice calls. If this becomes a performance problem,
-		// it is better to consider using WebSocket to send the results over a
-		// persistent connection established to/from a server.
-		@catch(exception=all)
-		(stream<HttpPostOutput_t> HttpResponse) as
-		 	TranscriptionResultHttpSender = HttpPost(HttpPostInput as HPI) {
-			param
-				url: $httpEndpointForSendingTranscriptionResults;
-				//
-				// application/octet-stream is the required content type for 
-				// this operator to post the payload as binary data.
-				// Users can also override it to suit their other needs such as
-				// text/plain or application/json or application/xml.
-				contentType: "application/json";
-				//
-				// For scenarios that will require HTTP POST body to
-				// have the query string format (param=value),
-				// the following contentType can be used.
-				//
-				// contentType: "application/x-www-form-urlencoded";
-				//
-				// Do you want to accept all the TLS server certificates (an insecure option)?
-				tlsAcceptAllCertificates: $tlsAcceptAllCertificates;
-				//
-				// Do you want to create a persistent (Keep-Alive) HTTP connection?
-				createPersistentHttpConnection: $createPersistentHttpConnection;
-				//
-				/*
-				// =============== START OF TLS CONFIGURATION ===============
-				// You can enable or disable trust store and key store features of
-				// this operator based on your need. Before doing that, please have a 
-				// thorough reading of the etc/creating-a-self-signed-certificate.txt file.
-				// 
-				// Do you want to point to a TLS trust store that has the certifiactes for
-				// the servers that we can trust?
-				tlsTrustStoreFile: getThisToolkitDir() + "/etc/" + 
-					$tlsTrustStoreFileOnClientSide;
-				//
-				// Do you have a trust store password?
-				tlsTrustStorePassword: $tlsTrustStorePasswordOnClientSide;
-				//
-				// Do you want to point to a TLS key store that has the 
-				// certificate and private key for the client?
-				tlsKeyStoreFile: getThisToolkitDir() + "/etc/" + 
-					$tlsKeyStoreFileOnClientSide;
-				//
-				// Do you have a TLS key store password?
-				tlsKeyStorePassword: $tlsKeyStorePasswordOnClientSide;
-				//
-				// Do you have a TLS key password?
-				tlsKeyPassword: $tlsKeyPasswordOnClientSide;
-				// =============== END OF TLS CONFIGURATION ===============
-				*/
-				//
-				// Do you want to log the individual steps/tasks/actions performed during the HTTP POST?
-				logHttpPostActions: $logHttpPostActions;
-				//
-				// If you get frequent connection timeouts, it is necessary to
-				// increase it to a higher value than the default of 30 seconds.
-				httpTimeout: $httpTimeout;
-				//
-				// Impose a tiny delay in milliseconds between continously happening  
-				// non-stop HTTP POSTs at a faster pace. HTTP POST in general is not 
-				// meant for that kind of high speed message exchanges. This minor delay 
-				// between consecutive posts will avoid opening too many quick 
-				// connections to the remote Web Server. That helps in not getting 
-				// connection refused errors. Provide a non-zero delay only if needed.
-				delayBetweenConsecutiveHttpPosts: $delayBetweenConsecutiveHttpPosts;
-				
-			config
-				threadedPort: queue(HPI, Sys.Wait);
-		}
-		
-		// Let us populate the HTTP response/ack received time.
-		// This will help us in calculating the HTTP message transfer latecny.
-		(stream<HttpPostOutput_t> HttpResponseWithAckTime as HRWAT) 
-			as HttpResponseAckTimeKeeper = Functor(HttpResponse as HR) {
-			output
-				HRWAT: ackDateTime = ctime(getTimestamp());
-				
-			config
-				threadedPort: queue(HR, Sys.Wait);
-		}
-		
-		() as MySink3 = FileSink(HttpResponseWithAckTime as HRWAT) {
-			param
-				// This file will contain the HTTP response from 
-				// sending the transcription results to an HTTP endpoint.
-				// We will write it to a dedicated file for a given 
-				// result processor id i.e. parallel channel.
-				// We need this file only when HTTP send option is activated and
-				// when the user configured a valid HTTP response file name.
-				file: (($sendTranscriptionResultsToHttpEndpoint == true && 
-				    $httpResponseFile != "/dev/null") ?
-					$httpResponseFile + "." + (rstring)(getChannel() + 1) : "/dev/null");
-				flush: 1u;
-
-			config
-				threadedPort: queue(HRWAT, Sys.Wait);
-		}
-
-		// Following additional operators were added by Senthil on 
-		// Feb/14/2020 based on the request from our important banking customer.
-		// Let us now write the results to individual voice channel specific files.
-		//
-		// Individual full CSV result for voice channel 1.
-		() as MySink4 = FileSink(TranscriptionResultForFirstVoiceChanel as TRFFVC) {
-			param
-				// This file will contain a comprehensive set of full STT results in CSV for a given voice channel.
-				file: ($writeResultsToVoiceChannelFiles == true ?  
-				TRFFVC.vgwSessionId + "-" + (rstring)TRFFVC.vgwVoiceChannelNumber + "-full-result.txt" :
-				"/dev/null");
-				closeMode: dynamic;
-				quoteStrings: false;
-				append: true;
-				flush: 1u;
-
-			config
-				threadedPort: queue(TRFFVC, Sys.Wait);
-		}
-		
-		// Individual full CSV result for voice channel 2.
-		() as MySink5 = FileSink(TranscriptionResultForSecondVoiceChanel as TRFSVC) {
-			param
-				// This file will contain a comprehensive set of full STT results in CSV for a given voice channel.
-				file: ($writeResultsToVoiceChannelFiles == true ?  
-				TRFSVC.vgwSessionId + "-" + (rstring)TRFSVC.vgwVoiceChannelNumber + "-full-result.txt" :
-				"/dev/null");
-				closeMode: dynamic;
-				quoteStrings: false;
-				append: true;
-				flush: 1u;
-
-			config
-				threadedPort: queue(TRFSVC, Sys.Wait);
-		}
-		
-		// Write the full transcription result in JSON for both the voice channels.
-		() as MySink6 = FileSink(TranscriptionResultInJson as TRIJ) {
-			param
-				// This file will contain a comprehensive set of full STT results in JSON for both the voice channels.
-				file: ($writeResultsToVoiceChannelFiles == true ?  
-				parseVgwSessionIdFromJson(TRIJ.jsonString) + "-full-result.json" :
-				"/dev/null");
-				closeMode: dynamic;
-				quoteStrings: false;
-				append: true;
-				flush: 1u;
-
-			config
-				threadedPort: queue(TRIJ, Sys.Wait);
-		}
-		
-		// Convert the voice channel 1 result to JSON.
-		(stream<Json> TranscriptionResultInJsonForFirstVoiceChannel) as ResultToJsonForFirstVoiceChannel = 
-			TupleToJSON(TranscriptionResultForFirstVoiceChanel as TRFFVC) {
-			config
-				threadedPort: queue(TRFFVC, Sys.Wait);
-		}
-		
-		// Write the full transcription result in JSON for voice channel 1.
-		() as MySink7 = FileSink(TranscriptionResultInJsonForFirstVoiceChannel as TRIJFFVC) {
-			param
-				// This file will contain a comprehensive set of full STT results in JSON for voice channel 1.
-				file: ($writeResultsToVoiceChannelFiles == true ?  
-				parseVgwSessionIdFromJson(TRIJFFVC.jsonString) + "-1-full-result.json" : "/dev/null");
-				closeMode: dynamic;
-				quoteStrings: false;
-				append: true;
-				flush: 1u;
-
-			config
-				threadedPort: queue(TRIJFFVC, Sys.Wait);
-		}
-
-		// Convert the voice channel 2 result to JSON.
-		(stream<Json> TranscriptionResultInJsonForSecondVoiceChannel) as ResultToJsonForSecondVoiceChannel = 
-			TupleToJSON(TranscriptionResultForSecondVoiceChanel as TRFSVC) {
-			config
-				threadedPort: queue(TRFSVC, Sys.Wait);
-		}
-		
-		// Write the full transcription result in JSON for voice channel 2.
-		() as MySink8 = FileSink(TranscriptionResultInJsonForSecondVoiceChannel as TRIJFSVC) {
-			param
-				// This file will contain a comprehensive set of full STT results in JSON for voice channel 2.
-				file: ($writeResultsToVoiceChannelFiles == true ?  
-				parseVgwSessionIdFromJson(TRIJFSVC.jsonString) + "-2-full-result.json" : "/dev/null");
-				closeMode: dynamic;
-				quoteStrings: false;
-				append: true;
-				flush: 1u;
-
-			config
-				threadedPort: queue(TRIJFSVC, Sys.Wait);
-		}
-		
-		// =================================================================
-		// START OF CALL RECORDING WRITE ACTIVITY.
-		// This code block is here purely for supporting the 
-		// call recording feature. When the user overrides the
-		// default (/dev) value for the callRecordingWriteDirectory
-		// submission time parameter with a different directory name,
-		// the logic in the code block below will capture the 
-		// raw audio data received in a given voice channel 
-		// for a given VGW session id and write it to files (one file
-		// per voice channel). 
-		// If a valid directory is specified by the user, this call recording
-		// feature will write one raw audio file per channel in a given voice call.
-		// File name format:  <vgwSessionId>-<voiceChannelNumber>-mulaw.bin
-		// e-g: 73269584-1-mulaw.bin  and  73269584-2-mulaw.bin
-		//
-		// In addition, it will also write a call metadata file for that voice channel.
-		// File name format:  <vgwSessionId>-<voiceChannelNumber>-metadata.json
-		// e-g: 73269584-1-metadata.json  and  73269584-2-metadata.json
-		(stream<BinarySpeechDataFragmentIn> BinarySpeechDataFragmentInVoiceChannel1;
-		 stream<BinarySpeechDataFragmentIn> BinarySpeechDataFragmentInVoiceChannel2)
-			as BinarySpeechDataFilterByVoiceChannel = 
-			Split(BinarySpeechDataFragmentIn as BSDF) {
-			param
-				// We will only have either channel number 1 or 2.
-				// So, send the speech data received via channel number 1 to 
-				// output port index 0 (i.e. first port).
-				// Send the speech data received via channel number 2 to 
-				// output port index 1 (i.e. second port).
-				index: (BSDF.vgwVoiceChannelNumber == 1) ? 0 : 1;
-		}
-				
-		// Invoke the call recording write coordinator for voice channel 1 speech data.
-		// This composite operator will emit output tuples only when a valid 
-		// call recording write directory is configured by the user.
-		(stream<$callMetaData_t> CallRecordingMetaDataForVoiceChannel1 as CRMD;
-		 stream<$callSpeechData_t> CallRecordingSpeechDataForVoiceChannel1 as CRSD) as 
-		 CallRecordingWriteCoordinator1 = 
-		 CallRecordingWriteCoordinator(BinarySpeechDataFragmentInVoiceChannel1) {
-		 	param
-		 		callRecordingWriteDirectory: $callRecordingWriteDirectory;
-		 		// Pass these stream types as composite operator parameters.
-		 		callMetaData_t: $callMetaData_t;
-				callSpeechData_t: $callSpeechData_t;
-		 }
-
-		// Invoke the call recording write coordinator for voice channel 2 speech data.
-		// This composite operator will emit output tuples only when a valid 
-		// call recording write directory is configured by the user.
-		(stream<$callMetaData_t> CallRecordingMetaDataForVoiceChannel2 as CRMD;
-		 stream<$callSpeechData_t> CallRecordingSpeechDataForVoiceChannel2 as CRSD) as 
-		 CallRecordingWriteCoordinator2 = 
-		 CallRecordingWriteCoordinator(BinarySpeechDataFragmentInVoiceChannel2) {
-		 	param
-		 		callRecordingWriteDirectory: $callRecordingWriteDirectory;
-		 		// Pass these stream types as composite operator parameters.
-		 		callMetaData_t: $callMetaData_t;
-				callSpeechData_t: $callSpeechData_t;
-		 }
-		 
-		 // Convert the voice call metadata for voice channel 1 to JSON.
-		(stream<Json> CallRecordingMetaDataForVoiceChannel1InJson) as CRMDVC1InJson = 
-			TupleToJSON(CallRecordingMetaDataForVoiceChannel1 as CRMD) {
-			config
-				threadedPort: queue(CRMD, Sys.Wait);
-		}
-
-		 // Convert the voice call metadata for voice channel 2 to JSON.
-		(stream<Json> CallRecordingMetaDataForVoiceChannel2InJson) as CRMDVC2InJson = 
-			TupleToJSON(CallRecordingMetaDataForVoiceChannel2 as CRMD) {
-			config
-				threadedPort: queue(CRMD, Sys.Wait);
-		}
-		
-		// Write the call metadata JSON for voice channel 1 into a file.
-		() as CallMetaDataSink1 = FileSink(CallRecordingMetaDataForVoiceChannel1InJson as CRMD) {
-			param
-				// This file will contain call metadata in JSON for voice channel 1.
-				// File name format:  <vgwSessionId>-<voiceChannelNumber>-metadata.json
-				// e-g: 73269584-1-metadata.json  and  73269584-2-metadata.json
-				file: $callRecordingWriteDirectory + "/" + 
-					parseVgwSessionIdFromJson(CRMD.jsonString) + "-1-metadata.json";
-				closeMode: dynamic;
-				quoteStrings: false;
-				flush: 1u;
-
-			config
-				threadedPort: queue(CRMD, Sys.Wait);
-		}
-		
-		// Write the call metadata JSON for voice channel 2 into a file.
-		() as CallMetaDataSink2 = FileSink(CallRecordingMetaDataForVoiceChannel2InJson as CRMD) {
-			param
-				// This file will contain call metadata in JSON for voice channel 2.
-				// File name format:  <vgwSessionId>-<voiceChannelNumber>-metadata.json
-				// e-g: 73269584-1-metadata.json  and  73269584-2-metadata.json
-				file: $callRecordingWriteDirectory + "/" + 
-					parseVgwSessionIdFromJson(CRMD.jsonString) + "-2-metadata.json";
-				closeMode: dynamic;
-				quoteStrings: false;
-				flush: 1u;
-
-			config
-				threadedPort: queue(CRMD, Sys.Wait);
-		}
-		 		
-		// Write the speech data bytes received on voice channel 1 to its own binary file.
-		() as CallSpeechDataSink1 = FileSink(CallRecordingSpeechDataForVoiceChannel1 as CRSD) {
-			param
-				// You can use this command to convert this 
-				// mulaw formatted audio file into a WAV file in order to
-				// play it using Audacity, QuickTime Player etc.:
-				// ffmpeg -f mulaw -ar 8000 -i <raw data> -codec:a pcm_mulaw <wav-filename>
-				//
-				// This file will contain binary speech data in mulaw format for voice channel 1.
-				// File name format:  <vgwSessionId>-<voiceChannelNumber>-mulaw.bin
-				// e-g: 73269584-1-mulaw.bin  and  73269584-2-mulaw.bin
-				file: $callRecordingWriteDirectory + "/" + 
-					CRSD.vgwSessionId + "-1-mulaw.bin";
-				closeMode: dynamic;
-				// We only want the blob speech attribute value to be written to the file.
-				// Let us suppress the other attribute(s) present in the incoming tuple.
-				suppress: CRSD.vgwSessionId;
-				format: block;
-				flush: 1u;
-
-			config
-				threadedPort: queue(CRSD, Sys.Wait);
-		}
-
-		// Write the speech data bytes received on voice channel 2 to its own binary file.
-		() as CallSpeechDataSink2 = FileSink(CallRecordingSpeechDataForVoiceChannel2 as CRSD) {
-			param
-				// You can use this command to convert this 
-				// mulaw formatted audio file into a WAV file in order to
-				// play it using Audacity, QuickTime Player etc.:
-				// ffmpeg -f mulaw -ar 8000 -i <raw data> -codec:a pcm_mulaw <wav-filename>
-				//
-				// This file will contain binary speech data in mulaw format for voice channel 2.
-				// File name format:  <vgwSessionId>-<voiceChannelNumber>-mulaw.bin
-				// e-g: 73269584-1-mulaw.bin  and  73269584-2-mulaw.bin
-				file: $callRecordingWriteDirectory + "/" + 
-					CRSD.vgwSessionId + "-2-mulaw.bin";
-				closeMode: dynamic;
-				// We only want the blob speech attribute value to be written to the file.
-				// Let us suppress the other attribute(s) present in the incoming tuple.
-				suppress: CRSD.vgwSessionId;
-				format: block;
-				flush: 1u;
-
-			config
-				threadedPort: queue(CRSD, Sys.Wait);
-		}
-		// END OF CALL RECORDING WRITE ACTIVITY.
-		// =================================================================
 } // End of the composite STTResultProcessor
-
-// The following analytic composite will get invoked by the 
-// core logic above that does the call recording write activity.
-// The logic here detects the start and end of a voice call before 
-// deciding whether to forward or not forward the speech data for 
-// call recording write activity. It simply acts as a helpful coordinator.
-// Please note that this composite is invoked within a parallel region.
-public composite CallRecordingWriteCoordinator(input SpeechFragment;
-	output CallRecordingMetaData, CallRecordingSpeechData) {
-	param
-		expression <rstring> $callRecordingWriteDirectory;
-		// This composite operator receives externally
-		// defined stream types via operator parameters.
-		type $callMetaData_t;
-		type $callSpeechData_t;
-		
-	graph
-		(stream<$callMetaData_t> CallRecordingMetaData as CRMD;
-		 stream<$callSpeechData_t> CallRecordingSpeechData as CRSD) as 
-		 CallRecordingWriteHelper = Custom(SpeechFragment as SF) {
-			logic
-				state: {
-					mutable rstring _currentVgwSessionId = "";
-					mutable $callMetaData_t _oTuple1 = {};
-					mutable $callSpeechData_t _oTuple2  = {};
-				}
-				
-			onTuple SF: {
-				// If the user didn't configure any valid directory for the 
-				// call recording write activity, we can return now.
-				if ($callRecordingWriteDirectory == "/dev") {
-					// Call recording write not needed.
-					return;
-				}
-				
-				// If we reached the end of a voice call, it is indicated by
-				// an empty blob in the speech attribute of the incoming tuple.
-				// When that condition occurs, we will reset our
-				// state variable and continue later when the next voice call happens.
-				if (_currentVgwSessionId != "" && size(SF.speech) <= 0) {
-					// Voice call ended.
-					_currentVgwSessionId = "";
-					appTrc(Trace.info, "2) End: " + SF.vgwSessionId + 
-						"-" + (rstring)vgwVoiceChannelNumber);
-					return;
-				}
-				
-				// Let us verify if we are getting data for a new 
-				// VGW session id for which the voice call is starting just now.
-				if (_currentVgwSessionId == "" && size(SF.speech) > 0) {
-					// It is a new voice call.
-					_currentVgwSessionId = SF.vgwSessionId;
-					
-					// Since this is the first speech fragment for this voice channel in
-					// a given voice call, let us send the call meta data on its own
-					// output stream to be written to a file in JSON format.
-					// Copy all the matching attributes to OUT from IN (a small subset).
-					assignFrom(_oTuple1, SF);
-					submit(_oTuple1, CRMD);
-					appTrc(Trace.info, "1) Begin: " + SF.vgwSessionId + 
-						"-" + (rstring)vgwVoiceChannelNumber);
-				}
-				
-				// If we received a non-zero sized speech fragment for an
-				// ongoing voice call, let us send it further for 
-				// call recording write activity.
-				if (_currentVgwSessionId != "" && size(SF.speech) > 0) {
-					// Voice call in progress.
-					// Copy only the required number of subset of 
-					// attributes from the incoming tuple.
-					assignFrom(_oTuple2, SF);
-					submit(_oTuple2, CRSD);
-				}
-			}				
-		}
-} // End of the composite CallRecordingWriteCoordinator
-
-// The following analytic composite receives a signal file name
-// from an upstream operator. It will look for
-// call meta data and call speech data of pre-recorded 
-// voice calls in the same directory as that of the signal file.
-// Then, it will send the call speech data combined with the
-// call meta data for transcription by the downstream operators.
-//
-// Please note that this composite can have its own 
-// parallel region for the purpose of load testing by 
-// replaying many pre-recorded voice calls at the same time.
-public composite CallRecordingReplay(input CallReplaySignalFileNameIn;
-	output PreRecordedBinarySpeechData) {
-	param
-		expression <rstring> $callRecordingReadDirectory;
-		// This composite operator receives externally
-		// defined stream types via operator parameters.
-		type $callMetaData_t;
-		type $binarySpeech_t;
-	
-	// Replaying the pre-recorded voice calls.
-	// The graph below will perform the logic necessary to
-	// read call meta data and speech data from pre-recorded calls and
-	// then do a replay. User must override the default value (/dev) for the 
-	// callRecordingReadDirectory submission time parameter with their
-	// own valid directory name. In that user-specified directory,
-	// they can keep copying pre-recorded audio files, 
-	// call metadata file along with a signal file to initiate transcription 
-	// by using the speech data stored in them.
-	// User must first ensure that the pre-recorded raw speech files, call metadata files 
-	// for both the voice channels of a given call exist in that directory.
-	// After ensuring that those files for both the voice channels of a 
-	// given call exist, user can execute the following Linux command inside that directory.
-	// touch  <vgwSessionId>.process-mulaw
-	// e-g: touch  73269584.process-mulaw
-	// This command will initiate the replay of the audio data as it   
-	// gets read from the pre-recorded voice calls.	
-	graph		
-		(stream<CallReplaySignalFileNameIn> CallReplaySignalFileName as CRSF) as 
-			 ReplaySignalFileNameFilter = Custom(CallReplaySignalFileNameIn as CRSFI) {
-			logic
-				onTuple CRSFI: {
-					// Simply keep forwarding it to the downstream operator.
-					submit(CRSFI, CRSF);
-				}
-				
-			config
-				threadedPort: queue(CRSFI, Sys.Wait);
-		}
-		
-		// Control the replay of only one pre-recorded voice call at a time.
-		// Release only one replay signal file at a time.
-		(stream<rstring fileName> GatedCallReplaySignalFileName) as 
-		 CallReplaySignalGate = Gate(CallReplaySignalFileName; Acknowledgement) {
-		 	param
-		 		// Allow only 1 tuple to go through at a time
-		 		maxUnackedTupleCount : 1u;  
-		 		// Acknowledge the specified number of tuples.
-		 		// In our case here, we will do one tuple at a time.
-		 		numTuplesToAck : Acknowledgement.count; 
-		 }
-		
-		// Form the call meta data and call speech data file names and
-		// then send them out for reading the data stored inside of them.
-		(stream<rstring fileName> CallMetaDataFileNameVC1 as CMDFVC1;
-		 stream<rstring fileName> CallSpeechDataFileNameVC1 as CSDFVC1;
-		 stream<rstring fileName> CallMetaDataFileNameVC2 as CMDFVC2;
-		 stream<rstring fileName> CallSpeechDataFileNameVC2 as CSDFVC2) as 
-		 PreRecordedCallFileNameCreator = Custom(GatedCallReplaySignalFileName as CRSFN) {
-		 logic
-		 	onTuple CRSFN: {
-		 		// User is initiating a replay through a signal file.
-		 		// This file name will have this format.
-		 		// <vgwSessionId>.process-mulaw
-				// e-g: 73269584.process-mulaw
-				// We can parse just the VGW session id from this file name.
-				//
-				// Tokenize the fully qualified signal file name,
-				list<rstring> tokens = tokenize(CRSFN.fileName, "/", true);
-				// Get the very last token which is just the signal file name.
-				rstring signalFileName = tokens[size(tokens)-1];
-				// Parse the VGW session id from the file name.
-				int32 idx = findFirst(signalFileName, ".process-mulaw");
-				rstring vgwSessionId = substring(signalFileName, 0, idx);
-				
-				// We can remove the signal file now.
-				mutable int32 rc = 0;
-				mutable uint64 fileSize = 0ul;
-				remove(CRSFN.fileName, rc);
-				
-				// At this point, we must ensure that we have a call metadata file and
-				// a call speech data file for voice channels 1 and 2 in the same directory where 
-				// the signal file is present (i.e. call recording read directory).
-				// Those file names will be in the following format.
-				// File name format:  <vgwSessionId>-<voiceChannelNumber>-metadata.json
-				// e-g: 73269584-1-metadata.json  and  73269584-2-metadata.json				
-				//
-				// File name format:  <vgwSessionId>-<voiceChannelNumber>-mulaw.bin
-				// e-g: 73269584-1-mulaw.bin  and  73269584-2-mulaw.bin
-				//
-				// Prepare file names for voice channel 1 and check if they exist.
-				rstring callMetaDataFileNameForVC1 = $callRecordingReadDirectory + "/" + 
-					vgwSessionId + "-1-metadata.json";
-				// Check if this file exists.
-				fstat(callMetaDataFileNameForVC1, "size", fileSize, rc);
-				
-				if (rc != 0) {
-					appTrc(Trace.error, "Skipping call replay for VGW session id " + 
-						vgwSessionId + ". File not found: " + callMetaDataFileNameForVC1);
-					return; 
-				}
-				
-				rstring callSpeechDataFileNameForVC1 = $callRecordingReadDirectory + "/" + 
-					vgwSessionId + "-1-mulaw.bin";
-				// Check if this file exists.
-				fstat(callSpeechDataFileNameForVC1, "size", fileSize, rc);
-				
-				if (rc != 0) {
-					appTrc(Trace.error, "Skipping call replay for VGW session id " + 
-						vgwSessionId + ". File not found: " + callSpeechDataFileNameForVC1);
-					return; 
-				}				
-				
-				// Prepare file names for voice channel 2 and check if they exist.
-				rstring callMetaDataFileNameForVC2 = $callRecordingReadDirectory + "/" + 
-					vgwSessionId + "-2-metadata.json";
-				// Check if this file exists.
-				fstat(callMetaDataFileNameForVC2, "size", fileSize, rc);
-				
-				if (rc != 0) {
-					appTrc(Trace.error, "Skipping call replay for VGW session id " + 
-						vgwSessionId + ". File not found: " + callMetaDataFileNameForVC2);
-					return; 
-				}
-				
-				rstring callSpeechDataFileNameForVC2 = $callRecordingReadDirectory + "/" + 
-					vgwSessionId + "-2-mulaw.bin";
-				// Check if this file exists.
-				fstat(callSpeechDataFileNameForVC2, "size", fileSize, rc);
-				
-				if (rc != 0) {
-					appTrc(Trace.error, "Skipping call replay for VGW session id " + 
-						vgwSessionId + ". File not found: " + callSpeechDataFileNameForVC2);
-					return; 
-				}				
-				
-				// We have all the required call meta data and call speech data files 
-				// for both the voice channels of a given voice call. We can proceed by
-				// sending those file names for reading by the downstream operators.
-				// Send the meta data file names for both the voice channels first.
-				mutable CallMetaDataFileNameVC1 oTuple1 = {};
-				mutable CallSpeechDataFileNameVC1 oTuple2 = {};
-				oTuple1.fileName = callMetaDataFileNameForVC1;
-				submit(oTuple1, CMDFVC1);
-				oTuple1.fileName = callMetaDataFileNameForVC2;
-				submit(oTuple1, CMDFVC2);
-				
-				// Give a sufficient amount of delay for the call metadata JSON to 
-				// get read before we send the speech data.
-				block(30.0);
-
-				// Send the speech data file names for both the voice channels now.				
-				oTuple2.fileName = callSpeechDataFileNameForVC1;
-				submit(oTuple2, CSDFVC1);
-				oTuple2.fileName = callSpeechDataFileNameForVC2;
-				submit(oTuple2, CSDFVC2);
-		 	}
-		}
-	
-		// This operator will read the call meta data JSON for voice channel 1.
-		(stream<Json> CallMetaDataJsonVC1) as 
-		 CallMetaDataJsonReader1 = FileSource(CallMetaDataFileNameVC1) {
-		 	param
-		 		format: line;
-		 }
-		 
-		// This operator will read the call meta data JSON for voice channel 1.
-		(stream<Json> CallMetaDataJsonVC2) as 
-		 CallMetaDataJsonReader2 = FileSource(CallMetaDataFileNameVC2) {
-		 	param
-		 		format: line;
-		 }
-		 
-		 // This operator will read the call binary speech data for voice channel 1.
-		(stream<blob speech, rstring fileName> CallSpeechDataVC1 as CSD) as 
-		 CallSpeechDataReader1 = FileSource(CallSpeechDataFileNameVC1) {
-			param
-				format: block;
-				// Typical file size for a two minute call recording is 1MB.
-				// We will support replay of up an hour long call i.e. 30MB file size.
-				// If user wants to do a replay of longer calls than that, he/she must
-				// change the block size below accordingly.
-				blockSize: (uint32)(30 * 1024 * 1024);
-				
-			output 
-				CSD: fileName = FileName();
-		}
-		
-		 // This operator will read the call binary speech data for voice channel 2.
-		(stream<blob speech, rstring fileName> CallSpeechDataVC2 as CSD) as 
-		 CallSpeechDataReader2 = FileSource(CallSpeechDataFileNameVC2) {
-			param
-				format: block;
-				// Typical file size for a two minute call recording is 1MB.
-				// We will support replay of up an hour long call i.e. 30MB file size.
-				// If user wants to do a replay of longer calls than that, he/she must
-				// change the block size below accordingly.
-				blockSize: (uint32)(30 * 1024 * 1024);
-
-			output 
-				CSD: fileName = FileName();
-		}
-		
-		// This operator will convert the call meta data JSON to tuple for voice channel 1.
-		(stream<$callMetaData_t> CallMetaDataVC1) as 
-		 CallMetaDataConverter1 = JSONToTuple(CallMetaDataJsonVC1) {
-		 	param
-		 		ignoreParsingError: true;
-		}
-		 
-		// This operator will convert the call meta data JSON to tuple for voice channel 2.
-		(stream<$callMetaData_t> CallMetaDataVC2) as 
-		 CallMetaDataConverter2 = JSONToTuple(CallMetaDataJsonVC2) {
-		 	param
-		 		ignoreParsingError: true;
-		}
-
-		(stream<boolean signal> TimerSignal) as
-			ReplayHangDetectionTimer = Beacon() {
-			param
-				// In theory, replay of a pre-recorded call should keep
-				// happening much quicker as long as there are enough
-				// number of available speech to text engines. 
-				// If a replay for a call gets stuck due to file read 
-				// errors or JSON conversion errors, this timer signal will
-				// help us to cancel the stuck replay and get ready to
-				// replay the next available pre-recorded call.
-				//
-				// Beacon will send a signal right away when it starts up and
-				// then keep sending more tuples steadily at a periodic interval.
-				// 
-				// Send a signal for every 60 minutes.
-				period: 60.0 * 60.0; 	
-				initDelay: 10.0;
-		}
-
-		// This operator will receive both the call meta data and the
-		// call speech data fragments for voice channels 1 and 2. It will 
-		// mix both of them and send out a tuple for transcription by
-		// downstream operators.
-		(stream<$binarySpeech_t> PreRecordedBinarySpeechData as PRBSD;
-		 stream<uint32 count> Acknowledgement as Ack) as 
-		 PreRecordedCallReplayer = Custom(CallMetaDataVC1, CallMetaDataVC2 as CMD;
-		 	CallSpeechDataVC1, CallSpeechDataVC2 as CSD; TimerSignal as TS) {
-		 	logic
-		 		state: {
-		 			// Key = vgwSessionId-vgwVoiceChannelNumber
-		 			// Value = Call meta data tuple.
-		 			mutable map<rstring, $callMetaData_t> _callMetaDataMap = {};
-		 			// Key = vgwSessionId-vgwVoiceChannelNumber
-		 			// Value = Cumulative speech data fragment count.
-		 			mutable map<rstring, int32> _speechDataFragmentCount = {};
-		 			// Key = vgwSessionId-vgwVoiceChannelNumber
-		 			// Value = Cumulative speech data bytes count.
-		 			mutable map<rstring, int32> _speechDataBytesCount = {};
-		 			// Key = vgwSessionId-vgwVoiceChannelNumber
-		 			// Value = Call speech data file size.
-		 			mutable map<rstring, int32>  _speechDataFileSize = {};
-		 			// Key = vgwSessionId-vgwVoiceChannelNumber
-		 			// Value = Call speech data tuples sent.
-		 			mutable map<rstring, int32>  _speechDataTuplesSentCount = {};		 			
-					mutable int32 _voiceChannelsCompletedCnt = 0;
-					// It is used for detecting any replay that is stuck
-					// waiting for data to be read from the pre-recorded files.
-					mutable rstring lastObservedReplayMapKey = "abcxyz";
-		 			mutable $binarySpeech_t _oTuple1 = {};
-		 		}
-		 		
-		 		onTuple CMD: {
-		 			// When the call meta data for a given voice channel arrives here,
-		 			// simply insert into the state map.
-		 			rstring key = CMD.vgwSessionId + "-" + 
-		 				(rstring)vgwVoiceChannelNumber;
-
-					appTrc(Trace.error, 
-					    "Pre-Recorded call replay channel=" + (rstring)getChannel() + 
-						". Received a replay request for a pre-recorded voice call " + 
-						key + ".");
-
-					// Let us check if this call meta data is arriving late i.e.
-					// we already received the speech data before even receiving this
-					// call meta data. This can happen since the JSON based call meta data and
-					// the binary based speech data are read by different FileSource operators above.
-					if(has(_speechDataFileSize, key) == true &&
-					   _speechDataFileSize[key] != 0) {
-						// This is not good. Speech data arrived here ahead of the call meta data.
-						appTrc(Trace.error, "*** A T T E N T I O N *** " +
-						    "Pre-Recorded call replay channel=" + (rstring)getChannel() + 
-							". Speech data seems to have arrived ahead of the call meta data for " + 
-							key + ". Speech data file zie=" + (rstring)_speechDataFileSize[key]);
-					}
-
-		 			insertM(_callMetaDataMap, key, CMD);	
-		 			insertM(_speechDataFragmentCount, key, 0);
-		 			insertM(_speechDataBytesCount, key, 0);
-		 			insertM(_speechDataFileSize, key, 0);	 			
-		 			insertM(_speechDataTuplesSentCount, key, 0);		 			
-		 		}
-		 		
-		 		onTuple CSD: {
-		 			// When the call speech data for a given voice channel arrives here,
-		 			// we must ensure that we already received the call meta data for
-		 			// this voice channel.
-		 			// The fileName attribute will carry the name of the current
-		 			// speech data file in the following format.
-					// File name format:  <vgwSessionId>-<voiceChannelNumber>-mulaw.bin
-					// e-g: 73269584-1-mulaw.bin  and  73269584-2-mulaw.bin
-					//
-					// Tokenize the fully qualified signal file name,
-					// e-g: /home/streamsadmin/call-recording-read/442786-1.process-mulaw
-					list<rstring> tokens = tokenize(CSD.fileName, "/", true);
-					// Get the very last token which is just the speech data file name.
-					rstring speechDataFileName = tokens[size(tokens)-1];
-					// Parse the <vgwSessionId>-<voiceChannelNumber> from the file name.
-					int32 idx = findFirst(speechDataFileName, "-mulaw.bin");
-					rstring key = substring(speechDataFileName, 0, idx);
-					
-		 			// Update the voice channel specific counters.
-		 			_speechDataFragmentCount[key] = 
-		 				_speechDataFragmentCount[key] + 1;
-		 			_speechDataBytesCount[key] = 
-		 				_speechDataBytesCount[key] + size(CSD.speech);
-
-					// When we receive the very first speech data fragment for a
-					// given <vgwSessionId>-<voiceChannelNumber>, we will save the
-					// size of the speech data file. We need that information to 
-					// detect the condition when we complete the reception of all the data
-					// from that file. (I tried with window marker onPunct and I had
-					// some race conditions with that. Hence, I'm using this approach.)
-					if (_speechDataFragmentCount[key] == 1) {
-						// Get the file size and store it only once at the very beginning.
-						mutable int32 rc = 0;
-						mutable uint64 fileSize = 0ul;
-						// Get the file size.
-						fstat(CSD.fileName, "size", fileSize, rc);
-						
-						if (rc != 0) {
-							appTrc(Trace.error, "Unable to get fize size for " +  CSD.fileName + 
-								". Serious error. Skipping the replay for this file now.");
-							return; 
-						}	
-						
-						_speechDataFileSize[key] = (int32)fileSize;			
-					}
-
-					// Have we already received the call meta data for this voice call?
-					if (has(_callMetaDataMap, key) == false) {
-						// We have not yet received the call meta data.
-						// That is not good. We must skip this speech data fragment.
-						appTrc(Trace.error, "Skipping a speech data fragment for " + 
-							key + " since we have not yet received the call meta data.");
-						return;
-					}
-
-					// We have the call meta data. We can create a new 
-					// binary speech data tuple now and send it out for transcription.
-					// Copy all the call meta data attributes to the outgoing tuple.
-					_oTuple1 = ($binarySpeech_t){};
-					assignFrom(_oTuple1, _callMetaDataMap[key]);
-					_oTuple1.speech = CSD.speech;
-					_oTuple1.endOfCallSignal = false;
-					_oTuple1.speechDataFragmentCnt = _speechDataFragmentCount[key];
-					_oTuple1.totalSpeechDataBytesReceived = _speechDataBytesCount[key];
-					submit(_oTuple1, PRBSD);
-					// Update the speech data tuples sent count for a given key.
-					_speechDataTuplesSentCount[key] = 
-						_speechDataTuplesSentCount[key] + 1;
-					
-					// Have we replayed all the speech data for this voice channel?
-					if(_speechDataBytesCount[key] >= _speechDataFileSize[key]) {
-						_voiceChannelsCompletedCnt++;
-					}
-					
-					//  Have we replayed the speech data in full for both the voice channels?
-					if (_voiceChannelsCompletedCnt == 2) {
-						// Wait for a sufficient amount of time for the submit command carrying the
-						// final speech data fragment for this voice call to get
-						// processed. After that delay, we can send the EOCS.
-						// if we don't do this delay, I have seen in my testing that 
-						// EOCS getting ahead of the final speech data fragment and 
-						// causing racing conditions and other logic issues in the
-						// upstream composite that does the call recording write activity.
-						block(30.0);
-						
-						// We can send an end of call signal for the just  
-						// finished replay of the pre-recorded voice call.
-						//
-						// Reset the voice channels completed count.
-						_voiceChannelsCompletedCnt = 0;
-						
-						// Send two EOCS signals one for each voice channel in the given call.
-						for (rstring str in _callMetaDataMap) {
-							_oTuple1 = ($binarySpeech_t){};
-							_oTuple1.vgwSessionId = _callMetaDataMap[str].vgwSessionId;
-							_oTuple1.isCustomerSpeechData = 
-								_callMetaDataMap[str].isCustomerSpeechData;
-							_oTuple1.vgwVoiceChannelNumber = 
-								_callMetaDataMap[str].vgwVoiceChannelNumber;
-							_oTuple1.endOfCallSignal = true;
-							submit(_oTuple1, PRBSD);
-						}
-						
-						// Clear all the state maps to be ready for the
-						// next pre-recorded voice call replay.
-						clearM(_callMetaDataMap);
-						clearM(_speechDataFragmentCount);
-						clearM(_speechDataBytesCount);
-						clearM(_speechDataFileSize);
-						clearM(_speechDataTuplesSentCount);
-
-						// Let us send an acknowledgement to the upstream
-						// Gate operator via the feedback path so that 
-						// the next pre-recorded call can be sent here for replay.
-						// Tell the upstream Gate operator to allow the next tuple.
-						submit({count = 1u}, Ack); 
-					}
-		 		}
-		 		
-		 		onTuple TS: {
-					// In theory, replay of a pre-recorded call should keep
-					// happening much quicker as long as there are enough
-					// number of available speech to text engines. 
-					// If a replay for a call gets stuck due to file read 
-					// errors or JSON conversion errors, this timer signal will
-					// help us to cancel the stuck replay and get ready to
-					// replay the next available pre-recorded call.
-					//
-					// As long as replay activity keeps going correctly,
-					// we have nothing much to do in this timer handler.
-					// Check if the same replay map key that we observed during the
-					// previous timer tick is still there. Since our timer interval is
-					// sufficiently longer (60 minutes), if we still see the same 
-					// replay map key, that means it is stuck.
-					if (has(_callMetaDataMap, lastObservedReplayMapKey) == false) {
-						// It is a new replay map key now. That means all going well.
-						// Let us refresh our last observed map key and leave this timer handler..
-						lastObservedReplayMapKey = "abcxyz";
-						
-						// Simply set to any first key available in that map.
-						for(rstring key in _callMetaDataMap) {
-							lastObservedReplayMapKey = key;
-							break;
-						}
-					
-						// Replay is not stuck at this time.
-						return;
-					} else {
-						// We still see the same map key that was observed in the
-						// previous timer tick. That means this replay activity has been
-						// sitting there for a while. Let us get it unstuck by
-						// canceling that replay.
-						// Reset our last observed map key to a dummy value.
-						appTrc(Trace.error, 
-						    "Pre-Recorded call replay channel=" + (rstring)getChannel() + 
-							". Detected a hung replay for a pre-recorded voice call " + 
-							lastObservedReplayMapKey  + ". Canceling that replay now.");
-
-						lastObservedReplayMapKey = "abcxyz";
-						
-						// If there was at least one replay tuple got sent, then
-						// we are required to send an EOCS for that voice channel.
-						for (rstring str in _callMetaDataMap) {
-							if (_speechDataTuplesSentCount[str] > 0) {
-								_oTuple1 = ($binarySpeech_t){};
-								_oTuple1.vgwSessionId = _callMetaDataMap[str].vgwSessionId;
-								_oTuple1.isCustomerSpeechData = 
-									_callMetaDataMap[str].isCustomerSpeechData;
-								_oTuple1.vgwVoiceChannelNumber = 
-									_callMetaDataMap[str].vgwVoiceChannelNumber;
-								_oTuple1.endOfCallSignal = true;
-								submit(_oTuple1, PRBSD);
-							}
-						}
-						
-						// Reset the voice channels completed count.
-						_voiceChannelsCompletedCnt = 0;
-
-						// Clear all the state maps to be ready for the
-						// next pre-recorded voice call replay.
-						clearM(_callMetaDataMap);
-						clearM(_speechDataFragmentCount);
-						clearM(_speechDataBytesCount);
-						clearM(_speechDataFileSize);
-						clearM(_speechDataTuplesSentCount);
-
-						// Let us send an acknowledgement to the upstream
-						// Gate operator via the feedback path so that 
-						// the next pre-recorded call can be sent here for replay.
-						// Tell the upstream Gate operator to allow the next tuple.
-						submit({count = 1u}, Ack); 
-					}
-		 		}
-			
-			config
-				threadedPort: queue(CSD, Sys.Wait);
-		 } 
-} // End of the composite CallRecordingReplay
 
 // Following are the common utility functions for 
 // use within the composites declared above.
 //
 // This function validates if the number of STT engines configured is correct.
 public stateful boolean validateSpeechEnginesConfiguration(int32 numberOfSTTEngines) {
-	// Check if there is an even number of speech engines conffigured for each speech processor job.
+	// Check if there is an even number of speech engines configured for each speech processor job.
 	if(numberOfSTTEngines % 2 != 0) {
 		// This is not a correct configuration. Let us abort now.
 		appTrc(Trace.error, 
@@ -2785,7 +1657,8 @@ public stateful boolean validateResultProcessorConfiguration(int32 numberOfSTTEn
 }
 
 // This function creates a new list with all the UDP channel numbers in it. 
-// That means, all such channels are idle at this time. 
+// That means, all such channels are idle at this time. This list holds the
+// idle UDP channels for the STT engines. 
 public list<int32> prepareIdleUdpChannelsList(int32 sttEngineCount) {
 	mutable list<int32> myList = [];
 	
@@ -2823,37 +1696,3 @@ public list<int32> prepareIdleResultProcessorUdpChannelsList(int32 resultProcess
 	
 	return(myList);
 }
-
-// This function was added by Senthil on Feb/14/2020 based on the
-// request from our important banking customer.
-public rstring parseVgwSessionIdFromJson(rstring str) {
-	// In the JSON string, the field we are interested in will appear like this.
-	// "vgwSessionId":"520359064"
-	// Let us parse that field now.
-	mutable int32 idx1 = findFirst(str, '"vgwSessionId":"');
-	
-	if (idx1 == -1) {
-		// We can't return a valid VGW session id. So return a dummy value.
-		return("ABC");
-	}
-	
-	// We found the session id token. 
-	// Let us now find the beginning of the actual session id value.
-	idx1 = findFirst(str, ':"', idx1);
-
-	if (idx1 == -1) {
-		// We can't return a valid VGW session id. So return a dummy value.
-		return("RST");
-	}
-	
-	// Let us now find the end of the actual session id value.
-	mutable int32 idx2 = findFirst(str, '"', idx1 + 2);
-	
-	if (idx2 == -1) {
-		// We can't return a valid VGW session id. So return a dummy value.
-		return("XYZ");	
-	}
-	
-	// We can get the substring representing the VGW session id now.
-	return(substring(str, idx1 + 2, idx2 - (idx1 + 2)));
-} 

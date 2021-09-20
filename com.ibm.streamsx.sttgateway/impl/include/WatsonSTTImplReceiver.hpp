@@ -2,10 +2,11 @@
  * WatsonSTTImpl.hpp
  *
  * Licensed Materials - Property of IBM
- * Copyright IBM Corp. 2019, 2020
+ * Copyright IBM Corp. 2019, 2021
  *
- *  Created on: Jan 14, 2020
- *      Author: joergboe
+ *  Created on:  Jan 14, 2020
+ *  Modified on: Sep 12, 2021
+ *  Author(s): Senthil, joergboe
 */
 
 #ifndef COM_IBM_STREAMS_STTGATEWAY_WATSONSTTIMPLRECEIVER_HPP_
@@ -570,6 +571,11 @@ void WatsonSTTImplReceiver<OP, OT>::on_open(client* c, websocketpp::connection_h
 	// https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-output#smart_formatting
 	if (smartFormattingNeeded == true) {
 		msg += ", \"smart_formatting\" : true";
+	}
+
+	// https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-output#redaction
+	if (redactionNeeded == true) {
+		msg += ", \"redaction\" : true";
 	}
 
 	// https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-output#keyword_spotting

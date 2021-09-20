@@ -8,7 +8,7 @@
 /*
 ==============================================
 First created on: Oct/03/2019
-Last modified on: Aug/23/2021
+Last modified on: Sep/12/2021
 
 This C++ example below can be used to generate voice traffic to test the
 other streamsx.sttgateway toolkit example named VoiceGatewayToStreamsToWatsonSTT.
@@ -20,7 +20,7 @@ interact with the IBM Streams application by performing similar message exchange
 are done to get a live voice call transcribed into text.
 
 When this application is run, it will read fragments of speech data from a 
-given WAV file and send it over two channels (two websocket connections) established
+given Mulaw formatted audio file and send it over two channels (two websocket connections) established
 with the IBM Streams application mentioned above.
 
 
@@ -43,17 +43,26 @@ g++ IBMVoiceGatewayDataSimulator.cpp -o c.out -std=c++11 -I <YOUR_WEBSOCKETPP_IN
     Makefile provided in this directory. You have to edit the Makefile to point to the correct
     Boost and websoketpp install directories and then simply run "make clean" and "make".
 
-6) Once it is compiled, you can run it to send speech messages read from specific WAV files to the VoiceGatewayToStreamsToWatsonSTT application running in IBM Streams. You can use the WAV files available from the audio-files directory in the samples directory of the streamsx.gateway toolkit. You can open multiple Linux terminal windows (e-g: 10 of them) and then run this application in quick succession from those terminal windows to send concurrent requests and test how the Streams application handles concurrent requests to perform Speech To Text. If it all works reliably, then the IBM Streams application can be connected to the real IBM Voice Gateway traffic to perform the STT operation. Other possibility is to write a bash shell script and invoke this application 10 times from there to run in the background mode.
+6) Once it is compiled, you can run it to send speech messages read from specific audio files to the VoiceGatewayToStreamsToWatsonSTT application running in IBM Streams. You can use the audio files available from the audio-files directory in the samples directory of the streamsx.gateway toolkit. You can open multiple Linux terminal windows (e-g: 10 of them) and then run this application in quick succession from those terminal windows to send concurrent requests and test how the Streams application handles concurrent requests to perform Speech To Text. If it all works reliably, then the IBM Streams application can be connected to the real IBM Voice Gateway traffic to perform the STT operation. Other possibility is to write a bash shell script and invoke this application 10 times from there to run in the background mode.
 
 This application takes the following command line arguments:
 WebSocket URL
-Wav file name
+Mulaw formatted audio file name
 Unique Voice Gateway Session Id  (Any random string)
-Wav content block size in bytes to send at a time
-Delay in milliseconds needed in between sending Wav content blocks
+Audio content block size in bytes to send at a time
+Delay in milliseconds needed in between sending audio content blocks
 
 Example invocation of this application is shown below:
-./c.out wss://b0513:443 /tmp/test1.wav vgw-session-1 16536 100
+./c.out wss://b0513:443 /tmp/test1.ul vgw-session-1 16536 100
+
+How do I create Mulaw formatted test audio files?
+-------------------------------------------------
+This VoiceDataSimulator application must read audio files with 
+8-bit pcm u-law samples. You can convert the WAV files in the
+samples/audio-files directory of the sttgateway toolkit using the 
+detailed instructions available in the 
+etc/Steps-To-Convert-WAV-To-MuLaw.txt file which can be found in the 
+other major Streams applications present in the samples directory.
 ==============================================
 */
 
@@ -378,25 +387,25 @@ int main(int argc, char *argv[]) {
     // One to mimic the customer channel and the other one for the agent channel.
     if (argc < 6) {
        // User didn't give the required arguments.
-       std::cout << "Usage: ./c.out  <WebSocket Server URL> <WAV file name> <VGW Session Id> <Wav content block size in bytes to send at a time> <Delay in milliseconds between sending Wav content blocks>" << std::endl;
-       std::cout << "Example: ./c.out wss://b0513:443 /tmp/test1.wav vgw-session-1 16536 100" << std::endl;
+       std::cout << "Usage: ./c.out  <WebSocket Server URL> <Audio file name> <VGW Session Id> <Audio content block size in bytes to send at a time> <Delay in milliseconds between sending audio content blocks>" << std::endl;
+       std::cout << "Example: ./c.out wss://b0513:443 /tmp/test1.ul vgw-session-1 16536 100" << std::endl;
        return(0);
     }
 
     std::string wsUrl = std::string(argv[1]);
-    std::string wavFileName = std::string(argv[2]);
+    std::string audioFileName = std::string(argv[2]);
     std::string vgwSessionId = std::string(argv[3]);
-    int32_t wavBlockSize = atoi(argv[4]);
-    int32_t delayBetweenSendingWavContentBlocks = atoi(argv[5]);
+    int32_t audioBlockSize = atoi(argv[4]);
+    int32_t delayBetweenSendingAudioContentBlocks = atoi(argv[5]);
     unsigned int microseconds = 1 * 1000 * 1000;
 
     // Check for the file existence before attempting to read the audio data.
     struct stat fileStat;
-    int32_t fileStatReturnCode = stat(wavFileName.c_str(), &fileStat);
+    int32_t fileStatReturnCode = stat(audioFileName.c_str(), &fileStat);
 				
     if (fileStatReturnCode != 0) {
        // File not found. Exit now.
-       std::cout << wavFileName << " is not there." << std::endl;
+       std::cout << audioFileName << " is not there." << std::endl;
        return(0);
     }
 
@@ -549,7 +558,7 @@ int main(int argc, char *argv[]) {
   
     // We can now read the audio file and send blocks (chunks) of speech data 
     // File is present. Read the binary data now.
-    std::ifstream input(wavFileName.c_str(), std::ios::binary);
+    std::ifstream input(audioFileName.c_str(), std::ios::binary);
     std::vector<char> buffer((std::istreambuf_iterator<char>(input)), 
        (std::istreambuf_iterator<char>()));
 
@@ -560,11 +569,11 @@ int main(int argc, char *argv[]) {
     int32_t chunkStart = 0;
     int32_t chunkSize = 0;
     bool sendItToFirstChannel = true;
-    std::cout << "Wav content is being sent now. (" << bufSize << " bytes)" << std::endl;
+    std::cout << "Audio content is being sent now. (" << bufSize << " bytes)" << std::endl;
 
     // Stay in a loop and send the data now.
     while(bufSize > 0) {
-       chunkSize = (bufSize >= wavBlockSize) ? wavBlockSize : bufSize;
+       chunkSize = (bufSize >= audioBlockSize) ? audioBlockSize : bufSize;
        std::string msg = std::string(&p[chunkStart], chunkSize);
           
        // Send it now by alternating between the channels.
@@ -591,7 +600,7 @@ int main(int argc, char *argv[]) {
           */
           endpoint2.sendBinary(con_id2, msg);
           // Wait for 200 milliseconds to somewhat represent the speed of human speech
-          microseconds = delayBetweenSendingWavContentBlocks * 1000;
+          microseconds = delayBetweenSendingAudioContentBlocks * 1000;
           usleep(microseconds);
        }
           
@@ -601,7 +610,7 @@ int main(int argc, char *argv[]) {
        bufSize -= chunkSize;
     } // End of while loop
     
-    std::cout << "Wav content is fully sent." << std::endl;
+    std::cout << "Audio content is fully sent." << std::endl;
     // We are done sending the data.
     // Wait for 3  seconds before sending the stop STT session message.
     microseconds = 3 * 1000 * 1000;

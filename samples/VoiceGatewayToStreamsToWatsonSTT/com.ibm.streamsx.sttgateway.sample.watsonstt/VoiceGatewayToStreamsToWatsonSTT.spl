@@ -8,7 +8,7 @@
 /*
 ==============================================
 First created on: Sep/25/2019
-Last modified on: Aug/23/2021
+Last modified on: Sep/20/2021
 
 A) What does this example application do?
    --------------------------------------
@@ -81,7 +81,7 @@ deploying them. Please refer to the streamsx.sttgateway documentation section ti
 2) Once you are sure that the IBM Voice Gateway can send the speech data to IBM Streams,
 you can give the following command to deploy this application in distributed mode.
 
-st submitjob -d <YOUR_STREAMS_DOMAIN> -i <YOUR_STREAMS_INSTANCE> -P tlsPort=9443 -P vgwSessionLoggingNeeded=false -P numberOfSTTEngines=4 -P sttApiKey=<YOUR_WATSON_STT_API_KEY> -P contentType="audio/mulaw;rate=8000" -P ipv6Available=true com.ibm.streamsx.sttgateway.sample.watsonstt.VoiceGatewayToStreamsToWatsonSTT.sab
+st submitjob -d <YOUR_STREAMS_DOMAIN> -i <YOUR_STREAMS_INSTANCE> -P tlsPort=9443 -P vgwSessionLoggingNeeded=false -P numberOfSTTEngines=4 -P numberOfResultProcessors=2 -P sttApiKey=<YOUR_WATSON_STT_API_KEY> -P contentType="audio/mulaw;rate=8000" -P ipv6Available=true com.ibm.streamsx.sttgateway.sample.watsonstt.VoiceGatewayToStreamsToWatsonSTT.sab
 
 NOTE: Just to prove that the STT JSON results are getting sent via HTTP,
 you can use a test http receiver Streams application included in the
@@ -97,7 +97,7 @@ deploy this application for processing 100 concurrent calls with 50 call replay 
 My IBM Streams instance had 10 application machines with a total of 344 virtual cores 
 (i.e. 172 physical cores) and each machine had a minimum of 128GB memory.
 
-time st submitjob -d <YOUR_STREAMS_DOMAIN> -i <YOUR_STREAMS_INSTANCE> -P tlsPort=9443 -P vgwSessionLoggingNeeded=false -P numberOfSTTEngines=200 -P sttApiKey=<YOUR_WATSON_STT_API_KEY> -P contentType="audio/mulaw;rate=8000" -P ipv6Available=true -P writeTranscriptionResultsToFiles=true -P sendTranscriptionResultsToHttpEndpoint=true -P httpEndpointForSendingTranscriptionResults=<YOUR_HTTP_ENDPOINT_URL> -P callRecordingWriteDirectory=<YOUR_CALL_RECORDING_WRITE_DIR> -P callRecordingReadDirectory=<YOUR_CALL_RECORDING_READ_DIR> -P numberOfCallReplayEngines=50 -C fusionScheme=legacy com.ibm.streamsx.sttgateway.sample.watsonstt.VoiceGatewayToStreamsToWatsonSTT.sab
+time st submitjob -d <YOUR_STREAMS_DOMAIN> -i <YOUR_STREAMS_INSTANCE> -P tlsPort=9443 -P vgwSessionLoggingNeeded=false -P numberOfSTTEngines=200 -P numberOfResultProcessors=100 -P sttApiKey=<YOUR_WATSON_STT_API_KEY> -P contentType="audio/mulaw;rate=8000" -P ipv6Available=true -P writeTranscriptionResultsToFiles=true -P sendTranscriptionResultsToHttpEndpoint=true -P httpEndpointForSendingTranscriptionResults=<YOUR_HTTP_ENDPOINT_URL> -P callRecordingWriteDirectory=<YOUR_CALL_RECORDING_WRITE_DIR> -P callRecordingReadDirectory=<YOUR_CALL_RECORDING_READ_DIR> -P numberOfCallReplayEngines=50 -C fusionScheme=legacy com.ibm.streamsx.sttgateway.sample.watsonstt.VoiceGatewayToStreamsToWatsonSTT.sab
 
 When deploying a large number of STT engines (more than 14) and large number of 
 call replay engines (more than 7), it is recommended to follow these tips.
@@ -133,18 +133,10 @@ E) Running this example without IBM Voice Gateway
    ----------------------------------------------
 You can use the VoiceDataSimulator test application from the samples directory to emulate Voice Gateway.
 In this case the VoiceDataSimulator must read audio files with 8-bit pcm u-law samples.
-You can convert the samples from the audio-files directory using the following command:
-
-sndfile-convert -ulaw 01-call-center-10sec.wav 01-call-center-10sec.gsm
-
-Convert all files using this Linux shell command:
-for x in *.wav; do y="${x%.wav}"; echo "$y"; sndfile-convert -ulaw "$x" "${y}.gsm"; done
-
-The command sndfile-convert is part of the package libsndfile-utils.
-http://www.mega-nerd.com/libsndfile/
-
-Play the gsm-file with this command:
-play -t raw -r 8k -e mu-law -b 8 -c 1 JFKulaw.gsm
+You can convert the WAV files in the samples/audio-files directory of the sttgateway 
+toolkit using the detailed instructions available in the 
+etc/Steps-To-Convert-WAV-To-MuLaw.txt file which can be found in the other major
+Streams applications present in the samples directory.
 ==============================================
 */
 namespace com.ibm.streamsx.sttgateway.sample.watsonstt;
@@ -181,7 +173,11 @@ type MySTTResult_t = rstring vgwSessionId, boolean isCustomerSpeechData,
 	int32 speechDataFragmentCnt, int32 totalSpeechDataBytesReceived, 
 	int32 sttEngineId, int32 sttResultProcessorId,
 	rstring callStartDateTime, 
+	int64 callStartTimeInEpochSeconds,
+	// This is the utterance result reception time expressed as ctime string.
 	rstring utteranceResultReceptionTime,
+	// Utterance Rx Time is time in seconds since the start of the call. 
+	int64 utteranceRxTime,
 	int32 utteranceNumber,
 	rstring utteranceText, boolean finalizedUtterance,
 	float64 confidence, 
@@ -288,7 +284,8 @@ type MySTTResult_t = rstring vgwSessionId, boolean isCustomerSpeechData,
  *  If you don't have ipv6 in your environment, you can set the
  *  following submission time value to false.
  * 
- * @param	sttUri	sttUri default wss://stream.watsonplatform.net/speech-to-text/api/v1/recognize
+ * wss://api.{location}.speech-to-text.watson.cloud.ibm.com/instances/{instance_id}/v1/recognize
+ * @param	sttUri	Mandatory parameter with no default. 
  * 
  * @param	sttBaseLanguageModel	sttBaseLanguageModel
  * 
@@ -312,6 +309,7 @@ type MySTTResult_t = rstring vgwSessionId, boolean isCustomerSpeechData,
  * 
  * @param	wordAlternativesThreshold	wordAlternativesThreshold
  * @param	smartFormattingNeeded	smartFormattingNeeded
+ * @param	redactionNeeded	redactionNeeded
  * @param	keywordsSpottingThreshold	keywordsSpottingThreshold
  * @param	keywordsToBeSpotted	keywordsToBeSpotted
  * @param	sttWebsocketLoggingNeeded	sttWebsocketLoggingNeeded
@@ -397,6 +395,16 @@ public composite VoiceGatewayToStreamsToWatsonSTT {
 		expression<rstring> $sttOnCP4DAccessToken : getSubmissionTimeValue("sttOnCP4DAccessToken", "");		
 		expression<int32> $numberOfSTTEngines :(int32)
 			getSubmissionTimeValue("numberOfSTTEngines", "10") ;
+		// Since both the voice channels for a given call will be
+		// processed by individual STT engines, the utterance results 
+		// coming from those two engines should be fed into a single
+		// result processor. That means, we only need half the total size of
+		// the provisioned number of STT engines for the result processors.
+		//  We will do a validation of this in one of the custom operators below 
+		// at the time of this application's startup phase. 
+		expression<int32> $numberOfResultProcessors : (int32)
+			getSubmissionTimeValue("numberOfResultProcessors", "5") ;
+
 		// Time in seconds to wait before sending data to the STT engines.
 		expression<float64> $initDelayBeforeSendingDataToSttEngines :
 			(float64)getSubmissionTimeValue("initDelayBeforeSendingDataToSttEngines", "15.0"); 
@@ -413,6 +421,10 @@ public composite VoiceGatewayToStreamsToWatsonSTT {
 		// following submission time value to false.
 		expression<boolean> $ipv6Available : (boolean)
 			getSubmissionTimeValue("ipv6Available", "true");
+		// This tells what is the maximum number of concurrent voice calls 
+		// allowed by the Voice Gateway source operator.
+		expression<uint32> $maxConcurrentCallsAllowed : (uint32)
+			getSubmissionTimeValue("maxConcurrentCallsAllowed", "10");
 			
 		// Recording the voice calls (A differentiating feature that we offer for free).
 		// Specify the directory where we can write the raw audio files using the
@@ -461,7 +473,7 @@ public composite VoiceGatewayToStreamsToWatsonSTT {
 			
 	type
 		// The following is the schema of the first output stream for the
-		// IBMVoiceGatewaySource operator. The first four attributes are
+		// IBMVoiceGatewaySource operator. The first five attributes are
 		// very important and the other ones are purely optional if some
 		// scenarios really require them.
 		// blob speech --> Speech fragments of a live conversation as captured and sent by the IBM Voice Gateway.
@@ -476,18 +488,22 @@ public composite VoiceGatewayToStreamsToWatsonSTT {
 		//                                 operator when it sends an EOCS for a voice channel. It will be
 		//                                 set to false by that operator when it sends binary speech data.
 		// rstring callStartDateTime --> Call start date time i.e. system clock time.
+		// int64 callStartTimeInEpochSeconds --> Call start time in epoch seconds.
 		// rstring callerPhoneNumber --> Details about the caller's phone number.
 		// rstring agentPhoneNumber --> Details about the agent's phone number.
 		// rstring ciscoGuid --> Value of the SIP invite custom header Cisco-Guid if present.
 		// int32 speechDataFragmentCnt --> Number of fragments (tuples) emitted so far on a given channel (customer or agent) for a given vgwSessionId.
 		// int32 totalSpeechDataBytesReceived --> Number of speech bytes received so far on a given channel (customer or agent) for a given vgwSessionId.
-		// int32 sttEngineId --> This attribute will be set in the next operator. (Please, read the comments there.)
-		// int32 sttResultProcessorId --> This attribute will be set in the next operator. (Please, read the comments there.)
+		// int32 int32 speechProcessorId --> Id of the speech processor job that is analyzing the speech data.
+		// int32 sttEngineId --> This attribute will be set in the speech processor job. (Please, read the comments there.)
+		// int32 sttResultProcessorId --> This attribute will be set in the speech processor job. (Please, read the comments there.)
 		BinarySpeech_t = blob speech, rstring vgwSessionId, boolean isCustomerSpeechData, 
-			int32 vgwVoiceChannelNumber, boolean endOfCallSignal,
-			rstring callStartDateTime, rstring callerPhoneNumber,
-			rstring agentPhoneNumber, rstring ciscoGuid,  
-			int32 speechDataFragmentCnt, int32 totalSpeechDataBytesReceived, 
+			int32 vgwVoiceChannelNumber, boolean endOfCallSignal, 
+			rstring callStartDateTime,
+			int64 callStartTimeInEpochSeconds, 
+			rstring callerPhoneNumber, rstring agentPhoneNumber, 
+			rstring ciscoGuid, int32 speechDataFragmentCnt, 
+			int32 totalSpeechDataBytesReceived, int32 speechProcessorId, 
 			int32 sttEngineId, int32 sttResultProcessorId;
 
 		// The following schema is for the call recording feature where we will
@@ -564,11 +580,13 @@ public composite VoiceGatewayToStreamsToWatsonSTT {
 				vgwSessionLoggingNeeded: $vgwSessionLoggingNeeded;
 				vgwStaleSessionPurgeInterval: $vgwStaleSessionPurgeInterval;
 				ipv6Available: $ipv6Available;
+				maxConcurrentCallsAllowed: $maxConcurrentCallsAllowed;
 			
 			// Get these values via custom output functions	provided by this operator.
 			output
 				BSD: vgwSessionId = getIBMVoiceGatewaySessionId(),
 					callStartDateTime = getCallStartDateTime(), 
+				    callStartTimeInEpochSeconds = getCallStartTimeInEpochSeconds(),
 					isCustomerSpeechData = isCustomerSpeechData(),
 					vgwVoiceChannelNumber = getVoiceChannelNumber(),
 					callerPhoneNumber = getCallerPhoneNumber(),
@@ -646,6 +664,11 @@ public composite VoiceGatewayToStreamsToWatsonSTT {
 			BinarySpeechData, PreRecordedBinarySpeechData as BSD) {
 			logic
 				state: {
+					mutable boolean _speechEnginesConfiguredCorrectly = 
+						validateSpeechEnginesConfiguration($numberOfSTTEngines);
+					mutable boolean _resultProcessorsConfiguredCorrectly = 
+						validateResultProcessorConfiguration($numberOfSTTEngines,
+						$numberOfResultProcessors);
 					// This map tells us which UDP channel is processing a 
 					// given vgwSessionId_vgwVoiceChannelNumber combo.
 					mutable map<rstring, int32> _vgwSessionIdToUdpChannelMap = {};
@@ -653,6 +676,10 @@ public composite VoiceGatewayToStreamsToWatsonSTT {
 					// idle at any given time.
 					mutable list<int32> _idleUdpChannelsList = 
 						prepareIdleUdpChannelsList($numberOfSTTEngines);
+					// This list tells us which UDP channels for result processors are 
+					// idle at any given time.
+					mutable list<int32> _idleResultProcessorUdpChannelsList = 
+						prepareIdleResultProcessorUdpChannelsList($numberOfResultProcessors);
 					// This map tells us which UDP channel is going to process
 					// the given voice call's (i.e. vgwSessionId) transcription
 					// results in the STTResultProcessor composite that appears
@@ -743,12 +770,54 @@ public composite VoiceGatewayToStreamsToWatsonSTT {
 							} else {
 								// We got an idle STT engine.
 								BSD.sttEngineId = mySttEngineId;
-	
+										
+								// For this voice call (i.e. vgwSessionId), select a 
+								// single result processor UDP channel. Both speakers in this 
+								// voice call will use that single result processor instance.
+								// This will ensure that the STT results for both the speakers 
+								// will reach the same result processor.
+								if (has(_vgwSessionToResultProcessorChannelMap, 
+									BSD.vgwSessionId) == false) {
+									int32 myResultProcessorId = 
+										getAnIdleUdpChannel(_idleResultProcessorUdpChannelsList);
+									
+									if (myResultProcessorId == -1) {
+										// This is not good and we should never end up in this situation.
+										// This means we have not provisioned sufficient number of result processors to
+										// handle the maximum planned concurrent calls. We have to ignore this
+										// speech data fragment and hope that an idle UDP channel number will
+										// become available by the time the next speech data fragment for this
+										// particular vgwSessionId_vgwVoiceChannelNumber combo arrives here. 
+										if (BSD.speechDataFragmentCnt == 1) {
+											// Display this alert only for the very first data fragment of a 
+											// given speaker of a given voice call.
+											appTrc(Trace.error, "No idle result processor available at this time for the " +
+												"vgwSessionId_vgwVoiceChannelNumber: " + _key + 
+												". There are " + (rstring)$numberOfResultProcessors +
+												" result processors configured and they are all being used for other" +
+												" voice calls at this time. Please start sufficient number of result processors" +
+												" next time to handle your maximum expected concurrent calls." +
+												" A rule of thumb for your result processor count is to have an" +
+												" exactly half the size of the total number of STT engines configured.");
+										}
+			
+										return;	
+									} else {
+										insertM(_vgwSessionToResultProcessorChannelMap,
+											BSD.vgwSessionId, myResultProcessorId);
+									}
+								} 
+								
+								// Set the STT result processor id.
+								BSD.sttResultProcessorId = 
+									_vgwSessionToResultProcessorChannelMap[BSD.vgwSessionId];
+									
 								// If this call is just beginning, then we will create a
 								// tiny text file to indicate that we started receiving 
 								// speech data from the IBM Voice Gateway for this new call.
 								rstring key1 = BSD.vgwSessionId + "_" + "1";
 								rstring key2 = BSD.vgwSessionId + "_" + "2";
+								mutable int32 err = 0ul;
 								
 								// If we have not yet created any entry in our state map for this call,
 								// then we can be sure that it is the start of this call.
@@ -756,47 +825,65 @@ public composite VoiceGatewayToStreamsToWatsonSTT {
 									has(_vgwSessionIdToUdpChannelMap, key2) == false) {
 									// We can now write a "Start of Call" indicator file in the
 									// application's data directory. e-g: 5362954-call-started.txt
-									mutable int32 err = 0ul;
-									rstring callStartDateTime = ctime(getTimestamp());
+									//									
+									// If call start date time is not set for some reason, we can set it now.
+									// For the actual calls coming through Voice Gateway, this must have been
+									// already set inside the Voice Gateway source operator above.
+									// This is simply defensive coding to address rare cases when
+									// these two attributes arrive here as empty.
+									if(BSD.callStartDateTime == "") {
+										BSD.callStartDateTime = ctime(getTimestamp());
+									}
+									
+									if(BSD.callStartTimeInEpochSeconds == 0l) {
+										BSD.callStartTimeInEpochSeconds = getSeconds(getTimestamp());
+									}
+									
 									rstring socsFileName = dataDirectory() + "/" +
 										BSD.vgwSessionId + "-call-started.txt";
 									uint64 fileHandle = fopen (socsFileName, "w+", err);
 									
 									if(err == 0) {
 										fwriteString ("VGW call session id " + BSD.vgwSessionId + 
-											" started at " + callStartDateTime + ".", fileHandle, err);
+											" started at " + BSD.callStartDateTime + ".\n",
+											fileHandle, err);
+										fwriteString("VGW voice channel number=" +
+											(rstring)BSD.vgwVoiceChannelNumber + 
+											", Speech engine id=" + (rstring)BSD.sttEngineId +
+											", Result processor id=" + 
+											(rstring)BSD.sttResultProcessorId + "\n",
+											fileHandle, err);
 										fclose(fileHandle, err);
 									}
 									
-									// If call start date time is not set for some reason, we can set it now.
-									// This will happen only for those calls that are being replayed.
-									// For the actual calls coming through Voice Gateway, this must have been
-									// already set inside the Voice Gateway source operator above.
-									if(BSD.callStartDateTime == "") {
-										BSD.callStartDateTime = callStartDateTime;
-									}
-
 									appTrc(Trace.error, "A new voice call has started. vgwSessionId=" + BSD.vgwSessionId);
+								} else if (has(_vgwSessionIdToUdpChannelMap, key1) == false ||
+									has(_vgwSessionIdToUdpChannelMap, key2) == false) {
+									// This means, one of the two voice channels in a 
+									// given VGW session is just beginning to arrive here.
+									// More specifically, the next voice channel for a given
+									// VGW session is sending its very first speech data packet.
+									// We can write some helpful details about it in the 
+									// call started file.
+									rstring socsFileName = dataDirectory() + "/" +
+										BSD.vgwSessionId + "-call-started.txt";
+									// Open the file in append mode.
+									uint64 fileHandle = fopen (socsFileName, "a+", err);
+									
+									if(err == 0) {
+										fwriteString("VGW voice channel number=" +
+											(rstring)BSD.vgwVoiceChannelNumber + 
+											", Speech engine id=" + (rstring)BSD.sttEngineId +
+											", Result processor id=" + 
+											(rstring)BSD.sttResultProcessorId + "\n",
+											fileHandle, err);
+										fclose(fileHandle, err);
+									}
 								}
 								
 								// Insert into the state map for future reference.
 								insertM(_vgwSessionIdToUdpChannelMap, 
 									_key, mySttEngineId);
-									
-								// For this voice call (i.e. vgwSessionId), select a 
-								// single result processor UDP channel. Both speakers in this 
-								// same voice call will use that same result processor instance.
-								// This will ensure that the STT results for both the speakers 
-								// will reach the same result processor.
-								if (has(_vgwSessionToResultProcessorChannelMap, 
-									BSD.vgwSessionId) == false) {
-									insertM(_vgwSessionToResultProcessorChannelMap,
-										BSD.vgwSessionId, mySttEngineId);
-								} 
-								
-								// Set the STT result processor id.
-								BSD.sttResultProcessorId = 
-									_vgwSessionToResultProcessorChannelMap[BSD.vgwSessionId];
 							} // End of if (mySttEngineId == -1)
 						} // End of if (has(_vgwSessionIdToUdpChannelMap, _key)
 	
@@ -934,7 +1021,16 @@ public composite VoiceGatewayToStreamsToWatsonSTT {
 								($numberOfEocsNeededForVoiceCallCompletion == 1 &&
 								(has(_vgwSessionIdToUdpChannelMap, key1) == false ||
 								has(_vgwSessionIdToUdpChannelMap, key2) == false))) {
+								// Since the same result processor is used for both the
+								// voice channels in a call, there will be a single
+								// result processor UDP channel allocated for a given voice call.
+								int32 resultProcessorUdpChannelToBeReleased = 
+									_vgwSessionToResultProcessorChannelMap[BSD.vgwSessionId];
 								removeM(_vgwSessionToResultProcessorChannelMap, BSD.vgwSessionId);
+								// We can go ahead and release the result processor that was
+								// used by this voice call.
+								appendM(_idleResultProcessorUdpChannelsList, 
+									resultProcessorUdpChannelToBeReleased);
 								
 								// Since the voice call for this VGW session id has ended completely,
 								// we can also release the STT engine(s) assigned for this call so that 
@@ -1071,8 +1167,8 @@ public composite VoiceGatewayToStreamsToWatsonSTT {
 public composite IBMWatsonSpeechToText(input AudioBlobContent, AccessToken;
 	output STTResult) {
 	param
-		expression<rstring> $sttUri : getSubmissionTimeValue("sttUri",
-			"wss://stream.watsonplatform.net/speech-to-text/api/v1/recognize");
+		// wss://api.{location}.speech-to-text.watson.cloud.ibm.com/instances/{instance_id}/v1/recognize
+		expression<rstring> $sttUri : getSubmissionTimeValue("sttUri");
 		expression<rstring> $sttBaseLanguageModel : 
 			getSubmissionTimeValue("sttBaseLanguageModel", "en-US_Telephony");
 		expression<rstring> $contentType : 
@@ -1095,6 +1191,8 @@ public composite IBMWatsonSpeechToText(input AudioBlobContent, AccessToken;
 			(float64)getSubmissionTimeValue("wordAlternativesThreshold", "0.0");
 		expression<boolean> $smartFormattingNeeded : 
 			(boolean)getSubmissionTimeValue("smartFormattingNeeded", "false");
+		expression<boolean> $redactionNeeded : 
+			(boolean)getSubmissionTimeValue("redactionNeeded", "false");
 		expression<float64> $keywordsSpottingThreshold : 
 			(float64)getSubmissionTimeValue("keywordsSpottingThreshold", "0.0");
 		expression<list<rstring>> $keywordsToBeSpotted : 
@@ -1107,6 +1205,69 @@ public composite IBMWatsonSpeechToText(input AudioBlobContent, AccessToken;
 			(boolean)getSubmissionTimeValue("sttLiveMetricsUpdateNeeded", "true");
 
 	graph
+		// For the purpose of scale testing the end to end Voice call data flow,
+		// we can use the Voice Data Simulator available in the streamsx.sttgateway
+		// toolkit to generate hundreds of voice calls and send it through the
+		// VgwDataRouter-->VgwDataRouterToWatsonSTT applications. However, to do
+		// such large scale testing, it may take time and effort to setup an
+		// STT test infrastructure. If that is doable, it is great. But, in the 
+		// absence of a large scale STT environment, we can activate the following
+		// Custom operator to return dummy utterances. When we uncomment this
+		// Custom operator code block, it is necessary to comment out the
+		// WatsonSTT operator code block below to avoid duplicate tuple processing
+		// logic as well as potential output tuple collisions and errors.
+		//
+		// Use this operator only for scale testing. Otherwise, keep this
+		// operator code block commented out.
+		//
+		/*
+		stream<MySTTResult_t> STTResult = 
+			Custom(AudioBlobContent as ABC; AccessToken as AT) {
+			logic
+				state: {
+					mutable int32 _conversationCnt = 0;
+					mutable rstring _conversationId = "";
+					mutable rstring _key = "";
+					mutable int32 _utteranceNumber = 0;
+					mutable MySTTResult_t _oTuple = {};
+				}
+				
+				onTuple ABC: {
+					_key = ABC.vgwSessionId + "_" + 
+						(rstring)ABC.vgwVoiceChannelNumber;
+						
+					if (_conversationId != _key) {
+						// There may be many blob fragments arriving for a given audio conversation.
+						// So, display only when the very first blob fragment for a given audio arrives.
+						_conversationId = _key;
+						appTrc(Trace.error, "Channel " + (rstring)getChannel() + 
+							", Speech input " + (rstring)++_conversationCnt +
+							": " + _conversationId);
+						// It is a new voice call. Reset the utterance number.
+						_utteranceNumber = 0;
+					}
+					
+					// Copy the matching attributes from the incoming tuple.
+					assignFrom(_oTuple, ABC);
+					// Set the utterance number and utterance text attributes.
+					_oTuple.utteranceNumber = ++_utteranceNumber;
+					_oTuple.utteranceText = "Utterance " + (rstring)_utteranceNumber;
+					_oTuple.finalizedUtterance = true;
+					submit(_oTuple, STTResult);
+				}
+				
+				onTuple AT: {
+					// Do nothing.
+					return;
+				}
+		}
+		*/
+
+		// Remember to comment out this operator code block if the 
+		// Custom operator code block above is uncommented for
+		// scale testing the end-to-end voice call data flow when 
+		// a suitable STT test environment is not in place.
+		//
 		stream<MySTTResult_t> STTResult = 
 			WatsonSTT(AudioBlobContent as ABC; AccessToken as AT) {
 			logic
@@ -1144,6 +1305,7 @@ public composite IBMWatsonSpeechToText(input AudioBlobContent, AccessToken;
 				maxUtteranceAlternatives: $maxUtteranceAlternatives;
 				wordAlternativesThreshold: $wordAlternativesThreshold;
 				smartFormattingNeeded: $smartFormattingNeeded;
+				redactionNeeded: $redactionNeeded;
 				keywordsSpottingThreshold: $keywordsSpottingThreshold;
 				keywordsToBeSpotted: $keywordsToBeSpotted;
 				websocketLoggingNeeded: $sttWebsocketLoggingNeeded;
@@ -1324,12 +1486,54 @@ public composite STTResultProcessor(input MyTranscriptionResult, BinarySpeechDat
 		 stream<MyTranscriptionResult> TranscriptionResultForSecondVoiceChanel as TRFSVC) = 
 			Custom(MyTranscriptionResult as MTR) {
 			logic
+				state: {
+					mutable rstring _vgwSessionId = "";
+					mutable rstring _ciscoGuid = "";
+					mutable rstring _callStartDateTime = "";
+					mutable int64 _callStartTimeInEpochSeconds = 0l;
+				}
+
 				onTuple MTR: {
+                    // In some cases, it was observed during testing that the 
+                    // call start time details arrive here with empty and 0 values.
+                    // To compensate for that, we are going to keep a local copy
+                    // of the non-empty and non-zero value of them for correct
+                    // calculation of the utterance generation time with reference to
+                    // the start time of a given voice call.
+                    // We will do it whenever a brand new VGW session id arrives here by
+                    // meeting the other conditions included in this statement.
+                    if(MTR.vgwSessionId != _vgwSessionId && 
+                       MTR.callStartDateTime != "" &&
+                       MTR.callStartTimeInEpochSeconds != 0l) {
+                       _vgwSessionId = MTR.vgwSessionId;
+                       _ciscoGuid = MTR.ciscoGuid;
+                       _callStartDateTime = MTR.callStartDateTime;
+                       _callStartTimeInEpochSeconds = MTR.callStartTimeInEpochSeconds;
+                    }
+
+                    // If we notice any empty or zero values for the call start time details,
+                    // We will fill it from the ones we saved in the state variables.
+                    if(MTR.ciscoGuid == "") {
+                       MTR.ciscoGuid = _ciscoGuid;
+                    }
+
+                    if(MTR.callStartDateTime == "") {
+                       MTR.callStartDateTime = _callStartDateTime;
+                    }
+
+                    if(MTR.callStartTimeInEpochSeconds == 0l) {
+                       MTR.callStartTimeInEpochSeconds =  _callStartTimeInEpochSeconds;
+                    }
+
 					// If the user opted for include the time of the
 					// utterance result reception time, let us add it to
 					// the transcription result.
 					if($includeUtteranceResultReceptionTime == true) {
 						MTR.utteranceResultReceptionTime = ctime(getTimestamp());
+						// We will also do the utterance reception time expressed
+						// in seconds elapsed since the start of the call.
+						MTR.utteranceRxTime = 
+							getSeconds(getTimestamp()) - MTR.callStartTimeInEpochSeconds;
 					}
 
 					// We will write the transcription results to 
@@ -1361,8 +1565,7 @@ public composite STTResultProcessor(input MyTranscriptionResult, BinarySpeechDat
 		() as MySink1 = FileSink(TranscriptionResultForWritingToFile as TRFWTF) {
 			param
 				// This file will contain a comprehensive set of full STT results.
-				file: (($writeTranscriptionResultsToFiles == true) ?
-					TRFWTF.vgwSessionId + "-full-result.txt" : "/dev/null");
+				file: TRFWTF.vgwSessionId + "-full-result.txt";
 				closeMode: dynamic;
 				quoteStrings: false;
 				append: true;
@@ -1380,6 +1583,7 @@ public composite STTResultProcessor(input MyTranscriptionResult, BinarySpeechDat
 		 int32 vgwVoiceChannelNumber,
 		 rstring callStartDateTime, 
 		 rstring utteranceResultReceptionTime, 
+		 int64 utteranceRxTime, 
 		 rstring utteranceText> Utterance as U) 
 			as UtteranceFilter = Custom(TranscriptionResultForWritingToFile as TRFWTF) {
 			logic
@@ -1405,8 +1609,7 @@ public composite STTResultProcessor(input MyTranscriptionResult, BinarySpeechDat
 			param
 				// This file will contain only a small subset of the
 				// STT results (Unique call id, channel number, caller or agent, utterance).
-				file: (($writeTranscriptionResultsToFiles == true) ?
-					U.vgwSessionId + "-utterance-result.txt" : "/dev/null");
+				file: U.vgwSessionId + "-utterance-result.txt";
 				closeMode: dynamic;
 				quoteStrings: false;
 				append: true;
@@ -2384,12 +2587,66 @@ public composite CallRecordingReplay(input CallReplaySignalFileNameIn;
 // Following are the common utility functions for 
 // use within the composites declared above.
 //
+// This function validates if the number of STT engines configured is correct.
+public stateful boolean validateSpeechEnginesConfiguration(int32 numberOfSTTEngines) {
+	// Check if there is an even number of speech engines configured for each speech processor job.
+	if(numberOfSTTEngines % 2 != 0) {
+		// This is not a correct configuration. Let us abort now.
+		appTrc(Trace.error, 
+			"_XXXXX Incorrect configuration for the number of speech engines in this speech processor job. " + 
+			"There should be an even number of speech engines running in every speech processor job.");
+		abort();
+	}
+	
+	return(true);
+}
+
+// This function validates if the number of result processors configured is correct.
+public stateful boolean validateResultProcessorConfiguration(int32 numberOfSTTEngines,
+	int32 numberOfResultProcessors) {
+	// Check if there is an even number of speech engines configured for each speech processor job.
+	if(numberOfSTTEngines % 2 != 0) {
+		// This is not a correct configuration. Let us abort now.
+		appTrc(Trace.error, 
+			"_YYYYY Incorrect configuration for the number of speech engines in this speech processor job. " + 
+			"There should be an even number of speech engines running in every speech processor job.");
+		abort();
+	}
+
+	// Check if the number of result processors configured is exactly half the
+	// size of the total speech engines configured for each speech processor job.
+	int32 expectedNumberOfResultProcessors = numberOfSTTEngines / 2;
+		
+	if(numberOfResultProcessors != expectedNumberOfResultProcessors) {
+		// This is not a correct configuration. Let us abort now.
+		appTrc(Trace.error, 
+			"_YYYYY Incorrect configuration found for the number of result processors. " + 
+			"Your total number of result processors should be configured to " +
+			(rstring)expectedNumberOfResultProcessors + ".");
+		abort();
+	}
+	
+	return(true);
+}
+
 // This function creates a new list with all the UDP channel numbers in it. 
 // That means, all such channels are idle at this time. 
 public list<int32> prepareIdleUdpChannelsList(int32 sttEngineCount) {
 	mutable list<int32> myList = [];
 	
 	for(int32 idx in range(sttEngineCount)) {
+		appendM(myList, idx);
+	}
+	
+	return(myList);
+}
+
+// This function creates a new list with all the result processor 
+// UDP channel numbers in it. That means, all such channels are idle to begin with. 
+public list<int32> prepareIdleResultProcessorUdpChannelsList(int32 resultProcessorCnt) {
+	mutable list<int32> myList = [];
+	
+	for(int32 idx in range(resultProcessorCnt)) {
 		appendM(myList, idx);
 	}
 	

@@ -2,10 +2,11 @@
  * WatsonSTTConfig.hpp
  *
  * Licensed Materials - Property of IBM
- * Copyright IBM Corp. 2019, 2020
+ * Copyright IBM Corp. 2019, 2021
  *
- *  Created on: Jan 23, 2020
- *      Author: joergboe
+ *  Created on:  Jan 14, 2020
+ *  Modified on: Sep 12, 2021
+ *  Author(s): Senthil, joergboe
  */
 
 #ifndef COM_IBM_STREAMS_STTGATEWAY_WATSONSTTCONFIG_HPP_
@@ -42,6 +43,7 @@ struct WatsonSTTConfig {
 	const bool identifySpeakers;
 	const bool speakerUpdatesNeeded;
 	const bool smartFormattingNeeded;
+	const bool redactionNeeded;
 	SPL::float64 keywordsSpottingThreshold;
 	const SPL::list<SPL::rstring> keywordsToBeSpotted;
 	const bool isTranscriptionCompletedRequested;

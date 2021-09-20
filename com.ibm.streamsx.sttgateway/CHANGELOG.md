@@ -1,5 +1,18 @@
 # Changes
 
+## v2.3.1
+* Sep/20/2021
+* Dynamically change the maximum concurrent calls allowed value.
+* Query maximum allowed concurrent calls and active concurrent calls values.
+* Utterance latency with reference to the call start time is available.
+* New operator metric to display the total throttled calls count.
+* Option to redact numeric values in the speech to text result.
+* Write the STT engine id and result processor id in the call started file.
+* STT URI submission time parameter is made mandatory.
+* A new call simulation script is available to send hundreds of calls via WebSocket into the Voice Gateway source operator for testing.
+* A new script is available to start many speech processor jobs and a single VgwDataRouter job.
+* A new script is available to cancel all the speech processor jobs and a single VgwDataRouter job. 
+
 ## v2.3.0
 * Aug/23/2021
 * Made changes in the IBMVoiceGatewaySource operator to parse the SIP invite custom header fields such as Cisco-Guid and include it in the output stream.

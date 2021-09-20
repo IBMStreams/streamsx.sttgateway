@@ -1,6 +1,6 @@
 ============================================================
 First created on: July/01/2018
-Last modified on: August/23/2021
+Last modified on: September/20/2021
 
 Purpose of this toolkit
 -----------------------
@@ -470,6 +470,10 @@ These examples showcase the full feature set of the IBMVoiceGatewaySource and th
 WatsonSTT operators that are available within this toolkit. More details about these
 examples can be obtained from the offical documentation for this toolkit.
 
+If you have no need for the call recording and call replay features, you can use the 
+two examples below that end with the word Mini. It will cut down the extra logic to 
+result in a fewer number of overall operators.
+
 1)  <YOUR_STTGATEWAY_TOOLKIT_HOME>/samples/AccessTokenGenerator
 2)  <YOUR_STTGATEWAY_TOOLKIT_HOME>/samples/AudioFileWatsonSTT
 3)  <YOUR_STTGATEWAY_TOOLKIT_HOME>/samples/AudioFileWatsonSTTAllOutput
@@ -481,8 +485,10 @@ examples can be obtained from the offical documentation for this toolkit.
 9)  <YOUR_STTGATEWAY_TOOLKIT_HOME>/samples/VgwDataRouter
 10) <YOUR_STTGATEWAY_TOOLKIT_HOME>/samples/VgwDataRouterToWatsonS2T
 11) <YOUR_STTGATEWAY_TOOLKIT_HOME>/samples/VgwDataRouterToWatsonSTT
-12) <YOUR_STTGATEWAY_TOOLKIT_HOME>/samples/stt_restults_http_receiver
-13) <YOUR_STTGATEWAY_TOOLKIT_HOME>/samples/VoiceDataSimulator
+12) <YOUR_STTGATEWAY_TOOLKIT_HOME>/samples/VgwDataRouterMini
+13) <YOUR_STTGATEWAY_TOOLKIT_HOME>/samples/VgwDataRouterToWatsonSTTMini
+14) <YOUR_STTGATEWAY_TOOLKIT_HOME>/samples/stt_restults_http_receiver
+15) <YOUR_STTGATEWAY_TOOLKIT_HOME>/samples/VoiceDataSimulator
 
 Importing this toolkit and its built-in examples into IBM Streams Studio
 ------------------------------------------------------------------------

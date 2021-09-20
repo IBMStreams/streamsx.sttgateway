@@ -8,7 +8,7 @@
 /*
 ============================================================
 First created on: Sep/17/2019
-Last modified on: Aug/21/2021
+Last modified on: Sep/17/2021
 ============================================================
 */
 
@@ -56,6 +56,8 @@ public:
 	bool websocketLoggingNeeded;
 	bool vgwSessionLoggingNeeded;
 	SPL::int64 vgwStaleSessionPurgeInterval;
+	SPL::uint32 maxConcurrentCallsAllowed;
+	SPL::uint32 activeConcurrentCallsCnt;
 	bool ipv6Available;
 	server_plain endpoint_plain;
 	server_tls endpoint_tls;
@@ -72,14 +74,22 @@ public:
 	// 3726389_0 : sip:+15712487798@169.61.56.229
 	// 3726389_1 : sip:+19149453000@4.55.11.163:5060
 	std::map<std::string, std::string> vgwSessionPhoneNumbersMap;
+
+	// This map holds the VGW session ids whose calls are being
+	// throttled when we already reached the maximum allowed 
+	// limit of concurrent calls.
+	std::map<std::string, bool> callsBeingThrottledMap;
 	
 	SPL::uint64 nVoiceCallsProcessed;
 	SPL::uint64 nSpeechDataBytesReceived;
+	// This particular metric can also be treated as the number of speech packets received from VGW.
 	SPL::uint64 nOutputTuplesSent;
+	SPL::uint64 nVoiceCallsThrottled;
 	
 	struct connection_metadata {
 		bool isTlsConnection;
 		SPL::rstring callStartDateTime;
+		SPL::int64 callStartTimeInEpochSeconds;
 		// VGW session status will carry the following values:
 		// 1 = VGW client opened a Websocket connection.
 		// 2 = VGW client started the STT transcription along with the call meta data.
@@ -147,6 +157,7 @@ public:
 	
 	// Custom metrics for this operator.
 	Metric *nVoiceCallsProcessedMetric;
+	Metric *nVoiceCallsThrottledMetric;
 	Metric *nSpeechDataBytesReceivedMetric;
 	Metric *nOutputTuplesSentMetric;
 	Metric *nTlsPortMetric;
@@ -197,8 +208,26 @@ public:
 	// Websocket TLS binding event handler
 	context_ptr on_tls_init(websocketpp::connection_hdl hdl);
 	
+	// HTTP event handler (for non_tls HTTP POST messages)
+	void on_http_message_non_tls(websocketpp::connection_hdl hdl);
+		
+	// HTTP event handler (for TLS HTTPS POST messages)
+	void on_http_message_tls(websocketpp::connection_hdl hdl);
+		
+	// HTTP common event handler (both for HTTP and HTTPS POST messages)
+	void on_http_message(websocketpp::connection_hdl hdl, 
+		bool isTlsConnection,
+		server_plain::connection_ptr & server_non_tls_con,
+		server_tls::connection_ptr & server_tls_con);
+
 	// Callback method needed within the TLS event handler.
 	std::string get_private_key_password();
+	
+	// It validates the given client connection.
+	bool validate_client(websocketpp::connection_hdl hdl, 
+		bool isTlsConnection, bool isHttpConnection,
+		server_plain::connection_ptr & server_non_tls_con,
+		server_tls::connection_ptr & server_tls_con);
 	
 	// Method that looks up connection metadata for a connection handle in our associate container.
 	MY_OPERATOR::connection_metadata& get_con_metadata_from_hdl(websocketpp::connection_hdl hdl);
@@ -212,6 +241,7 @@ private:
 	int32_t getVoiceChannelNumber(int32_t const & voiceChannelNumber);
 	std::string getAgentOrCallerPhoneNumber(std::string const & vgwSessionId, bool const & vgwIsCaller);
 	SPL::rstring getCallStartDateTime(SPL::rstring const & callStartDateTime);
+	SPL::int64 getCallStartTimeInEpochSeconds(SPL::int64 const & callStartTimeInEpochSeconds);
 	SPL::rstring getCiscoGuid(SPL::rstring const & ciscoGuid);
 }; 
 

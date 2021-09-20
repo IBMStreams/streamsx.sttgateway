@@ -584,6 +584,19 @@
       </parameter>
 
       <parameter>
+        <name>redactionNeeded</name>
+        <description>
+        This parameter indicates whether to redact (mask) numeric data in the transcription result. (Default is false)
+        see: [https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-output#redaction] 
+        </description>
+        <optional>true</optional>
+        <rewriteAllowed>true</rewriteAllowed>
+        <expressionMode>AttributeFree</expressionMode>
+        <type>boolean</type>
+        <cardinality>1</cardinality>
+      </parameter>
+
+      <parameter>
         <name>keywordsSpottingThreshold</name>
         <description>
         This parameter specifies the minimum confidence level that the STT service must have for an utterance word to 

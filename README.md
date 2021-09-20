@@ -191,6 +191,8 @@ st submitjob -P tlsPort=9443 -P vgwSessionLoggingNeeded=false -P numberOfS2TEngi
 ## Examples that showcase this toolkit's features
 There are many examples available in this toolkit that can be compiled and tested. Couple of them are generic real-world solutions running in production that can be customized and used when needed.
 
+If you have no need for the call recording and call replay features, you can use the two examples below that end with the word Mini. It will cut down the extra logic to result in a fewer number of overall operators.
+
 * [AccessTokenGenerator](https://github.com/IBMStreams/streamsx.sttgateway/tree/develop/samples/AccessTokenGenerator)
 * [AudioFileWatsonSTT](https://github.com/IBMStreams/streamsx.sttgateway/tree/develop/samples/AudioFileWatsonSTT)
 * [AudioFileWatsonSTTAllOutput](https://github.com/IBMStreams/streamsx.sttgateway/tree/develop/samples/AudioFileWatsonSTTAllOutput)
@@ -202,6 +204,8 @@ There are many examples available in this toolkit that can be compiled and teste
 * [VgwDataRouter](https://github.com/IBMStreams/streamsx.sttgateway/tree/develop/samples/VgwDataRouter)
 * [VgwDataRouterToWatsonS2T](https://github.com/IBMStreams/streamsx.sttgateway/tree/develop/samples/VgwDataRouterToWatsonS2T)
 * [VgwDataRouterToWatsonSTT](https://github.com/IBMStreams/streamsx.sttgateway/tree/develop/samples/VgwDataRouterToWatsonSTT)
+* [VgwDataRouterMini](https://github.com/IBMStreams/streamsx.sttgateway/tree/develop/samples/VgwDataRouterMini)
+* [VgwDataRouterToWatsonSTTMini](https://github.com/IBMStreams/streamsx.sttgateway/tree/develop/samples/VgwDataRouterToWatsonSTTMini)
 * [stt_results_http_receiver](https://github.com/IBMStreams/streamsx.sttgateway/tree/develop/samples/stt_results_http_receiver)
 * [audio_files](https://github.com/IBMStreams/streamsx.sttgateway/tree/develop/samples/audio-files)
 * [VoiceDataSimulator](https://github.com/IBMStreams/streamsx.sttgateway/tree/develop/samples/VoiceDataSimulator)

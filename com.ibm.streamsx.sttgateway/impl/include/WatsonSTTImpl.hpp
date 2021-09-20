@@ -2,10 +2,11 @@
  * WatsonSTTImpl.hpp
  *
  * Licensed Materials - Property of IBM
- * Copyright IBM Corp. 2019, 2020
+ * Copyright IBM Corp. 2019, 2021
  *
  *  Created on: Jan 14, 2020
- *      Author: joergboe
+ *  Modified on: Sep 12, 2021
+ *  Author(s): Senthil, joergboe
 */
 
 #ifndef COM_IBM_STREAMS_STTGATEWAY_WATSONSTTIMPL_HPP_
@@ -279,6 +280,7 @@ WatsonSTTImpl<OP, OT>::WatsonSTTImpl(OP & splOperator_,Conf config_)
 	<< "\nidentifySpeakers                        = " << Conf::identifySpeakers
 	<< "\nspeakerUpdatesNeeded                    = " << Conf::speakerUpdatesNeeded
 	<< "\nsmartFormattingNeeded                   = " << Conf::smartFormattingNeeded
+	<< "\nredactionNeeded                         = " << Conf::redactionNeeded
 	<< "\nkeywordsSpottingThreshold               = " << Conf::keywordsSpottingThreshold
 	<< "\nkeywordsToBeSpotted                     = " << Conf::keywordsToBeSpotted
 	<< "\nisTranscriptionCompletedRequested       = " << Conf::isTranscriptionCompletedRequested

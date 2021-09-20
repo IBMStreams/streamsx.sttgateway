@@ -46,6 +46,15 @@
       put the customer in the driver's seat to gather real-time intelligence from their
       voice infrastructure.
       
+      This operator allows the user to set the maximum number of concurrent calls allowed via the
+      operator parameter named maxConcurrentCallsAllowed. In addition, it also allows the user to 
+      dynamically query and adjust the maximum allowed concurrent calls count via the 
+      following CURL commands.
+      
+      curl -k -X POST https://host:port -H GetMaxConcurrentCalls:true
+      
+	  curl -k -X POST https://host:port -H SetMaxConcurrentCalls:150
+      
       For a detailed documentation about the requirements, operator design, usage patterns and 
       in-depth technical details, please refer to the official STT Gateway toolkit documentation 
       available at this URL:
@@ -61,6 +70,16 @@
           <name>nVoiceCallsProcessed</name>
           <description>
           Number of voice calls processed by this operator instance.
+          
+          *NOTE:* This metric is only updated if parameter `vgwLiveMetricsUpdateNeeded` is true.
+          </description>
+          <kind>Counter</kind>
+        </metric>
+
+        <metric>
+          <name>nVoiceCallsThrottled</name>
+          <description>
+          Number of voice calls throttled by this operator instance.
           
           *NOTE:* This metric is only updated if parameter `vgwLiveMetricsUpdateNeeded` is true.
           </description>
@@ -144,6 +163,10 @@
           <function>
             <description>Returns an rstring value with the call start date time i.e. system clock time.</description>
             <prototype><![CDATA[rstring getCallStartDateTime()]]></prototype>
+          </function>          
+          <function>
+            <description>Returns an int64 value with the call start time in epoch seconds.</description>
+            <prototype><![CDATA[int64 getCallStartTimeInEpochSeconds()]]></prototype>
           </function>          
           <function>
             <description>Returns an rstring value for the SIP invite custom header Cisco-Guid.</description>
@@ -285,6 +308,16 @@
         <rewriteAllowed>true</rewriteAllowed>
         <expressionMode>AttributeFree</expressionMode>
         <type>boolean</type>
+        <cardinality>1</cardinality>
+      </parameter>
+      
+      <parameter>
+        <name>maxConcurrentCallsAllowed</name>
+        <description>This parameter specifies the maximum concurrent calls allowed for processing by this operator. (Default is 10)</description>
+        <optional>true</optional>
+        <rewriteAllowed>true</rewriteAllowed>
+        <expressionMode>AttributeFree</expressionMode>
+        <type>uint32</type>
         <cardinality>1</cardinality>
       </parameter>
     </parameters>

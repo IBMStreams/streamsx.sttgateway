@@ -8,7 +8,7 @@
 /*
 ==============================================
 First created on: Nov/24/2020
-Last modified on: Aug/21/2021
+Last modified on: Sep/10/2021
 
 This is a utility composite that will get used in the following applications.
 
@@ -42,6 +42,7 @@ namespace com.ibm.streamsx.sttgateway.utils;
 // rstring id --> This attribute is needed by the WatsonS2T operator. 
 //                It is set to vgwSessionId_vgwVoiceChannelNumber
 // rstring callStartDateTime --> Call start date time i.e. system clock time.
+// int64 callStartTimeInEpochSeconds --> Call start time in epoch seconds.
 // rstring callerPhoneNumber --> Details about the caller's phone number.
 // rstring agentPhoneNumber --> Details about the agent's phone number.
 // rstring ciscoGuid --> Value of the SIP invite custom header Cisco-Guid if present.
@@ -52,7 +53,8 @@ namespace com.ibm.streamsx.sttgateway.utils;
 // int32 speechResultProcessorId --> This attribute will be set in the speech processor job. (Please, read the comments there.)
 type BinarySpeech_t = blob speech, rstring vgwSessionId, boolean isCustomerSpeechData, 
 	int32 vgwVoiceChannelNumber, boolean endOfCallSignal, 
-	rstring id, rstring callStartDateTime, 
+	rstring id, rstring callStartDateTime,
+	int64 callStartTimeInEpochSeconds, 
 	rstring callerPhoneNumber, rstring agentPhoneNumber, 
 	rstring ciscoGuid, int32 speechDataFragmentCnt, 
 	int32 totalSpeechDataBytesReceived, int32 speechProcessorId, 

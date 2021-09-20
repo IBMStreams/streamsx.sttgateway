@@ -1,14 +1,14 @@
 /*
 ==============================================
 # Licensed Materials - Property of IBM
-# Copyright IBM Corp. 2018, 2019
+# Copyright IBM Corp. 2018, 2021
 ==============================================
 */
 
 /*
 ============================================================
 First created on: Jul/01/2018
-Last modified on: Nov/06/2019
+Last modified on: Sep/12/2021
 
 Please refer to the sttgateway-tech-brief.txt file in the 
 top-level directory of this toolkit to read about 
@@ -436,6 +436,9 @@ https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-websocke
 	my $smartFormattingNeeded = $model->getParameterByName("smartFormattingNeeded");
 	$smartFormattingNeeded = $smartFormattingNeeded ? $smartFormattingNeeded->getValueAt(0)->getCppExpression() : 0;
 
+	my $redactionNeeded = $model->getParameterByName("redactionNeeded");
+	$redactionNeeded = $redactionNeeded ? $redactionNeeded->getValueAt(0)->getCppExpression() : 0;
+	
 	my $keywordsSpottingThreshold = $model->getParameterByName("keywordsSpottingThreshold");
 	# Default: 0.0 to distable the keywords spotting feature.
 	$keywordsSpottingThreshold = $keywordsSpottingThreshold ? $keywordsSpottingThreshold->getValueAt(0)->getCppExpression() : 0.3;
@@ -495,6 +498,7 @@ MY_OPERATOR::MY_OPERATOR()
 						<%=$identifySpeakers%>,
 						<%=$speakerUpdatesNeeded%>,
 						<%=$smartFormattingNeeded%>,
+						<%=$redactionNeeded%>,
 						<%=$keywordsSpottingThreshold%>,
 						<%=$keywordsToBeSpotted%>,
 						<%=$isTranscriptionCompletedRequested%>
