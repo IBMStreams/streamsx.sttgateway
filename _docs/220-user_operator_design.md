@@ -2,7 +2,7 @@
 title: "Operator Design"
 permalink: /docs/user/OperatorDesign/
 excerpt: "Describes the design of the streamsx.sttgateway toolkit operators."
-last_modified_at: 2020-09-18T21:30:40+01:00
+last_modified_at: 2022-01-10T13:55:40+01:00
 redirect_from:
    - /theme-setup/
 sidebar:
@@ -106,6 +106,9 @@ Following are the parameters accepted by the WatsonSTT operator. Some parameters
 | wordAlternativesThreshold | `float64` | `0.0` | This parameter controls the density of the word alternatives results (a.k.a. Confusion Networks). A value of 0.0 disables this feature. Valid value must be less than 1.0 |
 | smartFormattingNeeded | `boolean` | `false` | This parameter indicates whether to convert date, time, phone numbers, currency values, email and URLs into conventional representations. |
 | redactionNeeded | `boolean` | `false` | This parameter indicates whether to redact (mask) numeric data in the transcription result. |
+| speechDetectorSensitivity | `float64` | `0.5` | This parameter specifies the value to adjust the sensitivity of speech activity detection. Valid value must be from 0.0 to 1.0. |
+| backgroundAudioSuppression | `float64` | `0.0` | This parameter specifies the value to suppress side conversations or background noise. Valid value must be from 0.0 to 1.0. |
+| characterInsertionBias | `float64` | `0.0` | This parameter specifies the value to change how prone the STT engine is to insert more transcribed characters. Valid value must be from -0.5 to 1.0. |
 | keywordsSpottingThreshold | `float64` | `0.0` | This parameter specifies the minimum confidence level that the STT service must have for an utterance word to match a given keyword. A value of 0.0 disables this feature. Valid value must be less than 1.0. |
 | keywordsToBeSpotted | `list<rstring>` | `Empty list` | This parameter specifies a list (array) of strings to be spotted. |
 | websocketLoggingNeeded | `boolean` | `false` | This parameter specifies whether logging is needed from the Websocket library. |
