@@ -8,7 +8,7 @@
 /*
 ============================================================
 First created on: Jul/01/2018
-Last modified on: Sep/12/2021
+Last modified on: Jan/04/2022
 
 Please refer to the sttgateway-tech-brief.txt file in the 
 top-level directory of this toolkit to read about 
@@ -459,6 +459,18 @@ https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-websocke
 
 	my $sttLiveMetricsUpdateNeeded = $model->getParameterByName("sttLiveMetricsUpdateNeeded");
 	$sttLiveMetricsUpdateNeeded = $sttLiveMetricsUpdateNeeded ? $sttLiveMetricsUpdateNeeded->getValueAt(0)->getCppExpression() : 1;
+	
+	my $speechDetectorSensitivity = $model->getParameterByName("speechDetectorSensitivity");
+	# Default: 0.5
+	$speechDetectorSensitivity = $speechDetectorSensitivity ? $speechDetectorSensitivity->getValueAt(0)->getCppExpression() : 0.5;
+	
+	my $backgroundAudioSuppression = $model->getParameterByName("backgroundAudioSuppression");
+	# Default: 0.0
+	$backgroundAudioSuppression = $backgroundAudioSuppression ? $backgroundAudioSuppression->getValueAt(0)->getCppExpression() : 0.0;
+
+	my $characterInsertionBias = $model->getParameterByName("characterInsertionBias");
+	# Default: 0.0
+	$characterInsertionBias = $characterInsertionBias ? $characterInsertionBias->getValueAt(0)->getCppExpression() : 0.0;
 %>
 
 #include <type_traits>
@@ -501,7 +513,10 @@ MY_OPERATOR::MY_OPERATOR()
 						<%=$redactionNeeded%>,
 						<%=$keywordsSpottingThreshold%>,
 						<%=$keywordsToBeSpotted%>,
-						<%=$isTranscriptionCompletedRequested%>
+						<%=$isTranscriptionCompletedRequested%>,
+						<%=$speechDetectorSensitivity%>,
+						<%=$backgroundAudioSuppression%>,
+						<%=$characterInsertionBias%>
 					}
 				)
 {}

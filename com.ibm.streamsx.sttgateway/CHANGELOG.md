@@ -1,5 +1,10 @@
 # Changes
 
+## v2.3.2
+* Jan/10/2022
+* Fixed a problem where the call start date time values were not always correctly included in the STT result.
+* Added these three new parameters to the WatsonSTT operator: speechDetectorSensitivity, backgroundAudioSuppression, characterInsertionBias
+
 ## v2.3.1
 * Sep/20/2021
 * Dynamically change the maximum concurrent calls allowed value.

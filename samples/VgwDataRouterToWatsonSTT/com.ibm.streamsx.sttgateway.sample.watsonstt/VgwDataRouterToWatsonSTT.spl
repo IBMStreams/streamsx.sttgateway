@@ -1,14 +1,14 @@
 /*
 ==============================================
 # Licensed Materials - Property of IBM
-# Copyright IBM Corp. 2018, 2021
+# Copyright IBM Corp. 2018, 2022
 ==============================================
 */
 
 /*
 ==============================================
 First created on: Nov/27/2020
-Last modified on: Sep/20/2021
+Last modified on: Jan/08/2022
 
 IMPORTANT NOTE
 --------------
@@ -846,6 +846,10 @@ public composite VgwDataRouterToWatsonSTT {
 					// After getting released, such UDP channels will become available for 
 					// doing speech to text work for any new voice calls.
 					mutable map<rstring, int32> _vgwSessionToCompletedUdpChannelMap = {};
+					// This map tells us the call start date time string for a given vgwSessionId.
+					mutable map<rstring, rstring> _vgwSessionToCallStartDateTime = {};
+					// This map tells us the call start time in epoch seconds for a given vgwSessionId.
+					mutable map<rstring, int64> _vgwSessionToCallStartTimeInEpochSeconds = {};
 					mutable BinarySpeech_t _oTuple = {};
 					mutable rstring _key = "";
 				}
@@ -994,6 +998,10 @@ public composite VgwDataRouterToWatsonSTT {
 									if(BSD.callStartTimeInEpochSeconds == 0l) {
 										BSD.callStartTimeInEpochSeconds = getSeconds(getTimestamp());
 									}
+
+									// Insert the call start date time values in the state variables.
+									insertM(_vgwSessionToCallStartDateTime, BSD.vgwSessionId, BSD.callStartDateTime);
+									insertM(_vgwSessionToCallStartTimeInEpochSeconds, BSD.vgwSessionId, BSD.callStartTimeInEpochSeconds);
 									
 									rstring socsFileName = dataDirectory() + "/" +
 										BSD.vgwSessionId + "-call-started.txt";
@@ -1055,6 +1063,12 @@ public composite VgwDataRouterToWatsonSTT {
 							(rstring)BSD.totalSpeechDataBytesReceived +
 							", speechEngineId=" + (rstring)BSD.speechEngineId +
 							", speechResultProcessorId=" + (rstring)BSD.speechResultProcessorId); 
+						// Set the call start date time values to the tuple attributes.
+						if(has(_vgwSessionToCallStartDateTime, BSD.vgwSessionId) == true) {
+							BSD.callStartDateTime = _vgwSessionToCallStartDateTime[BSD.vgwSessionId];
+							BSD.callStartTimeInEpochSeconds = _vgwSessionToCallStartTimeInEpochSeconds[BSD.vgwSessionId];
+						}
+						
 						// Submit this tuple.
 						submit(BSD, BSDF);
 					} else {
@@ -1209,6 +1223,12 @@ public composite VgwDataRouterToWatsonSTT {
 									// We are done. Remove it from the map as well.
 									removeM(_vgwSessionToCompletedUdpChannelMap, key2);
 								}
+
+								// Remove the call start date time values from the state variables.
+								if(has(_vgwSessionToCallStartDateTime, BSD.vgwSessionId) == true) {
+									removeM(_vgwSessionToCallStartDateTime, BSD.vgwSessionId);
+									removeM(_vgwSessionToCallStartTimeInEpochSeconds, BSD.vgwSessionId);
+								}
 	
 								// At this time, the voice call for this VGW session id has ended.
 								// We can now write an "End of Call" indicator file in the
@@ -1353,6 +1373,15 @@ public composite IBMWatsonSpeechToText(input AudioBlobContent, AccessToken;
 			(boolean)getSubmissionTimeValue("smartFormattingNeeded", "false");
 		expression<boolean> $redactionNeeded : 
 			(boolean)getSubmissionTimeValue("redactionNeeded", "false");
+		// Allowed value range for this is from 0.0 to 1.0.
+		expression<float64> $speechDetectorSensitivity : 
+			(float64)getSubmissionTimeValue("speechDetectorSensitivity", "0.5");
+		// Allowed value range for this is from 0.0 to 1.0.	
+		expression<float64> $backgroundAudioSuppression : 
+			(float64)getSubmissionTimeValue("backgroundAudioSuppression", "0.0");
+		// Allowed value range for this is from -0.5 to 1.0.	
+		expression<float64> $characterInsertionBias : 
+			(float64)getSubmissionTimeValue("characterInsertionBias", "0.0");
 		expression<float64> $keywordsSpottingThreshold : 
 			(float64)getSubmissionTimeValue("keywordsSpottingThreshold", "0.0");
 		expression<list<rstring>> $keywordsToBeSpotted : 
@@ -1466,6 +1495,9 @@ public composite IBMWatsonSpeechToText(input AudioBlobContent, AccessToken;
 				wordAlternativesThreshold: $wordAlternativesThreshold;
 				smartFormattingNeeded: $smartFormattingNeeded;
 				redactionNeeded: $redactionNeeded;
+				speechDetectorSensitivity: $speechDetectorSensitivity;
+				backgroundAudioSuppression: $backgroundAudioSuppression;
+				characterInsertionBias: $characterInsertionBias;
 				keywordsSpottingThreshold: $keywordsSpottingThreshold;
 				keywordsToBeSpotted: $keywordsToBeSpotted;
 				websocketLoggingNeeded: $sttWebsocketLoggingNeeded;
@@ -1685,11 +1717,16 @@ public composite STTResultProcessor(input MyTranscriptionResult, BinarySpeechDat
                        MTR.callStartTimeInEpochSeconds =  _callStartTimeInEpochSeconds;
                     }
 
-					// If the user opted for include the time of the
+					// If the user opted for including the time of the
 					// utterance result reception time, let us add it to
 					// the transcription result.
 					if($includeUtteranceResultReceptionTime == true) {
+						// This is the current time expressed in ctime format.
 						MTR.utteranceResultReceptionTime = ctime(getTimestamp());
+						// We will also do the utterance reception time expressed
+						// in seconds elapsed since the start of the call.
+						MTR.utteranceRxTime = 
+							getSeconds(getTimestamp()) - MTR.callStartTimeInEpochSeconds;
 					}
 					
 					// We will write the transcription results to 

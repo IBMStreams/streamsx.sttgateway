@@ -47,6 +47,9 @@ struct WatsonSTTConfig {
 	SPL::float64 keywordsSpottingThreshold;
 	const SPL::list<SPL::rstring> keywordsToBeSpotted;
 	const bool isTranscriptionCompletedRequested;
+	SPL::float64 speechDetectorSensitivity;
+	SPL::float64 backgroundAudioSuppression;
+	SPL::float64 characterInsertionBias;
 
 	// Some definitions
 	//This time becomes effective, when the connectionAttemptsThreshold limit is exceeded

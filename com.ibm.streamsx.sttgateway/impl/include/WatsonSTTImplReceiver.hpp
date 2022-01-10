@@ -578,6 +578,20 @@ void WatsonSTTImplReceiver<OP, OT>::on_open(client* c, websocketpp::connection_h
 		msg += ", \"redaction\" : true";
 	}
 
+	// https://cloud.ibm.com/docs/speech-to-text?topic=speech-to-text-detection
+	if (speechDetectorSensitivity >= 0.0) {
+		msg += ", \"speech_detector_sensitivity\" : " + boost::to_string(speechDetectorSensitivity);
+	}
+
+	// https://cloud.ibm.com/docs/speech-to-text?topic=speech-to-text-detection
+	if (backgroundAudioSuppression >= 0.0) {
+		msg += ", \"background_audio_suppression\" : " + boost::to_string(backgroundAudioSuppression);
+	}
+
+	if (characterInsertionBias >= -5.0) {
+		msg += ", \"character_insertion_bias\" : " + boost::to_string(characterInsertionBias);
+	}
+
 	// https://cloud.ibm.com/docs/services/speech-to-text?topic=speech-to-text-output#keyword_spotting
 	if (keywordsSpottingThreshold > 0.0) {
 		msg += ", \"keywords_threshold\" : " + boost::to_string(keywordsSpottingThreshold);

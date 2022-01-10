@@ -232,6 +232,18 @@ WatsonSTTImpl<OP, OT>::WatsonSTTImpl(OP & splOperator_,Conf config_)
 		throw std::runtime_error(STTGW_INVALID_PARAM_VALUE_3("WatsonSTT", Conf::keywordsSpottingThreshold, "keywordsSpottingThreshold"));
 	}
 
+	if (Conf::speechDetectorSensitivity < 0.0 || Conf::speechDetectorSensitivity > 1.0) {
+		throw std::runtime_error(STTGW_INVALID_PARAM_VALUE_3("WatsonSTT", Conf::speechDetectorSensitivity, "speechDetectorSensitivity"));
+	}
+
+	if (Conf::backgroundAudioSuppression < 0.0 || Conf::backgroundAudioSuppression > 1.0) {
+		throw std::runtime_error(STTGW_INVALID_PARAM_VALUE_3("WatsonSTT", Conf::backgroundAudioSuppression, "backgroundAudioSuppression"));
+	}
+
+	if (Conf::characterInsertionBias < -0.5 || Conf::characterInsertionBias > 1.0) {
+		throw std::runtime_error(STTGW_INVALID_PARAM_VALUE_3("WatsonSTT", Conf::characterInsertionBias, "characterInsertionBias"));
+	}
+
 	// If the keywords to be spotted list is empty, then disable keywords_spotting.
 	if (Conf::keywordsToBeSpotted.size() == 0) {
 		Conf::keywordsSpottingThreshold = 0.0;
@@ -246,9 +258,9 @@ WatsonSTTImpl<OP, OT>::WatsonSTTImpl(OP & splOperator_,Conf config_)
 	}
 
 	// The parameters maxUtteranceAlternatives, wordAlternativesThreshold, keywordsSpottingThreshold, keywordsToBeSpotted
-	// are not available in sttResultMose complete
+	// are not available in sttResultMode complete
 	// The COF getUtteranceNumber, isFinalizedUtterance, getConfidence, getUtteranceAlternatives
-	// are not available in sttResultMose complete
+	// are not available in sttResultMode complete
 
 	// Update the operator metric.
 	sttOutputResultModeMetric->setValueNoLock(Conf::sttOutputResultMode);
@@ -284,6 +296,9 @@ WatsonSTTImpl<OP, OT>::WatsonSTTImpl(OP & splOperator_,Conf config_)
 	<< "\nkeywordsSpottingThreshold               = " << Conf::keywordsSpottingThreshold
 	<< "\nkeywordsToBeSpotted                     = " << Conf::keywordsToBeSpotted
 	<< "\nisTranscriptionCompletedRequested       = " << Conf::isTranscriptionCompletedRequested
+	<< "\nspeechDetectorSensitivity               = " << Conf::speechDetectorSensitivity
+	<< "\nbackgroundAudioSuppression              = " << Conf::backgroundAudioSuppression
+	<< "\ncharacterInsertionBias                  = " << Conf::characterInsertionBias
 	<< "\nconnectionState.wsState.is_lock_free()  = " << Rec::wsState.is_lock_free()
 	<< "\nrecentOTuple.is_lock_free()             = " << Rec::recentOTuple.is_lock_free()
 	<< "\n----------------------------------------------------------------" << std::endl;
