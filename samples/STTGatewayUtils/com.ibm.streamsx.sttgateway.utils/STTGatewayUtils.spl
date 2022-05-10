@@ -1,14 +1,14 @@
 /*
 ==============================================
 # Licensed Materials - Property of IBM
-# Copyright IBM Corp. 2018, 2021
+# Copyright IBM Corp. 2018, 2022
 ==============================================
 */
 
 /*
 ==============================================
 First created on: Nov/24/2020
-Last modified on: Sep/10/2021
+Last modified on: May/10/2022
 
 This is a utility composite that will get used in the following applications.
 
@@ -29,7 +29,8 @@ namespace com.ibm.streamsx.sttgateway.utils;
 // very important and the other ones are purely optional if some
 // scenarios really require them.
 // blob speech --> Speech fragments of a live conversation as captured and sent by the IBM Voice Gateway.
-// rstring vgwSessionId --> Unique identifier of a voice call. 
+// rstring vgwSessionId --> Unique identifier of a voice call.
+// int32 callSequenceNumber --> Unique sequence number for a call. 
 // boolean isCustomerSpeechData --> Every voice call will have a customer channel and an agent channel.
 //                                  This attribute tells whether this output stream carries customer speech data or not.
 // int32 vgwVoiceChannelNumber --> This indicates the voice channel number i.e. 1 or 2.
@@ -51,14 +52,16 @@ namespace com.ibm.streamsx.sttgateway.utils;
 // int32 int32 speechProcessorId --> Id of the speech processor job that is analyzing the speech data.
 // int32 speechEngineId --> This attribute will be set in the speech processor job. (Please, read the comments there.)
 // int32 speechResultProcessorId --> This attribute will be set in the speech processor job. (Please, read the comments there.)
-type BinarySpeech_t = blob speech, rstring vgwSessionId, boolean isCustomerSpeechData, 
+// int32 parallelChannel --> It indicates the parallel channel to be used in the vgwDataRouter job.
+type BinarySpeech_t = blob speech, rstring vgwSessionId, int32 callSequenceNumber, boolean isCustomerSpeechData, 
 	int32 vgwVoiceChannelNumber, boolean endOfCallSignal, 
 	rstring id, rstring callStartDateTime,
 	int64 callStartTimeInEpochSeconds, 
 	rstring callerPhoneNumber, rstring agentPhoneNumber, 
 	rstring ciscoGuid, int32 speechDataFragmentCnt, 
 	int32 totalSpeechDataBytesReceived, int32 speechProcessorId, 
-	int32 speechEngineId, int32 speechResultProcessorId;
+	int32 speechEngineId, int32 speechResultProcessorId,
+	int32 parallelChannel;
 
 // The following schema will be for the data being sent here by the
 // VgwDataRouter application. It sends us raw binary data which 
@@ -70,7 +73,7 @@ type DataFromVgwRouter_t = int32 msgType, blob payload;
 // The following schema is for the call recording feature where we will
 // store the call metadata details for a specific voice channel of a given
 // voice call.
-type CallMetaData_t = rstring vgwSessionId, boolean isCustomerSpeechData, 
+type CallMetaData_t = rstring vgwSessionId, int32 callSequenceNumber, boolean isCustomerSpeechData, 
 	int32 vgwVoiceChannelNumber, rstring callerPhoneNumber, 
 	rstring agentPhoneNumber, rstring ciscoGuid;
 	
@@ -110,7 +113,8 @@ type SendData_t = rstring strData, blob blobData;
 
 // The following schema defines the required attributes for the input stream of
 // the WebSocketSink operator.
-type WebSocketSinkSendData_t = rstring strData, blob blobData, list<rstring> sendToUrlContextPaths; 
+type WebSocketSinkSendData_t = rstring strData, blob blobData, 
+	list<rstring> sendToUrlContextPaths, int32 parallelChannel; 
 
 public composite STTGatewayUtils {
 	graph

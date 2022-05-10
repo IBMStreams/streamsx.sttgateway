@@ -135,6 +135,10 @@
           <function>
             <description>Returns an rstring value indicating the IBM Voice Gateway session id that corresponds to the current output tuple.</description>
             <prototype><![CDATA[rstring getIBMVoiceGatewaySessionId()]]></prototype>
+          </function> 
+          <function>
+            <description>Returns an integer value indicating the unique sequence number of a voice call.</description>
+            <prototype><![CDATA[int32 getCallSequenceNumber()]]></prototype>
           </function>                    
           <function>
             <description>Returns a boolean value to indicate if this is a customer's speech data or not.</description>

@@ -8,7 +8,7 @@
 /*
 ==============================================
 First created on: Sep/25/2019
-Last modified on: Jan/08/2022
+Last modified on: May/10/2022
 
 A) What does this example application do?
    --------------------------------------
@@ -480,7 +480,8 @@ public composite VoiceGatewayToStreamsToWatsonSTT {
 		// very important and the other ones are purely optional if some
 		// scenarios really require them.
 		// blob speech --> Speech fragments of a live conversation as captured and sent by the IBM Voice Gateway.
-		// rstring vgwSessionId --> Unique identifier of a voice call. 
+		// rstring vgwSessionId --> Unique identifier of a voice call.
+		// int32 callSequenceNumber --> Unique sequence number for a call.  
 		// boolean isCustomerSpeechData --> Every voice call will have a customer channel and an agent channel.
 		//                                  This attribute tells whether this output stream carries customer speech data or not.
 		// int32 vgwVoiceChannelNumber --> This indicates the voice channel number i.e. 1 or 2.
@@ -500,7 +501,8 @@ public composite VoiceGatewayToStreamsToWatsonSTT {
 		// int32 int32 speechProcessorId --> Id of the speech processor job that is analyzing the speech data.
 		// int32 sttEngineId --> This attribute will be set in the speech processor job. (Please, read the comments there.)
 		// int32 sttResultProcessorId --> This attribute will be set in the speech processor job. (Please, read the comments there.)
-		BinarySpeech_t = blob speech, rstring vgwSessionId, boolean isCustomerSpeechData, 
+		BinarySpeech_t = blob speech, rstring vgwSessionId, 
+			int32 callSequenceNumber, boolean isCustomerSpeechData, 
 			int32 vgwVoiceChannelNumber, boolean endOfCallSignal, 
 			rstring callStartDateTime,
 			int64 callStartTimeInEpochSeconds, 
@@ -512,9 +514,9 @@ public composite VoiceGatewayToStreamsToWatsonSTT {
 		// The following schema is for the call recording feature where we will
 		// store the call metadata details for a specific voice channel of a given
 		// voice call.
-		CallMetaData_t = rstring vgwSessionId, boolean isCustomerSpeechData, 
-			int32 vgwVoiceChannelNumber, rstring callerPhoneNumber, 
-			rstring agentPhoneNumber, rstring ciscoGuid;
+		CallMetaData_t = rstring vgwSessionId, int32 callSequenceNumber, 
+			boolean isCustomerSpeechData, int32 vgwVoiceChannelNumber, 
+			rstring callerPhoneNumber, rstring agentPhoneNumber, rstring ciscoGuid;
 			
 		// The following schema is for the call recording feature where we will
 		// store the call speech data for a specific voice channel of a given
@@ -714,7 +716,17 @@ public composite VoiceGatewayToStreamsToWatsonSTT {
         			// whether it is sending binary speech data or an EOCS.
         			if(BSD.endOfCallSignal == false) {
         				// The incoming tuple contains binary speech data.
-						//
+        				// If we are sent an empty speech blob, let us ignore that as
+        				// it will cause unwanted side effects in the downstream logic.
+        				if(blobSize(BSD.speech) <= 0ul) {
+							appTrc(Trace.error, 
+								"_ZZZZZ Empty speech packet received for " +
+								"vgwSessionId_vgwVoiceChannelNumber: " + _key + 
+								" We are going to ignore this packet by not sending it to" +
+								" an STT engine.");
+        					return;
+        				}
+        				
 						// Check if this vgwSessionId_vgwVoiceChannelNumber combo already 
 						// has an STT engine allocated for it via an UDP channel.					
 						if (has(_vgwSessionIdToUdpChannelMap, _key) == true) {

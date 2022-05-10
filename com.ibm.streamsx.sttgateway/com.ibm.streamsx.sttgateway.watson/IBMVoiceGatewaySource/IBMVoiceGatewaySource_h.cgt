@@ -1,14 +1,14 @@
 /*
 ==============================================
 # Licensed Materials - Property of IBM
-# Copyright IBM Corp. 2019, 2021
+# Copyright IBM Corp. 2019, 2022
 ==============================================
 */
 
 /*
 ============================================================
 First created on: Sep/17/2019
-Last modified on: Sep/17/2021
+Last modified on: May/10/2022
 ============================================================
 */
 
@@ -58,6 +58,8 @@ public:
 	SPL::int64 vgwStaleSessionPurgeInterval;
 	SPL::uint32 maxConcurrentCallsAllowed;
 	SPL::uint32 activeConcurrentCallsCnt;
+	SPL::uint32 peakConcurrentCallsCnt;
+	SPL::uint32 emptySpeechPacketsCnt;
 	bool ipv6Available;
 	server_plain endpoint_plain;
 	server_tls endpoint_tls;
@@ -155,6 +157,20 @@ public:
 	// EndOfCall signal.
 	std::map<std::string, SPL::list<int64_t>> vgw_session_id_map; 
 	
+	// This map's key is vgwSessionId and value is 
+	// a call sequence number of type int32_t.
+	// This map stores the unique call sequence number generated and
+	// assigned by this operator to every call.
+	// This unique call sequence number can be used by the 
+	// downstream operators for whatever need they may have for it.
+	// e-g: partition the voice call data based on this unique 
+	// number to distribute in a parallel region to achieve
+	// even load distribution across all the parallel channels.
+	std::map<std::string, int32_t> call_sequence_number_map; 
+	
+	// This counter is used to keep the call sequence number.
+	int32_t callSequenceNumber;
+	
 	// Custom metrics for this operator.
 	Metric *nVoiceCallsProcessedMetric;
 	Metric *nVoiceCallsThrottledMetric;
@@ -235,6 +251,7 @@ public:
 private:
 	// These are the output attribute assignment functions for this operator.
 	std::string getIBMVoiceGatewaySessionId(std::string const & vgwSessionId);
+	int32_t getCallSequenceNumber(int32_t const & callSequenceNumber);
 	bool isCustomerSpeechData(bool const & isThisSpeechDataFromCustomer);
 	int32_t getTupleCnt(int32_t const & emittedTupleCnt);
 	int32_t getTotalSpeechDataBytesReceived(int32_t const & totalSpeechDataBytesReceived);

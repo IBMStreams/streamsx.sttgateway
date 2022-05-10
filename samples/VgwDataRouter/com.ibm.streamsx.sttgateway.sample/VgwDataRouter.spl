@@ -8,7 +8,7 @@
 /*
 ==============================================
 First created on: Nov/24/2020
-Last modified on: Sep/15/2021
+Last modified on: May/10/2022
 
 A) What does this example application do?
    --------------------------------------
@@ -573,7 +573,17 @@ public composite VgwDataRouter {
         			// whether it is sending binary speech data or an EOCS.
         			if(BSD.endOfCallSignal == false) {
         				// The incoming tuple contains binary speech data.
-        				//
+        				// If we are sent an empty speech blob, let us ignore that as
+        				// it will cause unwanted side effects in the downstream logic.
+        				if(blobSize(BSD.speech) <= 0ul) {
+							appTrc(Trace.error, 
+								"_ZZZZZ Empty speech packet received for " +
+								"vgwSessionId_vgwVoiceChannelNumber: " + _key + 
+								" We are going to ignore this packet by not sending it to" +
+								" a speech processor.");
+        					return;
+        				}
+        				
 						// We have to first check if this speech data belongs to a 
 						// brand new voice call or an already ongoing voice call.
 						if(has(_vgwSessionIdToSpeechProcessorMap, BSD.vgwSessionId) == false) {

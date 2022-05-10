@@ -1,14 +1,14 @@
 /*
 ==============================================
 # Licensed Materials - Property of IBM
-# Copyright IBM Corp. 2018, 2021
+# Copyright IBM Corp. 2018, 2022
 ==============================================
 */
 
 /*
 ==============================================
 First created on: Nov/24/2020
-Last modified on: Sep/15/2021
+Last modified on: May/10/2022
 
 A) What does this example application do?
    --------------------------------------
@@ -438,6 +438,7 @@ public composite VgwDataRouter {
 			// Get these values via custom output functions	provided by this operator.
 			output
 				BSD: vgwSessionId = getIBMVoiceGatewaySessionId(),
+					callSequenceNumber = getCallSequenceNumber(),
 				    callStartDateTime = getCallStartDateTime(), 
 				    callStartTimeInEpochSeconds = getCallStartTimeInEpochSeconds(),
 					isCustomerSpeechData = isCustomerSpeechData(),
@@ -453,6 +454,15 @@ public composite VgwDataRouter {
 				placement: host(VgwPool[0]);
 		}
 
+		// Every incoming speech data for a given voice call must always be 
+		// sent to the same speech processor id.
+		// This operator selects an available speech processor id to where the
+		// incoming speech data tuple can be sent for processing. It also does
+		// the releasing of a previously assigned speech processor when a 
+		// voice call assigned to it is ending. Such handling of speech processor
+		// assignment and release should be done within a single operator that
+		// doesn't have parallel instances.
+		//
 		// We have to always route the speech data bytes (fragments) coming from  
 		// a given vgwSessionId_vgwVoiceChannelNumber to a particular 
 		// speech processor job. 
@@ -471,9 +481,8 @@ public composite VgwDataRouter {
 		// extra logic to locate an unused speech processor 
 		// i.e. an idle speech engine in a speech processor job to be assigned for a 
 		// given vgwSessionId_vgwVoiceChannelNumber.
-		// That special speech data distribution logic happens inside this operator.
-		(stream<WebSocketSinkSendData_t> CallDataForSpeechProcessor as CDFSP) as
-			VoiceCallDataRouter = Custom(BinarySpeechData as BSD) {
+		(stream<BinarySpeech_t> CallDataWithSpeechProcessorId as CDWSPI) as
+			SpeechProcessorIdSelector = Custom(BinarySpeechData as BSD) {
 			logic
 				state: {
 					// This variable tells us how many total concurrent calls can be
@@ -495,15 +504,13 @@ public composite VgwDataRouter {
 					// After getting released, such speech processors will become available for 
 					// doing speech to text work for any new voice calls.
 					mutable map<rstring, boolean> _vgwSessionVgwVoiceChannelNumberCompletedMap = {};
-					mutable DataFromVgwRouter_t _serializedTuple = {};
-					mutable WebSocketSinkSendData_t _oTuple = {};
 					mutable rstring _key = "";
 				}
-			
-				// Process the Binary Speech Data.
+				
 				onTuple BSD: {
 					// Get the sessionId + channelNumber combo string.
 					_key = BSD.vgwSessionId + "_" + (rstring)BSD.vgwVoiceChannelNumber;
+					mutable int32 speechProcessorId = -1;
 
 					// We will get the regular binary speech data and the End Of Call Signal (EOCS) in
 					// the same input stream. This design change was done on Feb/09/2021 to avoid any
@@ -513,7 +520,17 @@ public composite VgwDataRouter {
         			// whether it is sending binary speech data or an EOCS.
         			if(BSD.endOfCallSignal == false) {
         				// The incoming tuple contains binary speech data.
-        				//
+        				// If we are sent an empty speech blob, let us ignore that as
+        				// it will cause unwanted side effects in the downstream logic.
+        				if(blobSize(BSD.speech) <= 0ul) {
+							appTrc(Trace.error, 
+								"_ZZZZZ Empty speech packet received for " +
+								"vgwSessionId_vgwVoiceChannelNumber: " + _key + 
+								" We are going to ignore this packet by not sending it to" +
+								" a speech processor.");
+        					return;
+        				}
+        				
 						// We have to first check if this speech data belongs to a 
 						// brand new voice call or an already ongoing voice call.
 						if(has(_vgwSessionIdToSpeechProcessorMap, BSD.vgwSessionId) == false) {
@@ -521,7 +538,7 @@ public composite VgwDataRouter {
 							// send the speech data belonging to this call.
 							// Store this VGW session id to change the status of this 
 							// voice call from "brand new" to "ongoing".
-							int32 speechProcessorId = 
+							speechProcessorId = 
 								getSpeechProcessorIdForNewCallProcessing(
 								_numberOfConcurrentCallsAllowedPerSpeechProcessor,
 								_speechProcessorStatusList);
@@ -544,33 +561,25 @@ public composite VgwDataRouter {
 							// future use as the speech data keeps coming.
 							insertM(_vgwSessionIdToSpeechProcessorMap, BSD.vgwSessionId, speechProcessorId);
 							appTrc(Trace.error, "A new call with vgwSessionId=" + BSD.vgwSessionId +
-								" is being assigned to speech processor id " + (rstring)speechProcessorId);						
+								" is being assigned to speech processor id " + (rstring)speechProcessorId);
+							 						
+						} else {
+							// This incoming tuple carries speech data belonging to a 
+							// voice call that we have already started processing.
+							// So, get the already assigned speech processor id for this voice call.
+							speechProcessorId = _vgwSessionIdToSpeechProcessorMap[BSD.vgwSessionId];
 						}
 						
-						// We can prepare this speech data to be sent to the chosen speech processor id.
-						// We will do double serialization of the speech data as shown below.
-						//
-						// 1) Let us serialize the received speech data tuple.
-						// msgType = 1 means that it carries the binary speech data tuple.
-						_serializedTuple.msgType = 1;
-						clearM(_serializedTuple.payload);
-						// Call a native function to do the Tuple-->Blob conversion.
-						serializeTuple(BSD, _serializedTuple.payload);
-						
-						// 2) Let us now serialize it one more time to be sent as the final tuple.
-						_oTuple.strData = "";
-						// We can tell the downstream WebSocketSink operator about to which
-						// speech processor id our serialized data should be sent.
-						// That is done by specifying the URL context path of the WebSocketSink
-						// operator where a selected speech processor has connected to.
-						// As shown in the param section of the downstream sink operator,
-						// we have configured it to allow URL context path such as "1","2","3" and so on.
-						// With this arrangement, remote speech processor jobs can connect to our
-						// WebSocketSink via a distinct URL that carries their respective speech processor ids.
-						_oTuple.sendToUrlContextPaths = 
-							[(rstring)_vgwSessionIdToSpeechProcessorMap[BSD.vgwSessionId]];
-						serializeTuple(_serializedTuple, _oTuple.blobData);
-						submit(_oTuple, CDFSP);
+						// Set the chosen speech processor id in the tuple attribute.
+						BSD.speechProcessorId = speechProcessorId;
+						// For the downstream operator that is within a parallel region,
+						// we will send this tuple to a correct parallel channel that handles
+						// a given speech processor id. Since parallel channels range from
+						// 0 to N-1, we will subtract the chosen speech processor id value by
+						// 1 as speech processor id ranges from 1 to N.
+						BSD.parallelChannel = speechProcessorId - 1;
+						// Send this tuple away.
+						submit(BSD, CDWSPI);
 					} else {
 						//The incoming tuple contains an End of Call Signal (EOCS).
 						//
@@ -593,28 +602,18 @@ public composite VgwDataRouter {
 						if (has(_vgwSessionIdToSpeechProcessorMap, BSD.vgwSessionId) == true) {
 							int32 speechProcessorId = 
 								_vgwSessionIdToSpeechProcessorMap[BSD.vgwSessionId];
-							// Let us send the EOCS to the chosen speech processor id.
-							// We will do double serialization of the data as shown below.
-							// 1) Let us serialize the received speech data tuple.
-							// msgType = 2 means that it carries the EOCS tuple.
-							_serializedTuple.msgType = 2;
-							clearM(_serializedTuple.payload);
-							// Call a native function to do the Tuple-->Blob conversion.
-							serializeTuple(BSD, _serializedTuple.payload);
-							
-							// 2) Let us now serialize it one more time to be sent as the final tuple.
-							_oTuple.strData = "";
-							// We can tell the downstream WebSocketSink operator about to which
-							// speech processor id our serialized data should be sent.
-							// That is done by specifying the URL context path of the WebSocketSink
-							// operator where a selected speech processor has connected to.
-							// As shown in the param section of the downstream sink operator,
-							// we have configured it to allow URL context path such as "1","2","3" and so on.
-							// With this arrangement, remote speech processor jobs can connect to our
-							// WebSocketSink via a distinct URL that carries their respective speech processor ids.
-							_oTuple.sendToUrlContextPaths = [(rstring)speechProcessorId];
-							serializeTuple(_serializedTuple, _oTuple.blobData);
-							submit(_oTuple, CDFSP);										
+								
+							// Set the chosen speech processor id in the tuple attribute.
+							BSD.speechProcessorId = speechProcessorId;
+							// For the downstream operator that is within a parallel region,
+							// we will send this tuple to a correct parallel channel that handles
+							// a given speech processor id. Since parallel channels range from
+							// 0 to N-1, we will subtract the chosen speech processor id value by
+							// 1 as speech processor id ranges from 1 to N.
+							BSD.parallelChannel = speechProcessorId - 1;
+							// Send this tuple away.
+							submit(BSD, CDWSPI);
+								
 							// Add the _key to the call completed list for the speech processor id to be
 							// released later in the following if block only after receiving EOCS for 
 							// both the voice channels of this call.
@@ -685,6 +684,7 @@ public composite VgwDataRouter {
 									" got released.");						
 							}
 						} else {
+							// We couldn't get a speech processor id assigned for this voice call.
 							// Flag an error only when the user configured for two
 							// EOCS tuples to be received for considering a voice call
 							// as completed.
@@ -697,10 +697,110 @@ public composite VgwDataRouter {
 							}					
 						}						
 					} // End of if(BSD.endOfCallSignal == false)				
+			} // End of onTuple BSD
+
+			config
+				// Depending on the speech data load from the number of concurrent calls, 
+				// queue size below can be increased or decreased. 
+				threadedPort: queue(BSD, Sys.Wait, 300000);
+		} // End of the SpeechProcessorIdSelector operator.
+
+		// Speech data distribution logic happens inside this operator.
+		//
+		// Let us do partitioned parallelism for this operator to evenly distribute the
+		// high volume speech payload sent here by the source operator shown above.
+		// Incoming speech data will carry a unique call sequence number of type int32 that
+		// will be used to partition the tuples consistently to a particular parallel channel.
+		@parallel(width=$totalNumberOfSpeechProcessorJobs, partitionBy=[{port=BSD, attributes=[parallelChannel]}])
+		(stream<WebSocketSinkSendData_t> CallDataForSpeechProcessor as CDFSP) as
+			VoiceCallDataRouter = Custom(CallDataWithSpeechProcessorId as BSD) {
+			logic
+				state: {
+					mutable DataFromVgwRouter_t _serializedTuple = {};
+					mutable WebSocketSinkSendData_t _oTuple = {};
+				}
+			
+				// Process the Binary Speech Data.
+				onTuple BSD: {
+					// We will get the regular binary speech data and the End Of Call Signal (EOCS) in
+					// the same input stream. This design change was done on Feb/09/2021 to avoid any
+					// any port locks and/or tuple ordering issues that may happen if we choose to 
+        			// do it using two different output ports. The incoming tuple has an attribute
+        			// that is set to true or false by the IBMVoiceGatewaySource operator to indicate
+        			// whether it is sending binary speech data or an EOCS.
+        			if(BSD.endOfCallSignal == false) {
+						// We can prepare this speech data to be sent to the chosen speech processor id.
+						// We will do double serialization of the speech data as shown below.
+						//
+						// 1) Let us serialize the received speech data tuple.
+						// msgType = 1 means that it carries the binary speech data tuple.
+						_serializedTuple.msgType = 1;
+						clearM(_serializedTuple.payload);
+						// Call a native function to do the Tuple-->Blob conversion.
+						serializeTuple(BSD, _serializedTuple.payload);
+						
+						// 2) Let us now serialize it one more time to be sent as the final tuple.
+						_oTuple.strData = "";
+						// We can tell the downstream WebSocketSink operator about to which
+						// speech processor id our serialized data should be sent.
+						// That is done by specifying the URL context path of the WebSocketSink
+						// operator where a selected speech processor has connected to.
+						// As shown in the param section of the downstream sink operator,
+						// we have configured it to allow URL context path such as "1","2","3" and so on.
+						// With this arrangement, remote speech processor jobs can connect to our
+						// WebSocketSink via a distinct URL that carries their respective speech processor ids.
+						_oTuple.sendToUrlContextPaths = [(rstring)BSD.speechProcessorId];
+						// Set the parallelChannel in the final tuple so that the 
+						// WebSocket sink operator can use it to find a correct operator instance
+						// in a parallel region. See more details about it at the top of the
+						// WebSocket sink operator invocation in the code below.
+						// Parallel channels have a range from 0 to N-1 in a
+						// N-way parallel region. However, our speech processor id always 
+						// starts at 1. To align it correctly with the zero based parallel 
+						// channel number, we will decrement the speech processor id by 1.
+						_oTuple.parallelChannel = BSD.speechProcessorId - 1;
+						serializeTuple(_serializedTuple, _oTuple.blobData);
+						submit(_oTuple, CDFSP);
+					} else {
+						//The incoming tuple contains an End of Call Signal (EOCS).
+						// Let us send the EOCS to the chosen speech processor id.
+						// We will do double serialization of the data as shown below.
+						// 1) Let us serialize the received speech data tuple.
+						// msgType = 2 means that it carries the EOCS tuple.
+						_serializedTuple.msgType = 2;
+						clearM(_serializedTuple.payload);
+						// Call a native function to do the Tuple-->Blob conversion.
+						serializeTuple(BSD, _serializedTuple.payload);
+						
+						// 2) Let us now serialize it one more time to be sent as the final tuple.
+						_oTuple.strData = "";
+						// We can tell the downstream WebSocketSink operator about to which
+						// speech processor id our serialized data should be sent.
+						// That is done by specifying the URL context path of the WebSocketSink
+						// operator where a selected speech processor has connected to.
+						// As shown in the param section of the downstream sink operator,
+						// we have configured it to allow URL context path such as "1","2","3" and so on.
+						// With this arrangement, remote speech processor jobs can connect to our
+						// WebSocketSink via a distinct URL that carries their respective speech processor ids.
+						_oTuple.sendToUrlContextPaths = [(rstring)BSD.speechProcessorId];
+						// Set the parallelChannel in the final tuple so that the 
+						// WebSocket sink operator can use it to find a correct operator instance
+						// in a parallel region. See more details about it at the top of the
+						// WebSocket sink operator invocation in the code below.
+						// Parallel channels have a range from 0 to N-1 in a
+						// N-way parallel region. However, our speech processor id always 
+						// starts at 1. To align it correctly with the zero based parallel 
+						// channel number, we will decrement the speech processor id by 1.
+						_oTuple.parallelChannel = BSD.speechProcessorId - 1;
+						serializeTuple(_serializedTuple, _oTuple.blobData);
+						submit(_oTuple, CDFSP);										
+					} // End of if(BSD.endOfCallSignal == false)				
 				} // End of onTuple BSD
 								
 			config
-				threadedPort: queue(BSD, Sys.Wait);
+				// Depending on the speech data load from the number of concurrent calls, 
+				// queue size below can be increased or decreased. 
+				threadedPort: queue(BSD, Sys.Wait, 15000);
 		} // End of Custom operator.
 
 		// Invoke one or more instances of the WebSocketSink operator.
@@ -710,11 +810,31 @@ public composite VgwDataRouter {
 		// particular context path expressed by their speech processor id.
 		// It then routes the voice calls' speech data and EOCS to the
 		// corresponding speech processor job.
-		// For now, we will have a parallel width of 1.
-		// If it doesn't perform well, we can think of increasing the 
-		// width later which will require some rework on the 
-		// speech processor application code.
-		@parallel(width = 1)
+		//
+		// To distribute the speech data load in a well performing manner,
+		// We will have N parallel channels ranging from 0 to N-1.
+		// Here, N is equal to the total number of speech processor jobs running.
+		// Each parallel instance of this operator will listen on a port that is
+		// equal to base_port_numer + zero_based_parallel_channel_number.
+		// The incoming tuples will have an attribute named parallelChannel which will
+		// be in the range of 0 to N-1 to align with the range of the configured
+		// parallel channels. This will let us do the data partitioning based on that
+		// attribute so that the speech data destined for a given speech processor id will
+		// land on the correct parallel channel. Now, all that is remaining is for the
+		// individual speech processor jobs to connect to a WebSocket sink operator 
+		// instance running on a correct parallel channel.
+		// e-g: 
+		// Speech processor 1 will connect to parallel channel 0,
+		// Speech processor 2 will connect to parallel channel 1,
+		// Speech processor 3 will connect to parallel channel 2 and so on.
+		//
+		// This can be easily done at the time of starting the speech processor jobs to
+		// simply connect to the base_port_number + (speech_processor_id - 1). You can
+		// refer to the etc/start-mini.sh script available in the 
+		// VgwDataRouterToWatsonSTTMini project and see how the speech processors are
+		// started to connect to a specific WebSocket sink port.
+		//
+		@parallel(width=$totalNumberOfSpeechProcessorJobs, partitionBy=[{port=CDFSP, attributes=[parallelChannel]}])
 		() as VgwDataRouterSink = WebSocketSink(CallDataForSpeechProcessor as CDFSP) {
 			logic
 				state: {
@@ -726,7 +846,7 @@ public composite VgwDataRouter {
 				}
 				
 			param
-				tlsPort: $tlsPortForVgwDataTx;
+				tlsPort: $tlsPortForVgwDataTx + (uint32)getChannel();
 				certificateFileName: _certificateFileName;
 				certificatePassword: $certificatePassword;
 				trustedClientCertificateFileName: $trustedClientCertificateFileName;
@@ -734,7 +854,7 @@ public composite VgwDataRouter {
 				// have self signed certificates.
 				trustedClientX509SubjectIdentifiers: $trustedClientX509SubjectIdentifiers;
 				nonTlsEndpointNeeded: $nonTlsEndpointNeeded;
-				nonTlsPort: $nonTlsPortForWebSocketSink;
+				nonTlsPort: $nonTlsPortForWebSocketSink + (uint32)getChannel();
 				urlContextPath: $webSocketSinkurlContextPath;
 				websocketLiveMetricsUpdateNeeded: $websocketLiveMetricsUpdateNeeded;
 				websocketLoggingNeeded: $websocketLoggingNeeded;
@@ -747,9 +867,11 @@ public composite VgwDataRouter {
 				
 			config
 				// Always place it on a machine that carries the VgwDataRouter host tag.
+				// Depending on the speech data load from the number of concurrent calls, 
+				// queue size below can be increased or decreased. 
 				placement: host(VgwPool[0]);
-				threadedPort: queue(CDFSP, Sys.Wait);
-		}
+				threadedPort: queue(CDFSP, Sys.Wait, 15000);
+		} // End of WebSocketSink operator invocation.
 		
 	// This is a composite level configuration to declare a hostpool using host tags.
 	config
@@ -792,7 +914,7 @@ public list<int32> prepareIdleSpeechProcessorsList(int32 speechProcessorsCount) 
 	mutable int32 idx = 1;
 	
 	while(idx <= speechProcessorsCount) {
-		// Initialize it with 0 to indicate that no voice csll 
+		// Initialize it with 0 to indicate that no voice call 
 		// is currently being processed by a given speech processor.
 		appendM(myList, 0);
 		idx++;

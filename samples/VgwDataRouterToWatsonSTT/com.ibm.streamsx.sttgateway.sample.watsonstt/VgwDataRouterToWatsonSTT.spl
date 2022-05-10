@@ -8,7 +8,7 @@
 /*
 ==============================================
 First created on: Nov/27/2020
-Last modified on: Jan/08/2022
+Last modified on: May/10/2022
 
 IMPORTANT NOTE
 --------------
@@ -867,7 +867,17 @@ public composite VgwDataRouterToWatsonSTT {
         			// whether it is sending binary speech data or an EOCS.
         			if(BSD.endOfCallSignal == false) {
         				// The incoming tuple contains binary speech data.
-						//										
+        				// If we are sent an empty speech blob, let us ignore that as
+        				// it will cause unwanted side effects in the downstream logic.
+        				if(blobSize(BSD.speech) <= 0ul) {
+							appTrc(Trace.error, 
+								"_ZZZZZ Empty speech packet received for " +
+								"vgwSessionId_vgwVoiceChannelNumber: " + _key + 
+								" We are going to ignore this packet by not sending it to" +
+								" an STT engine.");
+        					return;
+        				}
+						
 						// Check if this vgwSessionId_vgwVoiceChannelNumber combo already 
 						// has an STT engine allocated for it via an UDP channel.					
 						if (has(_vgwSessionIdToUdpChannelMap, _key) == true) {
@@ -1339,6 +1349,15 @@ public composite VgwDataRouterToWatsonSTT {
 				callMetaData_t: CallMetaData_t;
 				callSpeechData_t: CallSpeechData_t;
 		}
+
+	config
+       // To learn about how to create host tags and assign them to the machines in
+       // your Streams instance, you can read tips-on-using-streams-host-tags.txt available 
+       // in the SPL-Examples-For-Beginners/047_streams_host_tags_at_work/host.tags directory.
+       hostPool: 
+          spPool = createPool({tags=["SpeechProcessor"]}, Sys.Shared); /*Sys.Exclusive*/
+       // Place the operators in this composite only on specifically tagged machine(s) present in the spPool.
+       placement: host(spPool);
 } // End of the main composite.
 
 // Following is a composite where we are going to perform the

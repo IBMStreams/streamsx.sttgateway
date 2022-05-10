@@ -1,5 +1,14 @@
 # Changes
 
+## v2.3.3
+* May/10/2022
+* Added code and logic necessary to scale the VgwDataRouter to process more voice calls with reduced use of CPU cycles.
+* Filtered empty speech packets arrving from either SBC or Voice Gateway.
+* Added more metrics in the VoiceGatewaySource operator to be queryable via the Curl command.
+* Added a hostpool to place the speech processor jobs based on a custom host tag.
+* Activated the option to consider a single EOCS to be treated as the end of a voice call instead of two EOCS signals.
+* Added a feature to change VgwSessionLogging in the VoiceGatewaySource operator via the Curl command.
+
 ## v2.3.2
 * Jan/10/2022
 * Fixed a problem where the call start date time values were not always correctly included in the STT result.

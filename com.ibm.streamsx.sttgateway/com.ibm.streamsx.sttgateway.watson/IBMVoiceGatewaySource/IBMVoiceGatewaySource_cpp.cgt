@@ -1,14 +1,14 @@
 /*
 ==============================================
 # Licensed Materials - Property of IBM
-# Copyright IBM Corp. 2019, 2021
+# Copyright IBM Corp. 2019, 2022
 ==============================================
 */
 
 /*
 ============================================================
 First created on: Sep/20/2019
-Last modified on: Sep/17/2021
+Last modified on: May/10/2022
 
 Please refer to the sttgateway-tech-brief.txt file in the 
 top-level directory of this toolkit to read about 
@@ -338,6 +338,9 @@ MY_OPERATOR::MY_OPERATOR()
 	nonTlsEndpointStarted = false;
 	boostAsioServiceRunning = false;
 	activeConcurrentCallsCnt = 0;
+	peakConcurrentCallsCnt = 0;
+	callSequenceNumber = 0;
+	emptySpeechPacketsCnt = 0; 
 }
 
 // Destructor
@@ -449,6 +452,7 @@ void MY_OPERATOR::prepareToShutdown()
 	// We can empty the following containers.
 	client_connections_map.clear();
 	vgw_session_id_map.clear();
+	call_sequence_number_map.clear();
 }
 
 // Processing for source and threaded operators   
@@ -1094,10 +1098,15 @@ void MY_OPERATOR::on_message(EndpointType* s, websocketpp::connection_hdl hdl,
 					bool vgwSessionIdFoundInMap = 
 						vgw_session_id_map.find(con_metadata.vgwSessionId) != vgw_session_id_map.end();
 					
-					if (vgwSessionIdFoundInMap == true) {
+					bool callSequenceNumberFoundInMap = 
+						call_sequence_number_map.find(con_metadata.vgwSessionId) != call_sequence_number_map.end();
+									
+					if (vgwSessionIdFoundInMap == true && callSequenceNumberFoundInMap == true) {
 						// Send the "End of Voice Call" signal now for this
 						// vgwSessionId_vgwVoiceChannelNumber combo.
 						OPort0Type oTuple;
+						oTuple.set_callSequenceNumber(
+							call_sequence_number_map[con_metadata.vgwSessionId]);
 						oTuple.set_vgwSessionId(con_metadata.vgwSessionId);
 						oTuple.set_isCustomerSpeechData(con_metadata.vgwIsCaller);
 						oTuple.set_vgwVoiceChannelNumber(con_metadata.vgwVoiceChannelNumber);
@@ -1130,6 +1139,8 @@ void MY_OPERATOR::on_message(EndpointType* s, websocketpp::connection_hdl hdl,
 							// This channel is the very last one in this voice call to end the session.
 							// So, let us remove it from the map.
 							vgw_session_id_map.erase(con_metadata.vgwSessionId);
+							// We can also clear this call's entry from this map.
+							call_sequence_number_map.erase(con_metadata.vgwSessionId);
 
 							if (it5 == callsBeingThrottledMap.end()) {
 								// This call is not being throttled.	
@@ -1196,6 +1207,8 @@ void MY_OPERATOR::on_message(EndpointType* s, websocketpp::connection_hdl hdl,
 							for(std::list<std::string>::iterator it = staleList.begin();
 								it != staleList.end(); it++) {
 								vgw_session_id_map.erase(*it);
+								// Remove from this map as well.
+								call_sequence_number_map.erase(*it);
 								
 								if (vgwSessionLoggingNeeded == true) {
 									SPLAPPTRC(L_ERROR, "Operator " << operatorPhysicalName <<
@@ -1224,6 +1237,8 @@ void MY_OPERATOR::on_message(EndpointType* s, websocketpp::connection_hdl hdl,
 									// Send it for voice channel 1 which is an 
 									// agent channel most of the time.
 									OPort0Type oTuple;
+									oTuple.set_callSequenceNumber(
+										call_sequence_number_map[*it]);
 									oTuple.set_vgwSessionId(*it);
 									oTuple.set_isCustomerSpeechData(false);
 									oTuple.set_vgwVoiceChannelNumber(1);
@@ -1231,6 +1246,8 @@ void MY_OPERATOR::on_message(EndpointType* s, websocketpp::connection_hdl hdl,
 									submit(oTuple, 0);
 									// Do the same for voice channel 2 which is a
 									// customer channel most of the time.
+									oTuple.set_callSequenceNumber(
+										call_sequence_number_map[*it]);
 									oTuple.set_vgwSessionId(*it);
 									oTuple.set_isCustomerSpeechData(true);
 									oTuple.set_vgwVoiceChannelNumber(2);
@@ -1312,6 +1329,8 @@ void MY_OPERATOR::on_message(EndpointType* s, websocketpp::connection_hdl hdl,
 										// Send the "End of Voice Call" signal now for this
 										// vgwSessionId_vgwVoiceChannelNumber combo.
 										OPort0Type oTuple;
+										oTuple.set_callSequenceNumber(
+											call_sequence_number_map[cmd.vgwSessionId]);
 										oTuple.set_vgwSessionId(cmd.vgwSessionId);
 										oTuple.set_isCustomerSpeechData(cmd.vgwIsCaller);
 										oTuple.set_vgwVoiceChannelNumber(cmd.vgwVoiceChannelNumber);
@@ -1404,6 +1423,18 @@ void MY_OPERATOR::on_message(EndpointType* s, websocketpp::connection_hdl hdl,
 	// silence or active speech data. In summary, we will need two
 	// STT engines to do the Speech To Text for every ongoing voice call.
 	if (msg->get_opcode() == websocketpp::frame::opcode::binary) {
+		int32_t payloadSize = msg->get_payload().size();
+		
+		// Added this check on May/10/2022.
+		// In our tests, we have seen empty speech packets arriving 
+		// from the SBC SIPREC server and through the Voice Gateway.
+		// We can't allow empty payload i.e. empty speech data.
+		if(payloadSize <= 0) {
+			// Update the empty speech packet count and return.
+			emptySpeechPacketsCnt++;
+			return;
+		}
+		
 		// IBM Voice Gateway can send binary speech after it has 
 		// already started a session with us by sending its voice call meta data.
 		if (con_metadata.vgwSessionStatus == VGW_STARTED_AN_STT_SESSION) {
@@ -1415,7 +1446,6 @@ void MY_OPERATOR::on_message(EndpointType* s, websocketpp::connection_hdl hdl,
 			//
 			// Update some of the counters we maintain in the con_metadata.
 			con_metadata.speechPacketsReceivedCnt++;
-			int32_t payloadSize = msg->get_payload().size();
 			con_metadata.speechDataBytesReceived += payloadSize;
 						
 			// If we received the very first speech packet for the given
@@ -1434,6 +1464,10 @@ void MY_OPERATOR::on_message(EndpointType* s, websocketpp::connection_hdl hdl,
 					SPL::list<int64_t> myList;
 					myList.push_back(con_metadata.vgwSessionStartTime);
 					vgw_session_id_map[con_metadata.vgwSessionId] = myList;
+					
+					// Attach a unique sequence number for this call.
+					call_sequence_number_map[con_metadata.vgwSessionId] = ++callSequenceNumber;
+					
 					// This is the first voice channel in which the speech data bytes
 					// have started arriving for this particular VGW session id.
 					con_metadata.vgwVoiceChannelNumber = 1;
@@ -1453,11 +1487,28 @@ void MY_OPERATOR::on_message(EndpointType* s, websocketpp::connection_hdl hdl,
 						callsBeingThrottledMap[con_metadata.vgwSessionId] = true;
 						// Let us keep a tally of the number of calls getting throttled.
 						nVoiceCallsThrottled++;
+						// Adjust the peak number of concurrent calls we have seen so far.
+						// This will tell us the high water mark attained at any 
+						// given time for the combination of active and throttled calls.
+						uint32_t newHighWaterMark = 
+							maxConcurrentCallsAllowed + callsBeingThrottledMap.size();
+						
+						if(peakConcurrentCallsCnt < newHighWaterMark) {
+							// Set it to a new value.
+							peakConcurrentCallsCnt = newHighWaterMark;
+						}
 					} else {
 						// No throttling for this call.
 						// This is a new call we are going to process.
 						// So, increment the active concurrent calls count.
 						activeConcurrentCallsCnt++;
+						
+						// Adjust the peak number of concurrent calls we have seen so far.
+						// This will tell us the high water mark attained at any 
+						// given time for the combination of active and throttled calls.
+						if(activeConcurrentCallsCnt > peakConcurrentCallsCnt) {
+							peakConcurrentCallsCnt = activeConcurrentCallsCnt;
+						}
 					}
 				} else {
 					// This vgwSessionId is already present in the map.
@@ -1514,6 +1565,10 @@ void MY_OPERATOR::on_message(EndpointType* s, websocketpp::connection_hdl hdl,
 				  // Send the current vgwSessionId.
 				  oTuple.set_<%=$name%>( 
 						<%=$operation%>(con_metadata.vgwSessionId));
+			  	  <%} elsif ($operation eq "getCallSequenceNumber") { 
+			%> 
+			  	  oTuple.set_<%=$name%>( 
+			  			<%=$operation%>(call_sequence_number_map[con_metadata.vgwSessionId]));
 				  <%} elsif ($operation eq "isCustomerSpeechData") { 
 			%> 
 				  oTuple.set_<%=$name%>( 
@@ -1565,7 +1620,8 @@ void MY_OPERATOR::on_message(EndpointType* s, websocketpp::connection_hdl hdl,
 					SPLAPPTRC(L_INFO, "Operator " << operatorPhysicalName <<
 						"-->Channel " << boost::to_string(udpChannelNumber) <<
 						"-->X2 Received speech data from the vgwSessionId " << 
-						con_metadata.vgwSessionId << 
+						con_metadata.vgwSessionId << " with a call sequence number " <<
+						call_sequence_number_map[con_metadata.vgwSessionId] << 
 						" and sent it via an output tuple. " <<
 						"vgwIsCaller=" << con_metadata.vgwIsCaller <<
 						", vgwVoiceChannelNumber=" << con_metadata.vgwVoiceChannelNumber <<
@@ -1699,7 +1755,10 @@ void MY_OPERATOR::on_close(websocketpp::connection_hdl hdl) {
 	//  one for the customer speech and the other for the agent speech.]
 	bool vgwSessionIdFoundInMap = 
 		vgw_session_id_map.find(con_metadata.vgwSessionId) != vgw_session_id_map.end();
-	
+
+	bool callSequenceNumberFoundInMap = 
+		call_sequence_number_map.find(con_metadata.vgwSessionId) != call_sequence_number_map.end();
+					
 	// For the correct call clean-up operation, this operator must have received
 	// call start session messages for both the voice channels in a call and it 
 	// must have also received speech data bytes from both the voice channels 
@@ -1708,7 +1767,9 @@ void MY_OPERATOR::on_close(websocketpp::connection_hdl hdl) {
 	// If not, that is going to cause trouble for the downstream operator logic 
 	// in properly releasing the speech engines assigned for a given call. 
 	// Please see the log message that will get written in the else block below.
-	if (vgwSessionIdFoundInMap == true && con_metadata.vgwVoiceChannelNumber > 0) {
+	if (vgwSessionIdFoundInMap == true && 
+		callSequenceNumberFoundInMap == true &&
+		con_metadata.vgwVoiceChannelNumber > 0) {
 		// Send the "End of Voice Call" signal now for this
 		// vgwSessionId_vgwVoiceChannelNumber combo.
 		//
@@ -1719,6 +1780,8 @@ void MY_OPERATOR::on_close(websocketpp::connection_hdl hdl) {
 		if (it5 == callsBeingThrottledMap.end()) {
 			// This call is not being throttled.
 			OPort0Type oTuple;
+			oTuple.set_callSequenceNumber(
+				call_sequence_number_map[con_metadata.vgwSessionId]);
 			oTuple.set_vgwSessionId(con_metadata.vgwSessionId);
 			oTuple.set_isCustomerSpeechData(con_metadata.vgwIsCaller);
 			oTuple.set_vgwVoiceChannelNumber(con_metadata.vgwVoiceChannelNumber);
@@ -1744,6 +1807,8 @@ void MY_OPERATOR::on_close(websocketpp::connection_hdl hdl) {
 			// This channel is the very last one in this voice call to end the session.
 			// So, let us remove it from the map.
 			vgw_session_id_map.erase(con_metadata.vgwSessionId);
+			// Remove from this map as well.
+			call_sequence_number_map.erase(con_metadata.vgwSessionId);
 
 			// Let us see if this call was throttled due to
 			// the imposed limit on the maximum allowed concurrent calls.
@@ -1838,6 +1903,8 @@ void MY_OPERATOR::on_close(websocketpp::connection_hdl hdl) {
 			for(std::list<std::string>::iterator it = staleList.begin();
 				it != staleList.end(); it++) {
 				vgw_session_id_map.erase(*it);
+				// Remove from this map as well.
+				call_sequence_number_map.erase(*it);
 				
 				if (vgwSessionLoggingNeeded == true) {
 					SPLAPPTRC(L_ERROR, "Operator " << operatorPhysicalName <<
@@ -1867,6 +1934,8 @@ void MY_OPERATOR::on_close(websocketpp::connection_hdl hdl) {
 				if (it5 == callsBeingThrottledMap.end()) {
 					// This call is not being throttled.	
 					OPort0Type oTuple;
+					oTuple.set_callSequenceNumber(
+						call_sequence_number_map[*it]);
 					oTuple.set_vgwSessionId(*it);
 					oTuple.set_isCustomerSpeechData(false);
 					oTuple.set_vgwVoiceChannelNumber(1);
@@ -1874,6 +1943,8 @@ void MY_OPERATOR::on_close(websocketpp::connection_hdl hdl) {
 					submit(oTuple, 0);
 					// Do the same for voice channel 2 which is a
 					// customer channel most of the time.
+					oTuple.set_callSequenceNumber(
+						call_sequence_number_map[*it]);
 					oTuple.set_vgwSessionId(*it);
 					oTuple.set_isCustomerSpeechData(true);
 					oTuple.set_vgwVoiceChannelNumber(2);
@@ -1956,6 +2027,8 @@ void MY_OPERATOR::on_close(websocketpp::connection_hdl hdl) {
 					if (it5 == callsBeingThrottledMap.end()) {
 						// This call is not being throttled.		
 						OPort0Type oTuple;
+						oTuple.set_callSequenceNumber(
+							call_sequence_number_map[cmd.vgwSessionId]);
 						oTuple.set_vgwSessionId(cmd.vgwSessionId);
 						oTuple.set_isCustomerSpeechData(cmd.vgwIsCaller);
 						oTuple.set_vgwVoiceChannelNumber(cmd.vgwVoiceChannelNumber);
@@ -2274,7 +2347,10 @@ void MY_OPERATOR::on_http_message(websocketpp::connection_hdl hdl,
 	}
 
 	bool httpRequestMethodError = false;
-	std::string resultText = "";
+	std::string resultText = "Please send a valid command HTTP header " +
+		std::string("i.e. SetMaxConcurrentCalls:123 or ") +
+		std::string("GetMaxConcurrentCalls:true or ") +
+		std::string("SetVgwSessionLoggingNeeded:true or SetVgwSessionLoggingNeeded:false");				
 	
 	// As of Sep/14/2021, this operator supports only HTTP POST.
 	if(httpRequestMethod != "POST") {
@@ -2291,32 +2367,45 @@ void MY_OPERATOR::on_http_message(websocketpp::connection_hdl hdl,
 			", Content-Length=" << contentLengthString << 
 			", hdl=" << hdl.lock().get(), "on_http_message");
 	
-		// We will allow one of the two custom headers.
+		// We will allow one of the three custom headers.
 		// SetMaxConcurrentCalls:256
 		// GetMaxConcurrentCalls:true
+		// SetVgwSessionLoggingNeeded:true
+		// SetVgwSessionLoggingNeeded:false
 		// User can send a Curl command as shown below.
 		// curl -k -X POST https://<host>:<port> -H GetMaxConcurrentCalls:true
 		// curl -k -X POST https://<host>:<port> -H SetMaxConcurrentCalls:512
+		// curl -k -X POST https://<host>:<port> -H SetVgwSessionLoggingNeeded:true
+		// curl -k -X POST https://<host>:<port> -H SetVgwSessionLoggingNeeded:false
 		//
 		std::string setMaxConcurrentCalls = "";
 		std::string getMaxConcurrentCalls = "";
+		std::string setVgwSessionLoggingNeeded = "";
 		
 		if(isTlsConnection == false) {
 			setMaxConcurrentCalls = server_non_tls_con->get_request_header("SetMaxConcurrentCalls");
 			getMaxConcurrentCalls = server_non_tls_con->get_request_header("GetMaxConcurrentCalls");
+			setVgwSessionLoggingNeeded = server_non_tls_con->get_request_header("SetVgwSessionLoggingNeeded");
 		} else {
 			setMaxConcurrentCalls = server_tls_con->get_request_header("SetMaxConcurrentCalls");
 			getMaxConcurrentCalls = server_tls_con->get_request_header("GetMaxConcurrentCalls");
+			setVgwSessionLoggingNeeded = server_tls_con->get_request_header("SetVgwSessionLoggingNeeded");
 		}
 		
-		if(setMaxConcurrentCalls == "" && getMaxConcurrentCalls == "") {
+		if(setMaxConcurrentCalls == "" && getMaxConcurrentCalls == "" && 
+			setVgwSessionLoggingNeeded == "") {
 			// No HTTP custom headers sent by the client.
 			resultText = "Please send a valid command HTTP header i.e. SetMaxConcurrentCalls:123 or " +
-				std::string("GetMaxConcurrentCalls:true");
-		} else if(setMaxConcurrentCalls != "" && getMaxConcurrentCalls != "") {
-			// Two custom headers sent by the client. It is not acceptable.
+				std::string("GetMaxConcurrentCalls:true or ") +
+				std::string("SetVgwSessionLoggingNeeded:true or ") +
+				std::string("SetVgwSessionLoggingNeeded:false");
+		} else if((setMaxConcurrentCalls != "" && getMaxConcurrentCalls != "") ||
+			(setMaxConcurrentCalls != "" && setVgwSessionLoggingNeeded != "") ||
+			(getMaxConcurrentCalls != "" && setVgwSessionLoggingNeeded != "")){
+			// More than one custom header sent by the client. It is not acceptable.
 			resultText = "Please send only one command HTTP header at a time i.e. " +
-				std::string("SetMaxConcurrentCalls:123 or GetMaxConcurrentCalls:true");
+				std::string("SetMaxConcurrentCalls:123 or GetMaxConcurrentCalls:true or ") +
+				std::string("SetVgwSessionLoggingNeeded:true or SetVgwSessionLoggingNeeded:false");
 		} else if(getMaxConcurrentCalls == std::string("true")) {
 			std::string totalRxPktsFinal = "0 M";
 			std::string totalRxBytesFinal = "0 GB";
@@ -2342,14 +2431,21 @@ void MY_OPERATOR::on_http_message(websocketpp::connection_hdl hdl,
 				boost::to_string(maxConcurrentCallsAllowed) +
 				std::string(", activeConcurrentCallsCnt=") + 
 				boost::to_string(activeConcurrentCallsCnt) + 
-				std::string(", totalVoiceCallsReceived=") +
+				std::string(", totalVoiceCallsCompleted=") +
 				boost::to_string(nVoiceCallsProcessed) +
-				std::string(", totalSpeechPacketsReceived=") +
+				std::string(", peakConcurrentCallsCnt=") + 
+				boost::to_string(peakConcurrentCallsCnt) + 
+				std::string(", totalThrottledCallsCnt=") +
+				boost::to_string(nVoiceCallsThrottled) +
+				std::string(", totalEmptySpeechPacketsIgnored=") +
+				boost::to_string(emptySpeechPacketsCnt) + 
+				std::string(", totalNonEmptySpeechPacketsReceived=") +
 				totalRxPktsFinal + 
 				std::string(", totalSpeechBytesReceived=") +
 				totalRxBytesFinal + 
-				std::string(", totalThrottledCallsCnt=") +
-				boost::to_string(nVoiceCallsThrottled);
+				std::string(", vgwSessionLoggingNeeded=") +
+				boost::to_string(vgwSessionLoggingNeeded);
+
 		} else if(setMaxConcurrentCalls != "") {
 			SPL::int32 value = atoi(setMaxConcurrentCalls.c_str());
 			
@@ -2383,19 +2479,29 @@ void MY_OPERATOR::on_http_message(websocketpp::connection_hdl hdl,
 					boost::to_string(maxConcurrentCallsAllowed) +
 					std::string(", activeConcurrentCallsCnt=") + 
 					boost::to_string(activeConcurrentCallsCnt) + 
-					std::string(", totalVoiceCallsReceived=") +
+					std::string(", totalVoiceCallsCompleted=") +
 					boost::to_string(nVoiceCallsProcessed) +
-					std::string(", totalSpeechPacketsReceived=") +
+					std::string(", peakConcurrentCallsCnt=") + 
+					boost::to_string(peakConcurrentCallsCnt) + 
+					std::string(", totalThrottledCallsCnt=") +
+					boost::to_string(nVoiceCallsThrottled) +
+					std::string(", totalEmptySpeechPacketsIgnored=") +
+					boost::to_string(emptySpeechPacketsCnt) + 
+					std::string(", totalNonEmptySpeechPacketsReceived=") +
 					totalRxPktsFinal + 
 					std::string(", totalSpeechBytesReceived=") +
 					totalRxBytesFinal + 
-					std::string(", totalThrottledCallsCnt=") +
-					boost::to_string(nVoiceCallsThrottled);
+					std::string(", vgwSessionLoggingNeeded=") +
+					boost::to_string(vgwSessionLoggingNeeded);
 			}
-		} else {
-			resultText = "Please send a valid command HTTP header " +
-				std::string("i.e. SetMaxConcurrentCalls:123 or ") +
-				std::string("GetMaxConcurrentCalls:true");			
+		} else if(setVgwSessionLoggingNeeded == std::string("true")) {
+			vgwSessionLoggingNeeded = true;
+			resultText = std::string("vgwSessionLoggingNeeded=") +
+				boost::to_string(vgwSessionLoggingNeeded);
+		} else if(setVgwSessionLoggingNeeded == std::string("false")) {
+			vgwSessionLoggingNeeded = false;
+			resultText = std::string("vgwSessionLoggingNeeded=") +
+				boost::to_string(vgwSessionLoggingNeeded);
 		}
 	} // End of if(httpRequestMethod != "POST")
 
@@ -2446,7 +2552,7 @@ MY_OPERATOR::connection_metadata& MY_OPERATOR::get_con_metadata_from_hdl(websock
 	if (it == client_connections_map.end()) {
 		std::ostringstream errorStringStream;
 		errorStringStream << 
-			"No connection metadata avaliable for a given connection handle: " << hdl.lock().get();
+			"No connection metadata available for a given connection handle: " << hdl.lock().get();
 		std::string error_string = errorStringStream.str();
 		// This connection is not in the list. This really shouldn't happen
 		// and probably means something else is wrong.
@@ -2491,6 +2597,10 @@ void MY_OPERATOR::process(Punctuation const & punct, uint32_t port)
 // IBMVoiceGatewaySource Output Functions that are needed to set the output tuple attributes with their values.
 std::string MY_OPERATOR::getIBMVoiceGatewaySessionId(std::string const & vgwSessionId) {
 	return(vgwSessionId); 
+}
+
+int32_t MY_OPERATOR::getCallSequenceNumber(int32_t const & callSequenceNumber) {
+	return(callSequenceNumber);
 }
 
 bool MY_OPERATOR::isCustomerSpeechData(bool const & isThisSpeechDataFromCustomer) {
