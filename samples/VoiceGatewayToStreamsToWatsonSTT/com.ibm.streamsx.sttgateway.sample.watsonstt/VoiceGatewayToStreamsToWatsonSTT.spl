@@ -8,7 +8,7 @@
 /*
 ==============================================
 First created on: Sep/25/2019
-Last modified on: May/10/2022
+Last modified on: May/11/2022
 
 A) What does this example application do?
    --------------------------------------
@@ -864,22 +864,26 @@ public composite VoiceGatewayToStreamsToWatsonSTT {
 									
 									rstring socsFileName = dataDirectory() + "/" +
 										BSD.vgwSessionId + "-call-started.txt";
-									uint64 fileHandle = fopen (socsFileName, "w+", err);
+									uint64 fileHandle = fopen (socsFileName, "a+", err);
 									
 									if(err == 0) {
 										fwriteString ("VGW call session id " + BSD.vgwSessionId + 
 											" started at " + BSD.callStartDateTime + ".\n",
 											fileHandle, err);
-										fwriteString("VGW voice channel number=" +
+										fwriteString("Call sequence number=" + 
+											(rstring)BSD.callSequenceNumber + 
+											", VGW voice channel number=" +
 											(rstring)BSD.vgwVoiceChannelNumber + 
-											", Speech engine id=" + (rstring)BSD.sttEngineId +
+											", STT engine id=" + (rstring)BSD.sttEngineId +
 											", Result processor id=" + 
 											(rstring)BSD.sttResultProcessorId + "\n",
 											fileHandle, err);
 										fclose(fileHandle, err);
 									}
 									
-									appTrc(Trace.error, "A new voice call has started. vgwSessionId=" + BSD.vgwSessionId);
+									appTrc(Trace.error, "A new voice call has started. vgwSessionId=" + 
+										BSD.vgwSessionId + ", callSequenceNumber=" + 
+										(rstring)BSD.callSequenceNumber);
 								} else if (has(_vgwSessionIdToUdpChannelMap, key1) == false ||
 									has(_vgwSessionIdToUdpChannelMap, key2) == false) {
 									// This means, one of the two voice channels in a 
@@ -894,9 +898,11 @@ public composite VoiceGatewayToStreamsToWatsonSTT {
 									uint64 fileHandle = fopen (socsFileName, "a+", err);
 									
 									if(err == 0) {
-										fwriteString("VGW voice channel number=" +
+										fwriteString("Call sequence number=" + 
+											(rstring)BSD.callSequenceNumber + 
+											", VGW voice channel number=" +
 											(rstring)BSD.vgwVoiceChannelNumber + 
-											", Speech engine id=" + (rstring)BSD.sttEngineId +
+											", STT engine id=" + (rstring)BSD.sttEngineId +
 											", Result processor id=" + 
 											(rstring)BSD.sttResultProcessorId + "\n",
 											fileHandle, err);
@@ -911,6 +917,7 @@ public composite VoiceGatewayToStreamsToWatsonSTT {
 						} // End of if (has(_vgwSessionIdToUdpChannelMap, _key)
 	
 						appTrc(Trace.debug, "vgwSessionId=" + BSD.vgwSessionId +
+							", callSequenceNumber=" + (rstring)BSD.callSequenceNumber +
 							", isCustomerSpeechData=" + (rstring)BSD.isCustomerSpeechData +
 							", vgwVoiceChannelNumber=" + (rstring)BSD.vgwVoiceChannelNumber +
 							", speechDataFragmentCnt=" + (rstring)BSD.speechDataFragmentCnt +
@@ -928,7 +935,9 @@ public composite VoiceGatewayToStreamsToWatsonSTT {
 						submit(BSD, BSDF);
 					} else {
 						// The incoming tuple contains an End of Call Signal (EOCS).
-						appTrc(Trace.error, "Received an BSD. vgwSessionId=" + BSD.vgwSessionId +
+						appTrc(Trace.error, "Received an EOCS for " +
+							". vgwSessionId=" + BSD.vgwSessionId +
+							", callSequenceNumber=" + (rstring)BSD.callSequenceNumber + 
 							", voiceChannelNumber=" + (rstring)BSD.vgwVoiceChannelNumber);
 						//
 						// Process the end of voice call signal.
@@ -1090,15 +1099,18 @@ public composite VoiceGatewayToStreamsToWatsonSTT {
 								mutable int32 err = 0ul;
 								rstring eocsFileName = dataDirectory() + "/" +
 									BSD.vgwSessionId + "-call-completed.txt";
-								uint64 fileHandle = fopen (eocsFileName, "w+", err);
+								uint64 fileHandle = fopen (eocsFileName, "a+", err);
 								
 								if(err == 0) {
-									fwriteString ("VGW call session id " + BSD.vgwSessionId + 
-										" ended at " + ctime(getTimestamp()) + ".", fileHandle, err);
+									fwriteString ("VGW call session id " + BSD.vgwSessionId +
+										", Call sequence number=" + (rstring)BSD.callSequenceNumber + 
+										" ended at " + ctime(getTimestamp()) + ".\n", fileHandle, err);
 									fclose(fileHandle, err);
 								}
 								
-								appTrc(Trace.error, "An ongoing voice call has completed. vgwSessionId=" + BSD.vgwSessionId);
+								appTrc(Trace.error, "An ongoing voice call has completed. vgwSessionId=" + 
+									BSD.vgwSessionId + ", callSequenceNumber=" + 
+									(rstring)BSD.callSequenceNumber);
 							}
 						}				
 					} // End of if(BSD.endOfCallSignal == false)
@@ -1538,9 +1550,60 @@ public composite STTResultProcessor(input MyTranscriptionResult, BinarySpeechDat
 					mutable rstring _ciscoGuid = "";
 					mutable rstring _callStartDateTime = "";
 					mutable int64 _callStartTimeInEpochSeconds = 0l;
+					mutable boolean _sttErrorObserved = false;
 				}
 
 				onTuple MTR: {
+					// WatsonSTT operator invocation done above is susceptible for
+					// encountering errors while attempting to transcribe a 
+					// speech payload due to any critical errors happening in
+					// the backend STT infrastructure. Such errors can include
+					// "Unable to transcode the Mulaw speech data" (OR)
+					// "Session timed out with the STT backend" and so on.
+					// When that situation occurs, WatsonSTT operator will
+					// set a descriptive error message in the sttErrorMessage tuple
+					// attribute that will arrive here. After encountering such
+					// critical error, WatsonSTT operator will also send an 
+					// immediate next tuple by setting the transcriptionCompleted 
+					// tuple attribute to true.
+					// We have to take care of such error conditions here by
+					// tracking two such consecutive tuples (a tuple with its
+					// sttErrorMessage attribute set to a non-empty string and an
+					// immediate next tuple with its transcriptionCompleted attribute
+					// set to true) and then by not sending that intermittent 
+					// transcription completed signal to the downstream application logic.
+					//
+					if (MTR.sttErrorMessage != "") {
+						// This tuple indicates that a critical error occurred in
+						// the upstream WatsonSTT operator. Let us record this
+						// condition in our state variable and look out for the
+						// immediate next tuple that will arrive here with its
+						// transcriptionCompleted attribute set to true.
+						_sttErrorObserved = true;
+						
+						// We will let this tuple carrying the error message propagate
+						// to the downstream application logic so that it can get written
+						// to the full transcription result file. 
+					}					
+
+					// Look out for the immediate next tuple that arrives here after
+					// we observed any STT backend critical error.					
+					if (_sttErrorObserved == true && MTR.transcriptionCompleted == true) {
+						// This tuple is the one that comes right after a tuple that 
+						// carried an STT critical error message. We don't have to propagate
+						// this tuple to downstream logic as this is not the real end of a 
+						// voice call as it is only indicating an intermittent error condition.
+						// Reset the STT error observed state variable.
+						_sttErrorObserved = false;
+						return;
+					}
+
+					// If there is no STT error message present in the received tuple,
+					// we will safely reset this particular state variable.
+					if (MTR.sttErrorMessage == "") {
+						_sttErrorObserved = false;
+					}
+					
                     // In some cases, it was observed during testing that the 
                     // call start time details arrive here with empty and 0 values.
                     // To compensate for that, we are going to keep a local copy

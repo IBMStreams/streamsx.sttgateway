@@ -1,5 +1,10 @@
 # Changes
 
+## v2.3.4
+* May/11/2022
+* Added code and logic necessary to handle certain error situations where the SpeechProcessor will send much more than the required two transcriptionCompleted signals.
+* Added code to make the call-started and call-completed files' open mode as append/update instead of write/update. This will allow us to get more details about the same VgwSessionId arriving as two different back-to-back calls.
+
 ## v2.3.3
 * May/10/2022
 * Added code and logic necessary to scale the VgwDataRouter to process more voice calls with reduced use of CPU cycles.
