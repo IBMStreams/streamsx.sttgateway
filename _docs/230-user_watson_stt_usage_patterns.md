@@ -2,7 +2,7 @@
 title: "Operator Usage Patterns"
 permalink: /docs/user/WatsonSTTUsagePatterns/
 excerpt: "Describes the streamsx.sttgateway toolkit usage patterns."
-last_modified_at: 2020-09-18T21:30:48+01:00
+last_modified_at: 2022-05-11T22:15:39+01:00
 redirect_from:
    - /theme-setup/
 sidebar:
@@ -40,6 +40,7 @@ At the full scope of this operator, output stream schema can be as shown below w
 type BinarySpeech_t =
    blob speech, // Speech fragment sent by the IBM Voice Gateway
    rstring vgwSessionId, // Unique identifier of a voice call
+   int32 callSequenceNumber, // Unique sequence number of a voice call
    boolean isCustomerSpeechData, // Is it customer's speech?
    int32 vgwVoiceChannelNumber, // Voice channel number of this speech data
    boolean endOfCallSignal, // Is it the end of a call for a voice channel?
@@ -83,6 +84,7 @@ In your SPL application, this operator can be invoked with either all operator p
     // Get these values via custom output functions	provided by this operator.
     output
        BSD: vgwSessionId = getIBMVoiceGatewaySessionId(),
+       callSequenceNumber = getCallSequenceNumber(),
        callStartDateTime = getCallStartDateTime(), 
        isCustomerSpeechData = isCustomerSpeechData(),
        vgwVoiceChannelNumber = getVoiceChannelNumber(),
@@ -99,7 +101,11 @@ This operator does the automatic attribute value assignment from the input tuple
 
 At the very basic level, users should call the very first three custom output functions shown below at all times. Rest of the custom output functions can be either called or omitted as dictated by your application requirements.
 
-**getIBMVoiceGatewaySessionId()** is used to get  the unique session id for a given voice call.
+**getIBMVoiceGatewaySessionId()** is used to get the unique session id for a given voice call.
+
+**getCallSequenceNumber()** is used to get a unique sequence number for a given voice call.
+
+**getCallStartDateTime()** is used to get the time (in string format) at which a given voice call was started. 
 
 **isCustomerSpeechData()** is used to find out if the speech data received was spoken by the customer or the agent.
 
