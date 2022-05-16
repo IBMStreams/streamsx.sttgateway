@@ -1,14 +1,14 @@
 /*
 ==============================================
 # Licensed Materials - Property of IBM
-# Copyright IBM Corp. 2018, 2021
+# Copyright IBM Corp. 2018, 2022
 ==============================================
 */
 
 /*
 ==============================================
 First created on: Nov/24/2020
-Last modified on: May/10/2022
+Last modified on: May/16/2022
 
 A) What does this example application do?
    --------------------------------------
@@ -547,6 +547,13 @@ public composite VgwDataRouter {
 					// given time by all the given speech processors that are configured to run.
 					mutable list<int32> _speechProcessorStatusList = 
 						prepareIdleSpeechProcessorsList($totalNumberOfSpeechProcessorJobs);
+					// This variable tells us the speech processor id that was
+					// chosen to process a most recently arrived new voice call.
+					// This will help us in choosing the speech processors in a 
+					// round robin fashion to evenly distribute the voice calls across 
+					// all the speech processors thereby avoiding the overcrowding of 
+					// just a few speech processors most of the time.
+					mutable int32 _recentlyChosenSpeechProcessorId = -1;
 					// This map tells us which speech processor is processing a given vgwSessionId.
 					// Key=vgwSessionId, Value=Speech Processor Id.
 					mutable map<rstring, int32> _vgwSessionIdToSpeechProcessorMap = {};
@@ -591,10 +598,12 @@ public composite VgwDataRouter {
 							// send the speech data belonging to this call.
 							// Store this VGW session id to change the status of this 
 							// voice call from "brand new" to "ongoing".
-							int32 speechProcessorId = 
+							speechProcessorId = 
 								getSpeechProcessorIdForNewCallProcessing(
 								_numberOfConcurrentCallsAllowedPerSpeechProcessor,
-								_speechProcessorStatusList);
+								_speechProcessorStatusList,
+								$totalNumberOfSpeechProcessorJobs,
+								_recentlyChosenSpeechProcessorId);
 							
 							if(speechProcessorId == -1) {
 								// This condition should not happen as long as there are enough
@@ -616,7 +625,12 @@ public composite VgwDataRouter {
 							// future use as the speech data keeps coming.
 							insertM(_vgwSessionIdToSpeechProcessorMap, BSD.vgwSessionId, speechProcessorId);
 							appTrc(Trace.error, "A new call with vgwSessionId=" + BSD.vgwSessionId +
-								" is being assigned to speech processor id " + (rstring)speechProcessorId);						
+								" is being assigned to speech processor id " + (rstring)speechProcessorId);
+
+							// Let us store the currently chosen speech processor id in a 
+							// state variable so that next time when a new call arrives we can
+							// choose the next speech processor to go in a round robin fashion.
+							_recentlyChosenSpeechProcessorId = speechProcessorId;						
 						}
 						
 						// We can prepare this speech data to be sent to the chosen speech processor id.
@@ -1385,33 +1399,72 @@ public list<int32> prepareIdleSpeechProcessorsList(int32 speechProcessorsCount) 
 // If all the speech processors are busy at this time, it will return -1.
 public int32 getSpeechProcessorIdForNewCallProcessing(
 	int32 numberOfConcurrentCallsAllowedPerSpeechProcessor,
-	mutable list<int32> speechProcessorStatusList) {
+	mutable list<int32> speechProcessorStatusList,
+	int32 speechProcessorsCount,
+	int32 recentlyChosenSpeechProcessorId) {
+	// We can't do much with an empty list.
 	if (size(speechProcessorStatusList) <= 0) {
 		return(-1);
 	}
 	
-	mutable int32 idx = -1;
+	// We are given a speech processor id that was earlier chosen for a most recently
+	// arrived new voice call. Instead of choosing the same speech processor id
+	// immediately for a newly arriving call right now, let us choose the next available 
+	// speech processor. With this round robin approach, we can give a fair chance to 
+	// every speech processor to process voice calls as they arrive. This will also
+	// help in spreading the voice call processing somewhat evenly across all the
+	// available speech processors thereby not overcrowding a few 
+	// speech processors most of the time.
+	// 
+	// Speech processor ids range from 1 to N. However, the SPL list passed to us above
+	// ranges from 0 to N-1. That means, the next speech processor status list index that
+	// we want to check is already being pointed to by the recently chosen 
+	// speech processor id passed above as it is 1 based.
+	//
 	mutable boolean speechProcessorAvailable = false;
+	mutable int32 speechProcessorIdToBeChecked = recentlyChosenSpeechProcessorId;
+	mutable int32 loopCnt = 1;
 	
-	for(int32 x in speechProcessorStatusList) {
-		idx++;
-		
-		if(x < numberOfConcurrentCallsAllowedPerSpeechProcessor) {
+	// If the recently chosen speech processor id is the very last one,
+	// let us start from the beginning of the list. We will do the same if this is the
+	// very first time this function is getting called with the recently
+	// chosen speech processor id set to -1.
+	if(recentlyChosenSpeechProcessorId == -1 || 
+		recentlyChosenSpeechProcessorId == speechProcessorsCount) {
+		speechProcessorIdToBeChecked = 0;
+	}
+	
+	// We can try to get one out of the configured number of speech processors as long as
+	// there exists a speech processor that is not fully booked at this time.
+	while(loopCnt++ <= speechProcessorsCount) {
+		// Can we choose this speech processor if it has 
+		// any available slots to take a new voice call for processing?
+		if(speechProcessorStatusList[speechProcessorIdToBeChecked] < 
+			numberOfConcurrentCallsAllowedPerSpeechProcessor) {
 			// This speech processor is not handling its max allowed concurrent calls.
+			// This speech processor id is available.
 			speechProcessorAvailable = true;
 			break;
 		}
-	} // End of for loop.
+
+		// If we are at the end of the list, let us wrap around to 
+		// the beginning of the list now.
+		if(++speechProcessorIdToBeChecked >= speechProcessorsCount) {
+			speechProcessorIdToBeChecked = 0;
+		}
+	} // End of while loop.
 	
 	if(speechProcessorAvailable == false) {
 		// All the speech processors are busy at this time.
 		// This is not good news for a newly arrived voice call.
 		return(-1);
-	}
-	
-	// A newly arrived call's processing will be assigned to this speech processor.
-	// Let us increment the given speech processor's current call handling count.
-	speechProcessorStatusList[idx] = speechProcessorStatusList[idx] + 1;
-	// Since it is a zero based index array, we will return a value by adding 1 to it.
-	return(idx + 1);
+	} else {
+		// A newly arrived call's processing will be assigned to this speech processor.
+		// Let us increment the given speech processor's current call handling count.
+		speechProcessorStatusList[speechProcessorIdToBeChecked] = 
+			speechProcessorStatusList[speechProcessorIdToBeChecked] + 1;
+		// Since it is a zero based index array, we will return a value by adding 1 to it.
+		// As we already mentioned above, we refer to the speech processor ids from 1 to N.
+		return(speechProcessorIdToBeChecked + 1);	
+	}	
 }

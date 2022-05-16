@@ -1,5 +1,9 @@
 # Changes
 
+## v2.3.5
+* May/16/2022
+* Added code and logic necessary for the VgwDataRouter application to select a speech processor for handling a new voice call in a round robin fashion. This will allow for an even distribution of the voice calls across the configured number of speech processors.
+
 ## v2.3.4
 * May/11/2022
 * Added code and logic necessary to handle certain error situations where the SpeechProcessor will send much more than the required two transcriptionCompleted signals.
