@@ -1,7 +1,7 @@
 # STT Gateway toolkit for IBM Streams
 
 ## Note from the toolkit author
-This toolkit created by Senthil Nathan is a value differentiator for key customers. He created it on his own initiative and interest to create a meaningful asset for IBM Streams. Core features in this toolkit reflect his technical and intellectual ideas. He is now an independent software consultant. To benefit from the compelling features of this asset, for any enhancements, any need for a new powerful toolkit as well as for creating new streaming data analytics solutions, customers can email senthil@moonraytech.com to reach him. Thank you.
+This toolkit created by Senthil Nathan is a value differentiator for key customers. He created it on his own initiative and interest to create a meaningful asset for IBM Streams. Core features in this toolkit reflect his original technical and intellectual ideas. He is now an independent software consultant. To benefit from the compelling features of this asset, for any enhancements, any need for a new powerful toolkit as well as for creating new streaming data analytics solutions, customers can email senthil@moonraytech.com to reach him. Thank you.
 
 ## Purpose
 This toolkit is designed to ingest audio data either stored in files (.wav, .mp3 etc. for a batch workload) or streamed through a telephony infrastructure (for a real-time workload). It then transcribes that audio into text via the IBM Watson STT (Speech To Text) service running on the IBM public cloud or on the IBM Cloud Pak for Data (CP4D i.e. private cloud).
